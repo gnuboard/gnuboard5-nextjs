@@ -44,9 +44,17 @@ jobs:
         working-directory: nextjs
         run: npm ci
 
+      # check:code 안에 PHP 문법 검사(check:php-syntax)가 있어 PHP 를 먼저 설치한다.
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      # CI 와 같은 검사 묶음 — 공개판의 check 는 개발 저장소 전용 파일을 찾으므로 쓰지 않는다.
       - name: Verify Next.js source
         working-directory: nextjs
-        run: npm run check
+        run: npm run check:code
 
       - name: Build static export
         working-directory: nextjs
