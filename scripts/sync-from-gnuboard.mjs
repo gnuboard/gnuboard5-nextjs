@@ -946,7 +946,6 @@ copyFileSync(
   join(sourceRoot, 'extend', 'webapp.extend.php'),
   join(repoRoot, 'overlay', 'extend', 'webapp.extend.php')
 );
-copyFileSync(join(sourceRoot, 'DESIGN.md'), join(repoRoot, 'DESIGN.md'));
 copyFileSync(
   join(sourceRoot, 'theme', PUBLIC_THEME, 'apache-rewrite.example.conf'),
   join(repoRoot, 'nextjs-install', 'apache-htaccess-rules.txt')
@@ -999,7 +998,7 @@ try {
 {
   const leaks = findPublicLeaks(repoRoot, {
     privateTokens,
-    scanRoots: ['nextjs', 'overlay', 'nextjs-install', 'DESIGN.md', 'README.md', 'INSTALL.md', 'AGENTS.md', 'docs', '.github'],
+    scanRoots: ['nextjs', 'overlay', 'nextjs-install', 'README.md', 'INSTALL.md', 'AGENTS.md', 'docs', '.github'],
   });
   if (leaks.length > 0) {
     const shown = leaks.slice(0, 60).map((leak) => `  - ${leak}`).join('\n');
