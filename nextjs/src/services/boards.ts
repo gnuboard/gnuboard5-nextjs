@@ -38,9 +38,18 @@ export function getBoards(options: number | GetBoardsOptions = 30): Promise<Boar
 
   const suffix = params.toString() ? `?${params.toString()}` : "";
 
-  return fetchApiData(apiUrl(`/boards${suffix}`), boardListSchema, [], {
-    next: { revalidate },
-  });
+  // 홈에서 두 번 나갔다 — 테마 홈의 갤러리 패널(themes/default/home-data.ts)과 본문
+  // 묶음(lib/community-home.ts)이 각자 부른다. 게시판 목록은 사람마다 다르지 않다.
+  // 빈 목록은 fetchApiData 의 실패 대체값일 수 있으므로 담아 두지 않는다.
+  return requestShare.get(
+    `boards${suffix}`,
+    SHARED_BOARD_TTL_MS,
+    () =>
+      fetchApiData(apiUrl(`/boards${suffix}`), boardListSchema, [], {
+        next: { revalidate },
+      }),
+    (list) => list.length === 0
+  );
 }
 
 /** 게시판 정보는 글 보기와 그 아래 목록이 거의 동시에 부른다 — 브라우저에서 잠깐 나눠 쓴다. */

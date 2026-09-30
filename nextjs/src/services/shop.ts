@@ -54,9 +54,16 @@ export interface ShopProductListResult {
 }
 
 export function getShopCategories(revalidate = 300): Promise<ShopCategory[]> {
-  return fetchApiData(apiUrl("/shop/categories"), shopCategorySchema.array(), [], {
-    next: { revalidate },
-  });
+  // 분류는 머리글·왼쪽 목록·홈 진열이 각자 부른다 — 한 화면에서 네 번까지 나갔다.
+  return requestShare.get(
+    "shop/categories",
+    SHARED_LIST_TTL_MS,
+    () =>
+      fetchApiData(apiUrl("/shop/categories"), shopCategorySchema.array(), [], {
+        next: { revalidate },
+      }),
+    isEmptyList
+  );
 }
 
 export function getShopBanners(
@@ -68,9 +75,15 @@ export function getShopBanners(
   query.set("device", params.device || "all");
   const suffix = `?${query.toString()}`;
 
-  return fetchApiData(apiUrl(`/shop/banners${suffix}`), shopBannerListSchema, [], {
-    next: { revalidate },
-  });
+  return requestShare.get(
+    `shop/banners${suffix}`,
+    SHARED_LIST_TTL_MS,
+    () =>
+      fetchApiData(apiUrl(`/shop/banners${suffix}`), shopBannerListSchema, [], {
+        next: { revalidate },
+      }),
+    isEmptyList
+  );
 }
 
 export function getShopPopups(
@@ -99,9 +112,15 @@ export function getShopProducts(
 
   const suffix = query.toString() ? `?${query.toString()}` : "";
 
-  return fetchApiData(apiUrl(`/shop/products${suffix}`), shopProductListSchema, [], {
-    next: { revalidate },
-  });
+  return requestShare.get(
+    `shop/products${suffix}`,
+    SHARED_LIST_TTL_MS,
+    () =>
+      fetchApiData(apiUrl(`/shop/products${suffix}`), shopProductListSchema, [], {
+        next: { revalidate },
+      }),
+    isEmptyList
+  );
 }
 
 export async function getShopProduct(
@@ -123,6 +142,22 @@ export async function getShopProduct(
  */
 const SHARED_DETAIL_TTL_MS = 15_000;
 const SHARED_SHOP_POLICY_TTL_MS = 60_000;
+/*
+ * 쇼핑 홈의 진열 목록. 휴대용 정적 빌드는 어느 설치본의 상품도 굽지 않으므로 테마 홈이 붙은 뒤
+ * 브라우저에서 같은 목록을 한 번 더 받는데(themes/default/shop-home-client.tsx), 화면 이동으로
+ * 들어오면 그 갱신이 두 번 돈다 — 목록 열두 종이 고스란히 두 벌씩 나갔다. 사람마다 다르지 않은
+ * 진열이라 길게 둘 수도 있지만, 관리자가 진열을 바꾼 것이 곧 보이도록 짧게 잡는다.
+ */
+const SHARED_LIST_TTL_MS = 5_000;
+
+/*
+ * 목록 API 는 실패해도 빈 배열로 돌아온다(fetchApiData 의 fallback). 그것을 담아 두면 잠깐의
+ * 장애가 TTL 만큼 굳으므로 빈 목록은 나눠 쓰지 않는다 — 진짜로 비어 있는 진열은 한 번 더
+ * 받지만, 빈 응답은 작고 그 편이 안전하다.
+ */
+function isEmptyList(list: readonly unknown[]): boolean {
+  return list.length === 0;
+}
 
 function stableParamsKey(params: object): string {
   return Object.entries(params)
@@ -361,9 +396,15 @@ export function getShopReviewsCached(
 
   const suffix = query.toString() ? `?${query.toString()}` : "";
 
-  return fetchApiData(apiUrl(`/shop/reviews${suffix}`), shopReviewListSchema, [], {
-    next: { revalidate },
-  });
+  return requestShare.get(
+    `shop/reviews${suffix}`,
+    SHARED_LIST_TTL_MS,
+    () =>
+      fetchApiData(apiUrl(`/shop/reviews${suffix}`), shopReviewListSchema, [], {
+        next: { revalidate },
+      }),
+    isEmptyList
+  );
 }
 
 export async function getShopProductReviewSummary(

@@ -75,6 +75,8 @@ export function PageLoadingProvider() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const loadingRef = useRef(false);
+  // React 가 마지막으로 커밋한 경로. popstate 가 이미 끝난 이동인지 가리는 데 쓴다.
+  const committedPathRef = useRef<string | null>(null);
   const fallbackTimer = useRef<number | null>(null);
   const finishTimer = useRef<number | null>(null);
   const historyTimer = useRef<number | null>(null);
@@ -119,16 +121,27 @@ export function PageLoadingProvider() {
     }, 8000);
   }, [clearTimers, stop]);
 
-  const scheduleStart = useCallback(() => {
-    if (historyTimer.current) {
-      window.clearTimeout(historyTimer.current);
-    }
+  const scheduleStart = useCallback(
+    (url: URL) => {
+      if (historyTimer.current) {
+        window.clearTimeout(historyTimer.current);
+      }
 
-    historyTimer.current = window.setTimeout(() => {
-      historyTimer.current = null;
-      start();
-    }, 0);
-  }, [start]);
+      historyTimer.current = window.setTimeout(() => {
+        historyTimer.current = null;
+        // 0ms 로 예약해도 실제 실행은 메인 스레드가 빈 뒤다. 무거운 라우트(/shop 은 청크
+        // 평가 + 렌더 + API 수십 개)에서는 0.5 초쯤 밀리고, 그 사이 이동이 끝나 finish() 가
+        // 종료를 예약해 둔다. 그때 start() 를 부르면 clearTimers() 가 그 종료 예약까지
+        // 지워서 막대를 끝내는 것이 8 초 폴백뿐이 된다 — 이동은 0.5 초에 끝났는데 9 초 남았다.
+        // 목적지에 이미 도착했다면 이 시작은 철 지난 것이므로 건너뛴다.
+        if (!shouldShowForUrl(url)) {
+          return;
+        }
+        start();
+      }, 0);
+    },
+    [start],
+  );
 
   const finish = useCallback(() => {
     if (!loadingRef.current) {
@@ -146,6 +159,7 @@ export function PageLoadingProvider() {
   }, [clearTimers, stop]);
 
   useEffect(() => {
+    committedPathRef.current = pathname;
     finish();
     // `searchParams` changes identity when the query string changes.
   }, [finish, pathname, searchParams]);
@@ -208,7 +222,16 @@ export function PageLoadingProvider() {
       }, 0);
     };
 
-    const onPopState = () => start();
+    const onPopState = () => {
+      // popstate 는 브라우저가 주소를 이미 바꾼 뒤에 온다. 게다가 React 라우터의 리스너가
+      // 우리보다 먼저 등록돼 있어 그 안에서 새 라우트를 동기 커밋해 버린다. 그러면 finish()
+      // 가 "진행 중 아님"으로 먼저 빠져나가고, 뒤늦게 start() 한 막대는 더 바뀔 주소가 없어
+      // 8 초 폴백까지 남는다(뒤로가기 한 번에 8.8 초). 이미 커밋된 주소면 시작하지 않는다.
+      if (committedPathRef.current === window.location.pathname) {
+        return;
+      }
+      start();
+    };
     const onBeforeUnload = () => start();
     const onPageShow = () => stop();
     const originalPushState = window.history.pushState;
@@ -217,7 +240,7 @@ export function PageLoadingProvider() {
     window.history.pushState = function pushState(data, unused, url) {
       const nextUrl = getUrl(url);
       if (nextUrl && shouldShowForUrl(nextUrl)) {
-        scheduleStart();
+        scheduleStart(nextUrl);
       }
       return originalPushState.call(this, data, unused, url);
     };
@@ -225,7 +248,7 @@ export function PageLoadingProvider() {
     window.history.replaceState = function replaceState(data, unused, url) {
       const nextUrl = getUrl(url);
       if (nextUrl && shouldShowForUrl(nextUrl)) {
-        scheduleStart();
+        scheduleStart(nextUrl);
       }
       return originalReplaceState.call(this, data, unused, url);
     };

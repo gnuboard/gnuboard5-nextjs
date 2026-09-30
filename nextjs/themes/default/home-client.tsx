@@ -42,7 +42,10 @@ export function SoluneHomeClient({ config, initialHome, initialExtras }: SoluneH
   useEffect(() => {
     let alive = true;
 
-    Promise.all([buildCommunityHomeData({ runtime: true }), loadSoluneHomeExtras()])
+    Promise.all([
+      buildCommunityHomeData({ runtime: true }),
+      loadSoluneHomeExtras({ runtime: true }),
+    ])
       .then(([nextHome, nextExtras]) => {
         if (!alive) return;
         setHome(nextHome);

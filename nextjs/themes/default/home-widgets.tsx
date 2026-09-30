@@ -12,6 +12,12 @@ import { SoluneCommentRowsSkeleton, SolunePopularRowsSkeleton } from "./home-ske
 import { SoluneAuthor, soluneListDate } from "./home-meta";
 
 const GALLERY_PANEL_LIMIT = 8;
+/*
+ * 갤러리 첫 줄(4단 중 한 줄)은 홈에서 가장 큰 그림이라 LCP 요소가 여기서 나온다. 기본값인
+ * lazy 로 두면 브라우저가 배치를 마친 뒤에야 받기 시작해 늦는다 — 첫 줄만 eager +
+ * fetchPriority=high 로 올린다(GalleryThumbnail 의 priority). 둘째 줄은 화면 밖이라 그대로 둔다.
+ */
+const GALLERY_PANEL_PRIORITY = 4;
 
 /**
  * FAQ 본문은 관리자가 에디터로 넣은 HTML 인데, 이 설치의 데이터처럼 한 번 더
@@ -248,7 +254,7 @@ export function SoluneGalleryPanel({
       <div className="solune-panel-body">
         <ul className="solune-gallery-grid">
           {/* 레퍼런스처럼 4단 두 줄(8장). 공지가 섞여 오면 줄이 하나 더 생겨 칸이 빈다. */}
-          {gallery.posts.slice(0, GALLERY_PANEL_LIMIT).map((post) => {
+          {gallery.posts.slice(0, GALLERY_PANEL_LIMIT).map((post, index) => {
             const comments = Number(post.wr_comment) || 0;
             const thumbnail = post.thumbnail || post.images?.[0] || "";
             return (
@@ -260,6 +266,7 @@ export function SoluneGalleryPanel({
                       src={thumbnail}
                       alt={post.wr_subject || ""}
                       sizes="(max-width: 48rem) 45vw, 200px"
+                      priority={index < GALLERY_PANEL_PRIORITY}
                     />
                   </span>
                   <span className="solune-gallery-subject">

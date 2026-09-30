@@ -14,6 +14,7 @@ import type { ShopBanner, ShopCategory, ShopReview } from "@/lib/shop-types";
 import type { G5ThemeComponentProps, G5ThemeShopHomeData } from "@/lib/theme-types";
 import type { WritePost } from "@/lib/types";
 import { apiClient } from "@/lib/api";
+import { requestShare } from "@/lib/request-share";
 import { formatNumber, truncate } from "@/lib/utils";
 import { getBoardPosts } from "@/services/boards";
 import { getClientPublicSettings } from "@/services/settings";
@@ -204,6 +205,9 @@ export type SoluneShopHomeExtras = {
   bankAccounts: string[];
 };
 
+/** 이 화면의 갱신이 두 번 도는 사이를 덮을 만큼만. services/shop.ts 의 목록 TTL 과 같은 값. */
+const SHOP_EXTRAS_SHARE_TTL_MS = 5_000;
+
 export const EMPTY_SHOP_EXTRAS: SoluneShopHomeExtras = {
   banners: [],
   categories: [],
@@ -213,13 +217,25 @@ export const EMPTY_SHOP_EXTRAS: SoluneShopHomeExtras = {
   bankAccounts: [],
 };
 
-/** 무통장 입금 계좌 — 결제 설정의 공개 값(로그인 없이 읽는다). */
+/**
+ * 무통장 입금 계좌 — 결제 설정의 공개 값(로그인 없이 읽는다).
+ *
+ * 이 갱신은 화면 이동으로 들어오면 두 번 돈다. 상점 설정은 사람마다 다르지 않으므로
+ * 잠깐 나눠 써서 같은 요청이 두 번 나가지 않게 한다.
+ */
 async function loadBankAccounts(): Promise<string[]> {
-  const response = await apiClient.get<{ bank_accounts?: unknown }>("/shop/payment/config");
-  const accounts = response.data?.bank_accounts;
-  return Array.isArray(accounts)
-    ? accounts.filter((line): line is string => typeof line === "string" && line.trim() !== "")
-    : [];
+  return requestShare.get(
+    "shop/payment-config:bank-accounts",
+    SHOP_EXTRAS_SHARE_TTL_MS,
+    async () => {
+      const response = await apiClient.get<{ bank_accounts?: unknown }>("/shop/payment/config");
+      const accounts = response.data?.bank_accounts;
+      return Array.isArray(accounts)
+        ? accounts.filter((line): line is string => typeof line === "string" && line.trim() !== "")
+        : [];
+    },
+    (accounts) => accounts.length === 0
+  );
 }
 
 /** 브라우저에서 부른다. 어느 하나가 실패해도 나머지는 채워지도록 개별로 감싼다. */

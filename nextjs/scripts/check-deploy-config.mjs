@@ -572,7 +572,9 @@ function checkRepositoryContracts() {
 
   const expectedVercelJson = createVercelConfig({ runtime: 'server' });
   const expectedStaticVercelJson = createVercelConfig({ runtime: 'static' });
-  if (stableJson(vercelJson) !== stableJson(expectedVercelJson)) {
+  // Vercel CLI 로 올린 배포는 빌드 서버의 vercel.json 에 name · version 을 덧붙인다. 그 둘은 빼고 비교한다.
+  const { name: _cliName, version: _cliVersion, ...vercelJsonAsCommitted } = vercelJson;
+  if (stableJson(vercelJsonAsCommitted) !== stableJson(expectedVercelJson)) {
     fail('vercel.json must match scripts/vercel-config.mjs. Run npm run generate:vercel-config.');
   }
   if (stableJson(vercelServerJson) !== stableJson(expectedVercelJson)) {
