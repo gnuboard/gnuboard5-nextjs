@@ -1,0 +1,87 @@
+{
+  "scripts/check-local-browser.mjs": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Split browser runtime setup, page assertions, and diagnostics into helper modules."
+  },
+  "src/app/(auth)/register/ClientPage.tsx": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Extract form state, validation, social signup, and profile sections into focused components/hooks."
+  },
+  "../overlay/api/v1/shop/common.php": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Move pricing, image, cart, and order normalization helpers into separate shop common files."
+  },
+  "src/app/shop/orders/[od_id]/ClientPage.tsx": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Extract order status, payment summary, item list, and action panels into smaller components."
+  },
+  "scripts/lib/g5-url-shape-live-guards.mjs": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Separate URL discovery, assertion formatting, and live response checks."
+  },
+  "../overlay/api/social/_bridge_common.php": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Split provider config, cookie/session handling, and redirect helpers into bridge submodules."
+  },
+  "../overlay/api/v1/qas.php": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Separate list, detail, write, update, and delete handlers for board Q&A routes."
+  },
+  "scripts/package-live-deploy.mjs": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Extract package assembly, SSH upload, and remote verification into smaller scripts."
+  },
+  "src/app/shop/products/[it_id]/ProductDetailClient.tsx": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Extract option selection, cart actions, metadata, and tab content into focused components/hooks."
+  },
+  "scripts/lib/local-order-scope-checks.mjs": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Split order fixture setup, API assertions, and cleanup checks into separate helpers."
+  },
+  "scripts/check-runtime-config.mjs": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Move runtime origin, auth, image, and theme checks into reusable guard modules."
+  },
+  "../overlay/api/v1/shop/naverpay.php": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Separate NaverPay request parsing, origin checks, and order payload assembly."
+  },
+  "../overlay/api/v1/auth_account_routes.php": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Split account profile, password, email verification, and session routes."
+  },
+  "../overlay/api/v1/shop/orders.php": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Separate order list, detail, cancellation, and guest lookup handlers."
+  },
+  "../overlay/api/v1/posts.php": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Split board list, post detail, write, update, and comment handling."
+  },
+  "../overlay/theme/nextjs_default/bridge/seo.php": {
+    "priority": "low",
+    "targetLines": 650,
+    "nextStep": "Split JSON-LD builders, sitemap/robots output, and meta tag helpers into separate bridge modules."
+  },
+  "../overlay/theme/nextjs_default/bridge/metadata.php": {
+    "priority": "low",
+    "targetLines": 650,
+    "nextStep": "Separate per-route metadata resolvers from the shared title/description helpers."
+  }
+}

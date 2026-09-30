@@ -1,0 +1,297 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - main2
+  pull_request:
+    branches:
+      - main
+      - main2
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nextjs:
+    name: Next.js source and build checks
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: nextjs/package-lock.json
+
+      - name: Install dependencies
+        working-directory: nextjs
+        run: npm ci
+
+      # check:code 안에 PHP 문법 검사(check:php-syntax)가 있어 PHP 를 먼저 설치한다.
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      # 공개판의 check:code = 개발 저장소 전용 검사를 뺀 품질 검사 묶음(scripts/sync-from-gnuboard.mjs 가 만든다).
+      - name: Check code quality gate
+        working-directory: nextjs
+        run: npm run check:code
+
+  vercel-theme-matrix:
+    name: Build Vercel theme matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.theme-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build theme matrix
+        id: theme-matrix
+        run: node nextjs/scripts/print-vercel-theme-matrix.mjs
+
+  vercel-static-fixture:
+    name: Vercel static fixture (${{ matrix.theme_source }})
+    needs: vercel-theme-matrix
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nextjs
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.vercel-theme-matrix.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: nextjs/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Check static export with fixture API
+        run: npm run check:vercel-static:fixture -- "${{ matrix.theme_source }}"
+
+  vercel-server-build:
+    name: Vercel server build (${{ matrix.theme_source }})
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'push' &&
+        (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/main2') &&
+        vars.LIVE_API_URL != '' &&
+        vars.LIVE_G5_URL != ''
+      )
+    needs: vercel-theme-matrix
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nextjs
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.vercel-theme-matrix.outputs.matrix) }}
+    env:
+      G5_NEXT_RUNTIME: server
+      G5_THEME_SOURCE: ${{ matrix.theme_source }}
+      G5_THEME_NAME: ${{ matrix.theme_name }}
+      NEXT_PUBLIC_API_URL: ${{ vars.LIVE_API_URL }}
+      G5_API_INTERNAL_URL: ${{ vars.LIVE_API_URL }}
+      NEXT_PUBLIC_G5_URL: ${{ vars.LIVE_G5_URL }}
+      NEXT_PUBLIC_APP_URL: ${{ matrix.app_url }}
+      NEXT_IMAGE_EXTRA_HOSTS: ${{ vars.LIVE_IMAGE_EXTRA_HOSTS }}
+      SERVER_RUNTIME_SMOKE_POST_PATH: ${{ vars.LIVE_SMOKE_POST_PATH }}
+      SERVER_RUNTIME_SMOKE_POST_TEXT: ${{ vars.LIVE_SMOKE_POST_TEXT }}
+      SERVER_RUNTIME_SMOKE_PRODUCT_PATH: ${{ vars.LIVE_SMOKE_PRODUCT_PATH }}
+      SERVER_RUNTIME_SMOKE_PRODUCT_TEXT: ${{ vars.LIVE_SMOKE_PRODUCT_TEXT }}
+      SERVER_RUNTIME_SMOKE_REQUIRE_DETAILS: ${{ vars.LIVE_SMOKE_REQUIRE_DETAILS || 'post,product' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: nextjs/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check dependency audit
+        run: npm audit --audit-level=moderate
+
+      - name: Check Vercel server env
+        run: npm run check:deploy-config -- --mode vercel --require-env --source "${G5_THEME_SOURCE}" --name "${G5_THEME_NAME}"
+
+      - name: Build Vercel server runtime
+        run: npm run build:vercel -- --runtime server --source "${G5_THEME_SOURCE}" --name "${G5_THEME_NAME}"
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Check Vercel server runtime smoke
+        run: npm run check:server-runtime-smoke
+
+  vercel-static-preview:
+    name: Vercel static preview (${{ matrix.theme_source }})
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'push' &&
+        (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/main2') &&
+        vars.LIVE_API_URL != '' &&
+        vars.LIVE_G5_URL != ''
+      )
+    needs: vercel-theme-matrix
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nextjs
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.vercel-theme-matrix.outputs.matrix) }}
+    env:
+      G5_NEXT_RUNTIME: static
+      G5_THEME_SOURCE: ${{ matrix.theme_source }}
+      G5_THEME_NAME: ${{ matrix.theme_name }}
+      NEXT_PUBLIC_API_URL: ${{ vars.LIVE_API_URL }}
+      NEXT_PUBLIC_G5_URL: ${{ vars.LIVE_G5_URL }}
+      NEXT_PUBLIC_APP_URL: ${{ matrix.app_url }}
+      NEXT_IMAGE_EXTRA_HOSTS: ${{ vars.LIVE_IMAGE_EXTRA_HOSTS }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: nextjs/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check dependency audit
+        run: npm audit --audit-level=moderate
+
+      - name: Check Vercel static env
+        run: npm run check:deploy-config -- --mode static --require-env --source "${G5_THEME_SOURCE}" --name "${G5_THEME_NAME}"
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Check Vercel static export preview
+        run: npm run check:vercel-static
+
+  vercel-release-env-required:
+    name: Vercel release env required
+    # Vercel 미리보기를 연결한 저장소(LIVE_API_URL 을 설정한 경우)에서만 나머지 변수가 다 있는지 본다.
+    # 설치 zip 만 배포하는 저장소는 Vercel 변수가 없으므로 이 검사를 건너뛴다.
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/main2') &&
+      vars.LIVE_API_URL != ''
+    runs-on: ubuntu-latest
+    env:
+      LIVE_API_URL: ${{ vars.LIVE_API_URL }}
+      LIVE_G5_URL: ${{ vars.LIVE_G5_URL }}
+      LIVE_SMOKE_POST_PATH: ${{ vars.LIVE_SMOKE_POST_PATH }}
+      LIVE_SMOKE_POST_TEXT: ${{ vars.LIVE_SMOKE_POST_TEXT }}
+      LIVE_SMOKE_PRODUCT_PATH: ${{ vars.LIVE_SMOKE_PRODUCT_PATH }}
+      LIVE_SMOKE_PRODUCT_TEXT: ${{ vars.LIVE_SMOKE_PRODUCT_TEXT }}
+    steps:
+      - name: Check live Vercel smoke variables
+        shell: bash
+        run: |
+          missing=()
+          for name in \
+            LIVE_API_URL \
+            LIVE_G5_URL \
+            LIVE_SMOKE_POST_PATH \
+            LIVE_SMOKE_POST_TEXT \
+            LIVE_SMOKE_PRODUCT_PATH \
+            LIVE_SMOKE_PRODUCT_TEXT
+          do
+            if [ -z "${!name}" ]; then
+              missing+=("$name")
+            fi
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing GitHub repository variables for Vercel release smoke:\n' >&2
+            printf '  - %s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+
+  vercel-release-strict:
+    name: Vercel release strict gate
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'push' &&
+        (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/main2') &&
+        vars.LIVE_API_URL != '' &&
+        vars.LIVE_G5_URL != '' &&
+        vars.LIVE_SMOKE_POST_PATH != '' &&
+        vars.LIVE_SMOKE_POST_TEXT != '' &&
+        vars.LIVE_SMOKE_PRODUCT_PATH != '' &&
+        vars.LIVE_SMOKE_PRODUCT_TEXT != ''
+      )
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nextjs
+    env:
+      NEXT_PUBLIC_API_URL: ${{ vars.LIVE_API_URL }}
+      G5_API_INTERNAL_URL: ${{ vars.LIVE_API_URL }}
+      NEXT_PUBLIC_G5_URL: ${{ vars.LIVE_G5_URL }}
+      NEXT_IMAGE_EXTRA_HOSTS: ${{ vars.LIVE_IMAGE_EXTRA_HOSTS }}
+      SERVER_RUNTIME_SMOKE_POST_PATH: ${{ vars.LIVE_SMOKE_POST_PATH }}
+      SERVER_RUNTIME_SMOKE_POST_TEXT: ${{ vars.LIVE_SMOKE_POST_TEXT }}
+      SERVER_RUNTIME_SMOKE_PRODUCT_PATH: ${{ vars.LIVE_SMOKE_PRODUCT_PATH }}
+      SERVER_RUNTIME_SMOKE_PRODUCT_TEXT: ${{ vars.LIVE_SMOKE_PRODUCT_TEXT }}
+      SERVER_RUNTIME_SMOKE_REQUIRE_DETAILS: ${{ vars.LIVE_SMOKE_REQUIRE_DETAILS || 'post,product' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: nextjs/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Check Vercel release gate strictly
+        run: npm run check:release:vercel:strict

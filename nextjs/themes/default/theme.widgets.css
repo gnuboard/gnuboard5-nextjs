@@ -1,0 +1,520 @@
+/* =====================================================================
+   Solune theme — home widgets that live outside the board panels:
+   comment stream, popular keywords, visit counter, poll, login card,
+   FAQ panel and gallery panel. Structure follows the reference site's
+   #aside / .solune-faq-panel / .solune-gallery-grid markup.
+   ===================================================================== */
+
+/* --- comment stream ---------------------------------------------------- */
+/* 최근 댓글 — 레퍼런스 comment_stream: 본문 두 줄 + 메타 한 줄. 게시판은 테두리 두른 회색 알약,
+   이름 · 날짜는 흐린 글자(글쓴이는 회원 사이드뷰 단추). */
+.solune-comment-list { display: grid; }
+.solune-comment-list li { border-bottom: 1px solid var(--solune-border); }
+.solune-comment-list li:last-child { border-bottom: 0; }
+.solune-comment-link { display: grid; min-width: 0; gap: 0.3rem; padding: 0.7rem 0; }
+.solune-comment-excerpt {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  color: color-mix(in oklab, var(--solune-text) 82%, transparent);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  word-break: keep-all;
+  transition: color 0.2s ease;
+}
+.solune-comment-excerpt:hover { color: var(--solune-primary); }
+.solune-comment-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--solune-muted); /* 레퍼런스의 45~55% 흐림은 AA 대비(4.5:1) 미달 — muted 토큰(5.3:1) */
+  font-size: 0.66rem;
+}
+.solune-comment-board {
+  flex: none;
+  border: 1px solid var(--solune-border);
+  border-radius: var(--solune-radius-pill);
+  padding: 0.1rem 0.4rem;
+  background: var(--solune-surface-soft);
+  color: inherit;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.solune-comment-name { min-width: 0; overflow: hidden; color: inherit; text-overflow: ellipsis; white-space: nowrap; }
+button.solune-comment-name:hover { color: var(--solune-primary); text-decoration: none; }
+.solune-comment-meta time { flex: none; font-variant-numeric: tabular-nums; }
+
+/* --- popular keywords -------------------------------------------------- */
+.solune-popular-caret { color: var(--solune-muted); }
+/* 상태 표시는 알약이 아니라 초록 점 + 회색 글씨(레퍼런스). 파란 배지는 수치보다 먼저 눈에 걸린다. */
+.solune-sidebar-status {
+  display: inline-flex;
+  min-height: 1.75rem;
+  flex: none;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--solune-muted); /* 레퍼런스의 45~55% 흐림은 AA 대비(4.5:1) 미달 — muted 토큰(5.3:1) */
+  font-size: 0.66rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.solune-sidebar-status i {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: #16a34a;
+  box-shadow: 0 0 0 3px color-mix(in oklab, #16a34a 20%, transparent);
+}
+
+/* --- visit counter ------------------------------------------------------ */
+/* 오늘을 큰 수로 세우고, 최대는 막대와 함께, 어제 · 전체는 이름 ……… 수 한 줄씩(레퍼런스). */
+.solune-visit-stats { display: grid; gap: 0.8rem; }
+.solune-visit-stats dt { color: var(--solune-muted); font-size: 0.66rem; font-weight: 700; letter-spacing: 0.02em; }
+.solune-visit-stats dd { font-variant-numeric: tabular-nums; }
+.solune-visit-lead dd { margin-top: 0.15rem; }
+.solune-visit-figure {
+  color: var(--solune-text);
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+.solune-visit-peak { padding-top: 0.8rem; border-top: 1px solid var(--solune-border); }
+.solune-visit-peak dt { float: left; }
+.solune-visit-peak dd { display: grid; gap: 0.4rem; }
+.solune-visit-peak-value { color: var(--solune-text); font-size: 0.95rem; font-weight: 800; text-align: right; }
+.solune-visit-bar {
+  display: block;
+  overflow: hidden;
+  width: 100%;
+  height: 0.35rem;
+  border-radius: var(--solune-radius-pill);
+  background: color-mix(in oklab, var(--solune-primary) 18%, var(--solune-surface));
+}
+.solune-visit-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--solune-primary); }
+.solune-visit-caption { color: var(--solune-muted); font-size: 0.66rem; }
+.solune-visit-caption b { color: var(--solune-primary); font-weight: 800; }
+.solune-visit-cell {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--solune-border);
+}
+.solune-visit-cell dd { color: var(--solune-text); font-size: 0.95rem; font-weight: 800; }
+
+/* --- poll --------------------------------------------------------------- */
+/* 레퍼런스 #poll: 제목 줄 아래에만 카드 안쪽 폭의 선을 긋는다(다른 위젯은 선 없이 여백). */
+.solune-poll-widget .solune-sidebar-widget-head {
+  align-items: center;
+  margin: 0 1.25rem 0.8rem;
+  border-bottom: 1px solid var(--solune-border);
+  padding: 1.15rem 0 0.8rem;
+}
+.solune-poll-widget .solune-sidebar-widget-body { padding-top: 0; }
+.solune-poll-question {
+  margin-bottom: 0.75rem;
+  color: var(--solune-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.solune-poll-options { display: grid; gap: 0.15rem; }
+.solune-poll-option {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  color: var(--solune-text-soft);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background-color 0.16s ease;
+}
+.solune-poll-option:hover { background: var(--solune-surface-soft); }
+/* 보기 앞 동그라미 — 레퍼런스처럼 회색 테두리 원, 고르면 주색 테두리 + 가운데 점. */
+.solune-poll-option input {
+  display: grid;
+  width: 1.1rem;
+  height: 1.1rem;
+  flex: none;
+  place-content: center;
+  margin: 0;
+  border: 1.5px solid color-mix(in oklab, var(--solune-text) 28%, transparent);
+  border-radius: 50%;
+  background: var(--solune-surface);
+  appearance: none;
+  cursor: pointer;
+}
+.solune-poll-option input::before {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--solune-primary);
+  content: "";
+  transform: scale(0);
+  transition: transform 0.12s ease;
+}
+.solune-poll-option input:checked { border-color: var(--solune-primary); }
+.solune-poll-option input:checked::before { transform: scale(1); }
+.solune-poll-option input:focus-visible { outline: 2px solid var(--solune-primary); outline-offset: 2px; }
+.solune-poll-submit {
+  width: 100%;
+  min-height: 2.75rem;
+  margin-top: 1rem;
+  border: 0;
+  border-radius: 0.5rem;
+  padding: 0.6rem 1rem;
+  background: var(--solune-primary);
+  color: var(--solune-primary-ink);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.16s ease;
+}
+.solune-poll-submit:hover:not(:disabled) { background: var(--solune-primary-hover); }
+.solune-poll-submit:disabled { opacity: 0.6; cursor: progress; }
+.solune-poll-result { display: grid; gap: 0.55rem; }
+.solune-poll-result-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--solune-text-soft);
+  font-size: 0.75rem;
+}
+.solune-poll-bar {
+  display: block;
+  overflow: hidden;
+  height: 0.35rem;
+  margin-top: 0.2rem;
+  border-radius: var(--solune-radius-pill);
+  background: var(--solune-surface-soft);
+}
+.solune-poll-bar > span { display: block; height: 100%; background: var(--solune-primary); }
+.solune-poll-error { margin-top: 0.5rem; color: var(--solune-danger); font-size: 0.7rem; }
+
+/* --- login / member card ------------------------------------------------ */
+.solune-login-card-body { padding: 1.25rem; }
+.solune-login-title {
+  margin-bottom: 0.75rem;
+  color: var(--solune-text);
+  font-size: 1.125rem;
+  font-weight: 900;
+  letter-spacing: var(--solune-heading-letter-spacing);
+}
+.solune-login-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  margin-top: 0.9rem;
+  color: var(--solune-muted);
+  font-size: 0.7rem;
+}
+.solune-login-links a:hover { color: var(--solune-primary); }
+.solune-member-head { display: flex; align-items: center; gap: 0.75rem; }
+.solune-member-avatar {
+  display: inline-grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 2.75rem;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--solune-primary);
+  color: var(--solune-primary-ink);
+}
+.solune-member-head strong {
+  display: block;
+  overflow: hidden;
+  color: var(--solune-text);
+  font-size: 1rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.solune-member-head span { color: var(--solune-muted); font-size: 0.75rem; }
+.solune-member-stats {
+  display: grid;
+  margin: 0.9rem 0;
+  border-block: 1px solid var(--solune-border);
+  padding: 0.6rem 0;
+}
+.solune-member-stats dt { color: var(--solune-muted); font-size: 0.7rem; font-weight: 600; }
+.solune-member-stats dd {
+  color: var(--solune-text);
+  font-size: 1rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+/* 관리자 · 마이페이지 · 로그아웃을 한 줄에 — 단추마다 같은 몫(flex 1)을 나눠 줄바꿈 없이 선다. */
+.solune-member-actions { display: flex; gap: 0.4rem; }
+.solune-member-actions :is(a, button) {
+  display: inline-flex;
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+  border: 1px solid var(--solune-border);
+  border-radius: var(--solune-radius-pill);
+  padding: 0.4rem 0.5rem;
+  background: transparent;
+  color: var(--solune-text-soft);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.solune-member-actions :is(a, button):hover {
+  border-color: var(--solune-primary);
+  color: var(--solune-primary);
+}
+/* 관리자 단추는 레퍼런스(btn-primary)처럼 채운 단추로 — 회원 카드에서 가장 먼저 찾는 손잡이다. */
+.solune-member-actions .solune-member-admin {
+  border-color: var(--solune-primary);
+  background: var(--solune-primary);
+  color: var(--solune-primary-ink);
+}
+.solune-member-actions .solune-member-admin:hover {
+  border-color: var(--solune-primary-hover);
+  background: var(--solune-primary-hover);
+  color: var(--solune-primary-ink);
+}
+
+/* --- FAQ panel ---------------------------------------------------------- */
+/* 레퍼런스 FAQ 패널: 점선으로 가르고, 질문은 600 · 본문색(열어도 파래지지 않고 화살표만 파랗다),
+   얹으면 파랗게. 답은 두 줄로 묶어 옆 카드와 높이가 어긋나지 않게 한다 — 전문은 더보기(/faq). */
+.solune-faq-list { display: grid; padding: 0 1.25rem 0.5rem; }
+.solune-faq-item { border-bottom: 1px dashed var(--solune-border); }
+.solune-faq-item:last-child { border-bottom: 0; }
+.solune-faq-q {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.625rem 0;
+  color: var(--solune-text);
+  font-size: 0.84375rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  cursor: pointer;
+  list-style: none;
+}
+.solune-faq-q::-webkit-details-marker { display: none; }
+.solune-faq-item:hover > .solune-faq-q { color: var(--solune-primary); }
+.solune-faq-q:focus-visible { outline: 2px solid var(--solune-primary); outline-offset: -2px; }
+.solune-faq-badge {
+  flex: none;
+  border-radius: 0.3125rem;
+  padding: 0.1875rem 0.4375rem;
+  background: var(--solune-primary-soft);
+  color: var(--solune-primary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.solune-faq-subject { min-width: 0; flex: 1; }
+.solune-faq-chevron { flex: none; color: var(--solune-muted); }
+.solune-faq-item[open] .solune-faq-chevron { transform: rotate(180deg); color: var(--solune-primary); }
+.solune-faq-a {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  margin-bottom: 0.625rem;
+  padding-left: 2rem;
+  color: var(--solune-text-soft);
+  font-size: 0.78125rem;
+  line-height: 1.7;
+  letter-spacing: -0.01em;
+}
+.solune-faq-a :is(p, li) { margin: 0; }
+
+/* --- gallery panel ------------------------------------------------------ */
+/* 레퍼런스처럼 패널 폭을 칸 수로 나눈다. 칸 수가 정해져 있어(repeat(n, 1fr)) 사진이 한두 장뿐이어도
+   한 장이 패널 폭만큼 늘어나지 않고 한 칸 폭으로 왼쪽에 선다. */
+.solune-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.1rem 0.875rem;
+  padding-top: 0.65rem;
+}
+/* 전폭 패널에서는 폭이 두 배라 4단(레퍼런스와 같은 48rem 기준). */
+@media (min-width: 48rem) {
+  .solune-gallery-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.solune-gallery-item { display: grid; min-width: 0; align-content: start; }
+.solune-gallery-link { display: grid; min-width: 0; gap: 0.5rem; }
+.solune-gallery-thumb {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--solune-border);
+  border-radius: 0.5rem;
+  background: var(--solune-surface-soft);
+}
+.solune-gallery-thumb img { object-fit: cover; transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1); }
+.solune-gallery-link:hover .solune-gallery-thumb img { transform: scale(1.04); }
+.solune-gallery-subject {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  color: var(--solune-text-soft);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+.solune-gallery-link:hover .solune-gallery-subject { color: var(--solune-primary); }
+.solune-gallery-comment { margin-left: 0.3rem; color: var(--solune-primary); font-size: 0.75rem; font-weight: 700; }
+.solune-gallery-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.3rem;
+  color: var(--solune-muted);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+/* 사진 16px · 이름은 한 단 진하게(회원 사이드뷰 단추). */
+.solune-gallery-writer {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--solune-text-soft);
+  font-weight: 500;
+  --solune-author-photo: 1rem;
+}
+button.solune-gallery-writer:hover { color: var(--solune-primary); text-decoration: none; }
+.solune-gallery-writer .solune-author-name { overflow: hidden; text-overflow: ellipsis; }
+.solune-gallery-meta time { flex: none; }
+
+/* --- 회원 사이드뷰 메뉴 (MemberSideview) ----------------------------------
+   게시판 · 새글 · 첫 화면 어디서 작성자를 눌러도 같은 팝업. 레퍼런스 sv 팝업처럼 흰 카드에
+   둥근 모서리 · 옅은 그림자, 항목은 넉넉한 줄 높이로. 팝업은 body 바로 아래로 뜬다. */
+body[data-g5-theme-source="default"] .member-sideview-menu {
+  width: auto;
+  min-width: 8.5rem;
+  padding: 0.35rem;
+  border: 1px solid var(--solune-border);
+  border-radius: 10px;
+  background: var(--solune-surface);
+  color: var(--solune-text);
+  box-shadow: 0 10px 28px color-mix(in oklab, var(--solune-text) 14%, transparent);
+}
+body[data-g5-theme-source="default"] .member-sideview-menu a {
+  display: block;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  color: var(--solune-text-soft);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+body[data-g5-theme-source="default"] .member-sideview-menu a:hover,
+body[data-g5-theme-source="default"] .member-sideview-menu a:focus-visible {
+  background: var(--solune-surface-soft);
+  color: var(--solune-primary);
+}
+
+/* --- 로그인 카드의 압축 폼 (LoginForm variant="compact") ------------------ */
+/* 레퍼런스 outlogin: 10px 모서리 칸 40px, 단추는 알약. 비어 있는 필수 칸에는 그누보드
+   require.png 처럼 오른쪽 위에 빨간 별(다 적으면 :valid 라 사라진다). */
+.solune-login-card .login-form--compact input:is([type="text"], [type="password"]) {
+  height: 2.5rem;
+  border-color: color-mix(in oklab, var(--solune-border) 80%, var(--solune-text) 8%);
+  border-radius: 0.625rem;
+  background-color: var(--solune-surface);
+  font-size: 0.875rem;
+}
+.solune-login-card .login-form--compact input[required]:invalid {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath fill='%23e5484d' d='M4.3 0h1.4l-.2 3.8 3.3-1.9.7 1.2-3.4 1.9 3.4 1.9-.7 1.2-3.3-1.9.2 3.8H4.3l.2-3.8-3.3 1.9-.7-1.2 3.4-1.9L.5 3.1l.7-1.2 3.3 1.9z'/%3E%3C/svg%3E");
+  background-position: right 0.4rem top 0.4rem;
+  background-repeat: no-repeat;
+  background-size: 7px 7px;
+}
+.solune-login-card .login-form--compact .login-submit {
+  height: 2.5rem;
+  border-radius: var(--solune-radius-pill);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.solune-login-card .login-form-links { margin-top: 0.35rem; color: var(--solune-muted); /* 레퍼런스의 45~55% 흐림은 AA 대비(4.5:1) 미달 — muted 토큰(5.3:1) */ font-size: 0.75rem; }
+.solune-login-card .login-form-links a { color: inherit; }
+.solune-login-card .login-form-links a:hover { color: var(--solune-primary); text-decoration: none; }
+/* 자동로그인 — 레퍼런스처럼 주색 테두리의 둥근 네모(1.125rem). */
+.solune-login-card .login-form-links input[type="checkbox"] {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0;
+  border: 1.5px solid var(--solune-primary);
+  border-radius: 50%;
+  appearance: none;
+  cursor: pointer;
+}
+.solune-login-card .login-form-links input[type="checkbox"]:checked {
+  background: var(--solune-primary) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' d='M4 8.5l2.6 2.5L12 5.5'/%3E%3C/svg%3E") center / 80% no-repeat;
+}
+
+/* 소셜 로그인 — 그누보드 skin/social 의 #sns_login: 40px 단추, 왼쪽 30px 로고(구글은 흰 상자),
+   글자는 굵게 · 앞에 옅은 세로선. 로고 그림 주소는 login-card.tsx 가 설치 경로에 맞춰 변수로 넘긴다. */
+.solune-login-card .social-login[data-layout="stacked"] { margin-top: 1rem; }
+.solune-login-card .social-login-title {
+  border-top-color: var(--solune-border);
+  padding-top: 1rem;
+  color: var(--solune-text-soft);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.solune-login-card .social-login[data-layout="stacked"] > .grid { gap: 0.3rem; }
+.solune-login-card .social-login[data-layout="stacked"] button {
+  position: relative;
+  height: 2.5rem;
+  min-height: 2.5rem;
+  justify-content: flex-start;
+  gap: 0;
+  overflow: hidden;
+  border: 0;
+  border-bottom: 1px solid rgb(0 0 0 / 12%);
+  border-radius: 6px;
+  padding: 0 0 0 2.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  background-repeat: no-repeat;
+  background-position: 5px 5px;
+}
+.solune-login-card .social-login[data-layout="stacked"] button > span:first-child { display: none; }
+.solune-login-card .social-login[data-layout="stacked"] button > span:last-child {
+  display: flex;
+  height: 100%;
+  flex: 1 1 auto;
+  align-items: center;
+  border-left: 1px solid rgb(0 0 0 / 10%);
+  padding-left: 0.625rem;
+  text-align: left;
+}
+.solune-login-card .social-login[data-layout="stacked"] button:hover > span:last-child { background: rgb(0 0 0 / 7%); }
+.solune-login-card [data-social-provider="naver"] { background-color: #1fc800 !important; background-image: var(--solune-sns-naver); color: #fff !important; }
+.solune-login-card [data-social-provider="kakao"] { background-color: #ffeb00 !important; background-image: var(--solune-sns-kakao); color: #3c1e1e !important; }
+.solune-login-card [data-social-provider="facebook"] { background-color: #3b579d !important; background-image: var(--solune-sns-facebook); color: #fff !important; }
+.solune-login-card [data-social-provider="twitter"] { background-color: #1ea1f2 !important; background-image: var(--solune-sns-twitter); color: #fff !important; }
+.solune-login-card [data-social-provider="payco"] { background-color: #df0b00 !important; background-image: var(--solune-sns-payco); color: #fff !important; }
+.solune-login-card [data-social-provider="google"] { background-color: #4285f4 !important; color: #fff !important; letter-spacing: -0.5px; }
+.solune-login-card [data-social-provider="google"]::before {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 33px;
+  height: 33px;
+  border-radius: 3px;
+  background: #fff var(--solune-sns-google) center / 28px 28px no-repeat;
+  content: "";
+}

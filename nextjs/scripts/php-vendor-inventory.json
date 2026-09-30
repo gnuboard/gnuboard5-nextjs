@@ -1,0 +1,25 @@
+{
+  "vendors": [
+    {
+      "name": "PHPMailer",
+      "path": "plugin/PHPMailer/class.phpmailer.php",
+      "versionPattern": "public \\$Version = '([^']+)'",
+      "expectedVersion": "5.2.28",
+      "replacement": "Composer package phpmailer/phpmailer ^6"
+    },
+    {
+      "name": "HTMLPurifier",
+      "path": "plugin/htmlpurifier/HTMLPurifier.standalone.php",
+      "versionPattern": "const VERSION = '([^']+)'",
+      "expectedVersion": "4.15.0",
+      "replacement": "Composer package ezyang/htmlpurifier"
+    },
+    {
+      "name": "PHPExcel",
+      "path": "lib/PHPExcel/Autoloader.php",
+      "versionPattern": "Copyright \\(c\\) 2006 - 2015 PHPExcel",
+      "expectedVersion": "legacy-2006-2015",
+      "replacement": "Composer package phpoffice/phpspreadsheet"
+    }
+  ]
+}

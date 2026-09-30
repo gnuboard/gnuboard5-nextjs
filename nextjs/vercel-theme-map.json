@@ -1,0 +1,13 @@
+{
+  "generatedFrom": "theme-manifest.json",
+  "edit": "Do not edit this generated file directly. Update theme-manifest.json and run npm run generate:theme-maps.",
+  "themes": [
+    {
+      "source": "default",
+      "theme": "nextjs_default",
+      "devPort": 3001,
+      "appUrl": "https://gnuboard5-nextjs-default.vercel.app",
+      "uiSmoke": true
+    }
+  ]
+}

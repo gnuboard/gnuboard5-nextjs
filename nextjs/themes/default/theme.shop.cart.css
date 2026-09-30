@@ -1,0 +1,44 @@
+/* 장바구니 — 앱 마크업의 cart-* 손잡이. */
+
+/* --- 장바구니 (앱 소유 화면, cart-* 손잡이) ----------------------------
+   레퍼런스 cart.php: 제목, 검은 활성 칸의 세 단계 막대, 표처럼 줄로 나뉜
+   상품 목록, 오른쪽에 짙은 테두리의 "결제 예정 금액" 상자. 빈 장바구니도
+   같은 틀이다. */
+body[data-g5-theme-source="default"] .solune-shop-page {
+  .cart-title { margin: 32px 0 26px; font-size: 26px; font-weight: 700; letter-spacing: -0.025em; }
+  .cart-title-count { color: var(--solune-muted); font-size: 18px; font-weight: 500; }
+  .cart-steps { margin-bottom: 32px; border-color: var(--solune-border); border-radius: 0; font-size: 13px; }
+  .cart-step { padding: 13px 8px; border-left-color: var(--solune-border); color: var(--solune-muted); }
+  .cart-step.is-current { background: var(--ondam-ink); color: #fff; }
+  .cart-step-num { border-color: currentColor; font-size: 11px; }
+  .cart-step.is-current .cart-step-num { background: #fff; border-color: #fff; color: var(--ondam-ink); font-weight: 700; }
+
+  .cart-layout { gap: 28px; align-items: start; }
+  .cart-items { display: block; border-top: 2px solid var(--solune-text); }
+  .cart-items > * + * { margin-top: 0; }
+  .cart-item { border: 0; border-bottom: 1px solid var(--solune-border); border-radius: 0; padding: 18px 4px; }
+  .cart-item-thumb { width: 84px; height: 84px; border: 1px solid var(--solune-border); border-radius: 0; }
+  .cart-item-name { font-size: 14.5px; font-weight: 600; }
+  .cart-item-qty button, .cart-summary button, .cart-summary a { border-radius: 0; }
+  .cart-item-qty button { border-color: var(--solune-border-strong); }
+  .cart-item-price { font-size: 15px; }
+  .cart-empty { border: 0; border-bottom: 1px solid var(--solune-border); border-radius: 0; padding: 40px 0; }
+  .cart-empty svg { display: none; }
+  .cart-empty-text { color: var(--solune-text-soft); font-size: 13px; }
+
+  .cart-summary { border: 1px solid var(--solune-text); border-radius: 0; padding: 22px 20px; }
+  .cart-summary-title { margin-bottom: 18px; font-size: 13px; font-weight: 700; }
+  .cart-summary-row { color: var(--solune-text-soft); font-size: 13px; }
+  .cart-summary-row > span:first-child { color: var(--solune-muted); }
+  .cart-summary-total { margin-top: 6px; border-top-color: var(--solune-border); padding-top: 18px; }
+  .cart-summary-total .flex { align-items: baseline; }
+  .cart-summary-total .flex > span:first-child { font-size: 13px; font-weight: 700; }
+  .cart-summary-total .text-primary { color: var(--solune-text); font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+  .cart-order { height: 46px; background: var(--solune-primary); font-size: 13px; font-weight: 600; }
+  .cart-continue { height: 46px; border-color: var(--solune-border-strong); background: var(--solune-surface); color: var(--solune-text); font-size: 13px; font-weight: 600; } /* 레퍼런스: 흰 바탕 옅은 테두리. 앱 outline 단추의 푸른 바탕을 덮는다 */
+  .cart-continue:hover { background: var(--solune-surface-soft); }
+}
+@media (max-width: 767px) {
+  body[data-g5-theme-source="default"] .solune-shop-page .cart-title { margin-top: 20px; font-size: 22px; }
+  body[data-g5-theme-source="default"] .solune-shop-page .cart-step { font-size: 12px; }
+}

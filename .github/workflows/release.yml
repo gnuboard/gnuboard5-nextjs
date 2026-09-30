@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version, for example v0.1.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: nextjs/package-lock.json
+
+      - name: Print release environment
+        run: |
+          node --version
+          npm --version
+          git --version
+          gh --version
+          echo "release version: $RELEASE_VERSION"
+
+      - name: Install dependencies
+        working-directory: nextjs
+        run: npm ci
+
+      - name: Verify Next.js source
+        working-directory: nextjs
+        run: npm run check
+
+      - name: Build static export
+        working-directory: nextjs
+        run: npm run build
+
+      - name: Assemble release package
+        run: node scripts/package-release.mjs "$RELEASE_VERSION"
+
+      - name: Verify release package
+        run: node scripts/verify-release-package.mjs "$RELEASE_VERSION"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$RELEASE_VERSION" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_VERSION" \
+              "gnuboard5-nextjs-${RELEASE_VERSION}.zip" \
+              --clobber
+          else
+            # v0.2.0-beta.1 처럼 하이픈이 붙은 태그는 시험판(Pre-release)으로 올린다.
+            PRERELEASE=""
+            case "$RELEASE_VERSION" in *-*) PRERELEASE="--prerelease" ;; esac
+            gh release create "$RELEASE_VERSION" \
+              "gnuboard5-nextjs-${RELEASE_VERSION}.zip" \
+              $PRERELEASE \
+              --target "$GITHUB_SHA" \
+              --title "gnuboard5-nextjs ${RELEASE_VERSION}" \
+              --notes "Download the attached zip and extract it into the Gnuboard5 root. See INSTALL.md inside the zip."
+          fi

@@ -1,0 +1,76 @@
+/* 쿠폰존 — 앱 마크업(src/app/shop/couponzone/ClientPage.tsx)의 coupon-* 손잡이.
+
+   레퍼런스 couponzone.php (2026-09): 두 칸 표 모양이 아니라 한 줄에 쿠폰 하나.
+   [사진 130×86, 모서리 8] [종류(초록 11px) / 큰 금액 · 쿠폰 이름 / 조건 줄(12px 옅게)] [쿠폰받기(초록 알약)]
+   줄 사이는 옅은 선, 구역 제목 위에는 짙은 선. 사진이 없는 쿠폰은 같은 자리에 금액을 옅은 바탕으로. */
+body[data-g5-theme-source="default"] .solune-shop-page {
+  .couponzone-title { margin: 32px 0 26px; font-size: 26px; font-weight: 700; letter-spacing: -0.025em; }
+  .couponzone-intro { margin-bottom: 40px; color: var(--solune-muted); font-size: 13.5px; }
+  .couponzone-intro a { color: var(--solune-text); text-decoration: underline; text-underline-offset: 3px; }
+
+  .coupon-section { border-top: 1px solid var(--solune-text); padding-top: 22px; }
+  .coupon-section h2 { font-size: 16px; font-weight: 700; }
+  .coupon-section h2 + p { margin-top: 10px; color: var(--solune-muted); font-size: 12.5px; }
+
+  .coupon-list { display: block; margin-top: 18px; }
+  .coupon-card {
+    display: grid;
+    grid-template-columns: 130px minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 22px;
+    overflow: visible;
+    border: 0;
+    border-bottom: 1px solid var(--solune-border);
+    border-radius: 0;
+    padding: 22px 0;
+    background: none;
+    box-shadow: none;
+  }
+  .coupon-card:hover { box-shadow: none; }
+
+  .coupon-visual {
+    width: 130px;
+    height: 86px;
+    grid-column: 1;
+    grid-row: 1 / span 3;
+    border: 0;
+    border-radius: 8px;
+    background: var(--solune-surface-soft);
+  }
+  .coupon-visual img, .coupon-visual-amount { min-height: 0; height: 86px; }
+  .coupon-visual-amount { padding: 8px; }
+  .coupon-visual-amount > span:first-child { color: var(--solune-text-soft); font-size: 22px; font-weight: 800; }
+  .coupon-visual-amount > span:last-child { margin-top: 2px; color: var(--solune-muted); font-size: 11px; }
+
+  /* 가운데: 종류·이름 → 금액 → 조건. 버튼은 오른쪽 칸으로 뺀다(본문 상자를 풀어 줄 칸에 바로 놓음). */
+  .coupon-body { display: contents; }
+  .coupon-head { display: flex; min-width: 0; flex-direction: column; grid-column: 2; grid-row: 1; }
+  .coupon-kind { color: var(--solune-primary); font-size: 11px; font-weight: 600; }
+  .coupon-title { margin-top: 2px; color: var(--solune-text-soft); font-size: 15px; font-weight: 600; }
+  .coupon-value { grid-column: 2; grid-row: 2; padding-top: 4px; }
+  .coupon-value-amount { color: var(--solune-text); font-size: 26px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
+  .coupon-meta { grid-column: 2; grid-row: 3; gap: 4px 14px; margin-top: 8px; color: var(--solune-muted); font-size: 12px; }
+  .coupon-meta svg { display: none; }
+  .coupon-meta a { color: var(--solune-text-soft); text-decoration: underline; text-underline-offset: 3px; }
+  .coupon-action { grid-column: 3; grid-row: 1 / span 3; align-self: center; padding: 0; }
+  .coupon-action button {
+    height: 40px;
+    border-radius: 999px;
+    padding: 0 20px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .coupon-action button:not(:disabled) { background: var(--solune-primary); color: var(--color-primary-content, #fff); }
+  .coupon-action button:not(:disabled):hover { filter: brightness(0.94); }
+
+  /* 폰: 사진을 줄이고 버튼은 아래 줄 전체 폭으로. */
+  @media (max-width: 639px) {
+    .coupon-card { grid-template-columns: 88px minmax(0, 1fr); column-gap: 14px; row-gap: 0; }
+    .coupon-visual { width: 88px; height: 64px; align-self: start; }
+    .coupon-visual img, .coupon-visual-amount { height: 64px; }
+    .coupon-visual-amount > span:first-child { font-size: 16px; white-space: nowrap; }
+    .coupon-value-amount { font-size: 22px; }
+    .coupon-action { grid-column: 1 / -1; grid-row: 4; margin-top: 12px; }
+    .coupon-action button { width: 100%; }
+  }
+}

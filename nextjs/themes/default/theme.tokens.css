@@ -1,0 +1,222 @@
+/* =====================================================================
+   Solune theme — design tokens.
+
+   Values are lifted from the reference Solune Gnuboard theme. The live palette there is the BLUE one declared in
+   `css/community.css` under html[data-theme="light"] — it overrides the green
+   defaults in `css/default.css`, so the blue values are what the site shows.
+
+   Three layers live here, in this order:
+   1. --solune-* raw variables (the reference site's own names, reused as-is
+      by theme.shell.css / theme.home.css).
+   2. shadcn HSL triples so every Radix/shadcn control inherits the palette.
+   3. daisyUI v5 --color-* variables (scoped to the themed <body>).
+   ===================================================================== */
+
+:root {
+  /* --- reference-site variables (light) ------------------------------- */
+  --solune-page: #f5f7fa;
+  --solune-surface: #ffffff;
+  --solune-surface-soft: #f8fafc;
+  --solune-surface-tint: #edf4ff;
+  --solune-text: #101828;
+  --solune-text-soft: #344054;
+  /* #667085 는 옅은 바탕(#eef2f6)에서 4.4:1 로 AA 에 살짝 못 미쳐 한 단계 내렸다(4.75:1, 흰 바탕 5.35:1). */
+  --solune-muted: #626b7f;
+  --solune-border: #d9e0ea;
+  --solune-border-strong: #c6d0dd;
+  --solune-primary: #3159b7;
+  --solune-primary-hover: #254a9f;
+  --solune-primary-soft: #edf4ff;
+  --solune-primary-ink: #ffffff;
+  --solune-secondary: #4361b5;
+  --solune-accent: #3159b7;
+  --solune-danger: #bd4e54;
+  --solune-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --solune-shadow-md: 0 14px 36px rgba(16, 24, 40, 0.08);
+  --solune-shadow-lift: 0 10px 22px -8px rgba(16, 24, 40, 0.16);
+  --solune-radius-sm: 0.5rem;
+  --solune-radius-md: 0.75rem;
+  --solune-radius-lg: 1rem;
+  --solune-radius-pill: 999px;
+  --solune-shell: 80rem;
+  --solune-sidebar: 18rem;
+  --solune-header-height: 4rem;
+  --solune-font: "Pretendard Variable", Pretendard, "Noto Sans KR", -apple-system,
+    BlinkMacSystemFont, system-ui, sans-serif;
+  --solune-body-letter-spacing: -0.01em;
+  --solune-heading-letter-spacing: -0.025em;
+
+  /* --- shadcn tokens --------------------------------------------------- */
+  --background: 216 33% 97%;
+  --foreground: 220 43% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 43% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 43% 11%;
+  --primary: 222 58% 45%;
+  --primary-accessible: 222 62% 38%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 214 32% 95%;
+  --secondary-foreground: 220 43% 11%;
+  --muted: 214 32% 95%;
+  --muted-foreground: 221 13% 44%; /* = --solune-muted */
+  --accent: 217 100% 96%;
+  --accent-foreground: 222 62% 38%;
+  --destructive: 357 46% 52%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 215 29% 88%;
+  --input: 215 29% 88%;
+  --ring: 222 58% 45%;
+  --radius: 0.5rem;
+
+  /* --- legacy accent tokens some inner pages still reference ----------- */
+  --naver-green: #3159b7;
+  --naver-green-hover: #254a9f;
+  --green-text: #254a9f;
+  --naver-link: #3159b7;
+  --naver-caption: #667085;
+  --naver-fill: #f5f7fa;
+  --container-width: 80rem;
+  --surface-border: #d9e0ea;
+  --surface-hover: #edf4ff;
+  --text-strong: #101828;
+  --text-body: #344054;
+  --text-soft: #667085;
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --shadow-card-hover: 0 10px 22px -8px rgba(16, 24, 40, 0.16);
+  --accent-bar: linear-gradient(180deg, #3159b7 0%, #254a9f 100%);
+}
+
+/* Dark values mirror the reference site's html[data-theme="dark"] block.
+   Two entry points, because the app pins next-themes to light
+   (src/app/layout.tsx, forcedTheme="light") and never sets `.dark`:
+   - `:root.dark` — used automatically if that pin is ever lifted.
+   - `:root[data-solune-theme="dark"]` — what this theme's own header swap
+     sets, mirroring the reference site's localStorage key `solune-theme`.
+   Overriding the variables (rather than relying on the `.dark` class) is what
+   makes shadcn and daisyUI components follow along, since both read them. */
+:root.dark,
+:root[data-solune-theme="dark"] {
+  color-scheme: dark;
+  --solune-page: #0b1220;
+  --solune-surface: #182235;
+  --solune-surface-soft: #202c42;
+  --solune-surface-tint: #263a63;
+  --solune-text: #edf2ff;
+  --solune-text-soft: #c7d2e6;
+  --solune-muted: #9aa8bf;
+  --solune-border: #33445f;
+  --solune-border-strong: #455979;
+  --solune-primary: #8eaeff;
+  --solune-primary-hover: #b4c8ff;
+  --solune-primary-soft: #24365e;
+  --solune-primary-ink: #0b1220;
+  --solune-secondary: #aab8ff;
+  --solune-accent: #a9bfff;
+  --solune-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24);
+  --solune-shadow-md: 0 18px 42px rgba(0, 0, 0, 0.26);
+  --solune-shadow-lift: 0 10px 22px -8px rgba(0, 0, 0, 0.6);
+
+  --background: 220 49% 8%;
+  --foreground: 223 100% 96%;
+  --card: 219 38% 15%;
+  --card-foreground: 223 100% 96%;
+  --popover: 219 38% 15%;
+  --popover-foreground: 223 100% 96%;
+  --primary: 223 100% 78%;
+  --primary-accessible: 223 100% 80%;
+  --primary-foreground: 220 49% 8%;
+  --secondary: 219 35% 19%;
+  --secondary-foreground: 223 100% 96%;
+  --muted: 219 35% 19%;
+  --muted-foreground: 217 22% 68%;
+  --accent: 219 45% 26%;
+  --accent-foreground: 223 100% 90%;
+  --destructive: 357 60% 62%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 217 30% 29%;
+  --input: 217 30% 29%;
+  --ring: 223 100% 78%;
+}
+
+/* daisyUI v5 variables. Scoped to the themed <body> so they beat daisyUI's
+   default theme without leaking into other theme sources.
+
+   Deliberately NOT overridden here: --color-secondary, --color-accent and
+   --border. globals.css maps --color-secondary/--color-accent onto shadcn's
+   bg-secondary / hover:bg-accent, and shadcn reads --border as an HSL triple
+   while daisyUI uses it as a border WIDTH. Setting them on <body> repaints or
+   breaks every shadcn surface. daisyUI's 1px width is scoped to daisyUI
+   components in the rule below instead. */
+body[data-g5-theme-source="default"] {
+  --color-base-100: #ffffff;
+  --color-base-200: #f5f7fa;
+  --color-base-300: #d9e0ea;
+  --color-base-content: #101828;
+  --color-primary: #3159b7;
+  --color-primary-content: #ffffff;
+  --color-neutral: #101828;
+  --color-neutral-content: #edf2ff;
+  --color-info: #3159b7;
+  --color-info-content: #ffffff;
+  --color-success: #157347;
+  --color-success-content: #ffffff;
+  --color-warning: #b45309;
+  --color-warning-content: #ffffff;
+  --color-error: #bd4e54;
+  --color-error-content: #ffffff;
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.75rem;
+
+  background-color: var(--solune-page);
+  color: var(--solune-text);
+  font-family: var(--solune-font);
+  letter-spacing: var(--solune-body-letter-spacing);
+  /* Korean wraps on word boundaries; the pair keeps long URLs from overflowing. */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+:root.dark body[data-g5-theme-source="default"],
+:root[data-solune-theme="dark"] body[data-g5-theme-source="default"] {
+  --color-base-100: #182235;
+  --color-base-200: #0b1220;
+  --color-base-300: #33445f;
+  --color-base-content: #edf2ff;
+  --color-primary: #8eaeff;
+  --color-primary-content: #0b1220;
+  --color-neutral: #edf2ff;
+  --color-neutral-content: #0b1220;
+}
+
+/* 앱의 공용 컨트롤은 밝은 값을 유틸리티로 못박아 둔다(input/textarea/select/드롭다운의 bg-white,
+   text-[#333], border-[#dadce0]; 배지 outline 의 bg-white; 로그인 상자의 bg-[#fbfcfb]).
+   앱 자체는 다크 모드를 열지 않으니 거기선 문제가 없지만, 이 테마의 다크에서는 흰 칸에
+   흰 글자가 된다(입력 글자 대비 1.1:1). 앱 컴포넌트를 건드리지 않고 여기서 되돌린다 —
+   선택자가 유틸리티(클래스 하나)보다 무거워 그냥 이긴다. */
+:root.dark body[data-g5-theme-source="default"] :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select, [data-slot="select-trigger"], [data-slot="select-content"], [data-slot="dropdown-menu-content"], [data-slot="dropdown-menu-sub-content"]),
+:root[data-solune-theme="dark"] body[data-g5-theme-source="default"] :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select, [data-slot="select-trigger"], [data-slot="select-content"], [data-slot="dropdown-menu-content"], [data-slot="dropdown-menu-sub-content"]) {
+  background-color: var(--solune-surface);
+  border-color: var(--solune-border-strong);
+  color: var(--solune-text);
+}
+:root.dark body[data-g5-theme-source="default"] :is(input, textarea)::placeholder,
+:root[data-solune-theme="dark"] body[data-g5-theme-source="default"] :is(input, textarea)::placeholder {
+  color: var(--solune-muted);
+}
+:root.dark body[data-g5-theme-source="default"] :is([data-slot="badge"].bg-white, .bg-\[\#fbfcfb\]),
+:root[data-solune-theme="dark"] body[data-g5-theme-source="default"] :is([data-slot="badge"].bg-white, .bg-\[\#fbfcfb\]) {
+  background-color: var(--solune-surface-soft);
+  border-color: var(--solune-border);
+}
+/* 로그인·가입 폼이 제목 글자를 text-[#202124] 로 못박는다(7곳). 다크에선 검정 위 검정. */
+:root.dark body[data-g5-theme-source="default"] .text-\[\#202124\],
+:root[data-solune-theme="dark"] body[data-g5-theme-source="default"] .text-\[\#202124\] {
+  color: var(--solune-text);
+}
+
+body[data-g5-theme-source="default"]
+  :is(.btn, .badge, .tab, .tabs, .menu, .card, .input, .kbd, .drawer, .steps, .step) {
+  --border: 1px;
+}

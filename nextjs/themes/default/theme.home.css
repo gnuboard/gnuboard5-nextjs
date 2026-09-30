@@ -1,0 +1,259 @@
+/* =====================================================================
+   Solune theme — community home (content rail, board panels, sidebar).
+   Geometry follows the reference site's #container_wr / .solune-reference-panel
+   rules in theme/solune/css/community.css.
+   ===================================================================== */
+
+.solune-content-shell {
+  display: grid;
+  width: min(100%, var(--solune-shell));
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 2rem;
+  margin-inline: auto;
+  padding: 1.5rem 1rem 2.5rem;
+}
+@media (min-width: 640px) {
+  .solune-content-shell { padding-inline: 1.5rem; }
+}
+@media (min-width: 1024px) {
+  .solune-content-shell {
+    grid-template-columns: minmax(0, 1fr) var(--solune-sidebar);
+    padding: 2rem 2rem 3rem;
+  }
+}
+.solune-main-content { display: grid; min-width: 0; gap: 1.25rem; }
+.solune-sidebar { display: grid; min-width: 0; gap: 1rem; }
+
+/* --- board panels ------------------------------------------------------ */
+.solune-board-grid { display: grid; gap: 1.25rem; }
+@media (min-width: 768px) {
+  .solune-board-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.solune-reference-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--solune-border);
+  border-radius: var(--solune-radius-md);
+  background: var(--solune-surface);
+  box-shadow: var(--solune-shadow-sm);
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.solune-reference-panel:is(:hover, :focus-within) { box-shadow: var(--solune-shadow-lift); }
+.solune-panel-head {
+  display: flex;
+  min-height: 3.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--solune-border);
+  padding: 1rem 1.25rem;
+}
+.solune-panel-title {
+  color: var(--solune-text);
+  font-size: 1.125rem;
+  font-weight: 900;
+  letter-spacing: var(--solune-heading-letter-spacing);
+}
+.solune-panel-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: var(--solune-radius-pill);
+  padding: 0.25rem 0.6rem;
+  color: var(--solune-text);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+.solune-panel-more:hover {
+  background: var(--solune-primary-soft);
+  color: var(--solune-primary);
+}
+.solune-panel-body { padding: 0.35rem 1.25rem 1rem; }
+
+/* --- latest lists ------------------------------------------------------ */
+.solune-latest-list { display: grid; }
+.solune-latest-list li { border-bottom: 1px solid var(--solune-border); }
+.solune-latest-list li:last-child { border-bottom: 0; }
+.solune-latest-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+}
+/* 레퍼런스 latest 스킨 실측(2026-09): 제목 14px · 본문색, 줄 높이 20px, 한 줄 45px. */
+.solune-latest-subject {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--solune-text);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  transition: color 0.16s ease;
+}
+.solune-latest-subject:hover { color: var(--solune-primary); }
+.solune-latest-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 비밀글 표 — 레퍼런스 badge-ghost: 옅은 회색 바탕의 작은 글자. */
+.solune-latest-badge {
+  flex: 0 0 auto;
+  border-radius: 0.3rem;
+  padding: 0.1rem 0.4rem;
+  background: var(--solune-surface-soft);
+  color: var(--solune-text-soft);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+/* 레퍼런스는 댓글 수를 접두사 없는 파란 숫자로 제목 옆에 붙인다. */
+.solune-latest-comment {
+  flex: 0 0 auto;
+  color: var(--solune-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.solune-latest-meta {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--solune-muted);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+/* 글쓴이는 회원 사이드뷰 단추(SoluneAuthor) — 제목 링크 밖에 선다. 사진 16px · 이름 진한 회색. */
+.solune-latest-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--solune-text-soft);
+  font-weight: 500;
+  --solune-author-photo: 1rem;
+}
+button.solune-latest-author:hover { color: var(--solune-primary); text-decoration: none; }
+.solune-latest-author .solune-author-name {
+  max-width: 6rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 글쓴이 사진 — 회원 사진, 없으면 레퍼런스 no_profile 처럼 회색 동그라미 속 기본 얼굴. */
+.solune-author-photo {
+  display: inline-grid;
+  width: var(--solune-author-photo, 1.375rem);
+  height: var(--solune-author-photo, 1.375rem);
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--solune-border) 70%, var(--solune-surface));
+  color: var(--solune-surface);
+}
+.solune-author-photo img { width: 100%; height: 100%; object-fit: cover; }
+.solune-author-photo svg { width: 72%; height: 72%; margin-top: 18%; }
+/* 이니셜 아바타(글 보기 머리의 글쓴이). */
+.solune-avatar {
+  display: inline-grid;
+  width: 1.3rem;
+  height: 1.3rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--solune-primary-soft);
+  color: var(--solune-primary);
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+}
+@media (max-width: 639px) {
+  /* 좁은 화면에서는 날짜만 남긴다 — 제목이 밀리는 것보다 낫다. */
+  .solune-latest-author { display: none; }
+}
+.solune-empty {
+  padding: 1.25rem 0;
+  color: var(--solune-muted);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+/* --- sidebar widgets --------------------------------------------------- */
+/* 레퍼런스 community-sidebar: 둥근 1rem 카드, 제목 줄에 선을 긋지 않고 여백으로 가른다.
+   목록은 줄 사이에만 선(첫 줄 위는 없음). */
+.solune-sidebar-widget {
+  position: relative;
+  min-width: 0;
+  border: 1px solid var(--solune-border);
+  border-radius: 1rem;
+  background: var(--solune-surface);
+  box-shadow: var(--solune-shadow-sm);
+}
+.solune-sidebar-widget-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1.25rem 1.25rem 0.75rem;
+}
+.solune-sidebar-widget-head h2 {
+  color: var(--solune-text);
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.4;
+}
+.solune-sidebar-head-link {
+  display: inline-flex;
+  min-height: 1.75rem;
+  flex: none;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--solune-muted); /* 레퍼런스의 45~55% 흐림은 AA 대비(4.5:1) 미달 — muted 토큰(5.3:1) */
+  font-size: 0.7rem;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+.solune-sidebar-head-link:hover { color: var(--solune-primary); }
+.solune-sidebar-widget-body { padding: 0.25rem 1.25rem 1.25rem; }
+
+.solune-popular-list { display: grid; }
+.solune-popular-list li { border-top: 1px solid var(--solune-border); }
+.solune-popular-list li:first-child { border-top: 0; }
+.solune-popular-item {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.65rem 0;
+  color: var(--solune-text-soft);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.4;
+  transition: color 0.2s ease;
+}
+.solune-popular-item:hover { color: var(--solune-primary); }
+.solune-popular-rank {
+  color: var(--solune-primary);
+  font-size: 0.8rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.solune-popular-word {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.solune-popular-meta {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--solune-muted);
+  font-size: 0.7rem;
+}

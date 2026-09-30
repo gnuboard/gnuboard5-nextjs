@@ -1,0 +1,129 @@
+name: Live QA
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      theme_source:
+        description: 'Optional theme source to test; required when live_app_url is set'
+        required: false
+        default: ''
+        type: string
+      live_app_url:
+        description: 'Optional live app URL override for the selected theme_source'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+  deployments: read
+
+concurrency:
+  group: live-qa-${{ github.event.deployment.ref || github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  theme-matrix:
+    name: Build Vercel theme matrix
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'deployment_status' &&
+        github.event.deployment_status.state == 'success' &&
+        (
+          github.event.deployment.ref == 'main' ||
+          github.event.deployment.ref == 'main2' ||
+          github.event.deployment.environment == 'Production' ||
+          github.event.deployment.environment == 'production'
+        )
+      )
+    outputs:
+      matrix: ${{ steps.theme-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build theme matrix
+        id: theme-matrix
+        env:
+          THEME_SOURCE_FILTER: ${{ github.event.inputs.theme_source || '' }}
+          LIVE_APP_URL_OVERRIDE: ${{ github.event.inputs.live_app_url || '' }}
+        run: node nextjs/scripts/print-vercel-theme-matrix.mjs
+
+  live-qa:
+    name: Live browser QA (${{ matrix.theme_source }})
+    needs: theme-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.theme-matrix.outputs.matrix) }}
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      LIVE_API_URL: ${{ vars.LIVE_API_URL }}
+      NEXT_PUBLIC_G5_URL: ${{ vars.LIVE_G5_URL }}
+      G5_API_INTERNAL_URL: ${{ vars.LIVE_API_URL }}
+      G5_THEME_SOURCE: ${{ matrix.theme_source }}
+      G5_THEME_NAME: ${{ matrix.theme_name }}
+      G5_E2E_USER_ID: ${{ secrets.G5_E2E_USER_ID }}
+      G5_E2E_USER_PASSWORD: ${{ secrets.G5_E2E_USER_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: nextjs/package-lock.json
+
+      - name: Resolve live URL
+        run: |
+          app_url="${{ matrix.app_url }}"
+          if [ -z "$app_url" ]; then
+            echo "Missing matrix.app_url for ${{ matrix.theme_source }}" >&2
+            exit 1
+          fi
+          echo "LIVE_APP_URL=$app_url" >> "$GITHUB_ENV"
+          echo "PLAYWRIGHT_BASE_URL=$app_url" >> "$GITHUB_ENV"
+          echo "LOCAL_APP_URL=$app_url" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_APP_URL=$app_url" >> "$GITHUB_ENV"
+          expected_api_url="${LIVE_API_URL:-${app_url%/}/api/v1}"
+          echo "LOCAL_EXPECTED_API_URL=$expected_api_url" >> "$GITHUB_ENV"
+          echo "Testing ${{ matrix.theme_source }} at $app_url"
+          echo "Deployment target: ${{ github.event.deployment_status.target_url }}"
+
+      - name: Install dependencies
+        working-directory: nextjs
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: nextjs
+        run: npx playwright install --with-deps chromium
+
+      - name: Check live RSC routes
+        working-directory: nextjs
+        run: npm run check:live-rsc-payloads
+
+      - name: Run live browser smoke
+        working-directory: nextjs
+        run: npm run check:browser-smoke
+
+      - name: Run live auth browser checks
+        if: env.G5_E2E_USER_ID != '' && env.G5_E2E_USER_PASSWORD != ''
+        working-directory: nextjs
+        env:
+          LOCAL_SMOKE_LOGIN_ID: ${{ secrets.G5_E2E_USER_ID }}
+          LOCAL_SMOKE_LOGIN_PASSWORD: ${{ secrets.G5_E2E_USER_PASSWORD }}
+        run: npm run check:browser-auth
+
+      - name: Run server runtime auth smoke
+        if: env.G5_E2E_USER_ID != '' && env.G5_E2E_USER_PASSWORD != ''
+        working-directory: nextjs
+        env:
+          LOCAL_SMOKE_LOGIN_ID: ${{ secrets.G5_E2E_USER_ID }}
+          LOCAL_SMOKE_LOGIN_PASSWORD: ${{ secrets.G5_E2E_USER_PASSWORD }}
+        run: npm run check:server-runtime-auth

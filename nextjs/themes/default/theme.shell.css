@@ -1,0 +1,595 @@
+/* =====================================================================
+   Solune theme — page chrome (service switch, sticky header, mega menu,
+   drawer, footer). Class names and geometry follow the reference site
+   (theme/solune/css/community-header.css + community-drawer.css) so the two
+   implementations stay comparable rule for rule.
+   ===================================================================== */
+
+/* --- shared rail ------------------------------------------------------ */
+.solune-shell {
+  width: min(100%, var(--solune-shell));
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+@media (min-width: 640px) {
+  .solune-shell { padding-inline: 1.5rem; }
+}
+@media (min-width: 1024px) {
+  .solune-shell { padding-inline: 2rem; }
+}
+
+.solune-root {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  background: var(--solune-page);
+}
+.solune-wrapper { min-height: 32rem; flex: 1 1 auto; }
+
+/* --- service switch strip -------------------------------------------- */
+.solune-community-header-shell { background: var(--solune-surface); }
+.solune-community-service-switch {
+  border-bottom: 1px solid var(--solune-border);
+  background: var(--solune-surface);
+}
+.solune-community-service-switch-inner {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.solune-community-service-links,
+.solune-community-member-menu { display: flex; align-items: center; }
+/* Pull the first link back by its own padding so its glyph lines up with the
+   logo and the cards below it. The hit area is unchanged. */
+.solune-community-service-links { gap: 0.25rem; margin-inline-start: -0.7rem; }
+.solune-community-service-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.55rem 0.7rem;
+  color: color-mix(in oklab, var(--solune-text) 64%, transparent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+.solune-community-service-link:hover,
+.solune-community-service-link:focus-visible { color: var(--solune-primary); }
+.solune-community-service-link-active { color: var(--solune-text); }
+/* The reference marks the current service with an underline bar, not a divider. */
+.solune-community-service-link-active::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  right: 0.7rem;
+  bottom: -2px;
+  left: 0.7rem;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--solune-primary);
+}
+
+.solune-community-member-menu {
+  margin-left: auto;
+  min-height: 2.25rem;
+  gap: 1rem;
+  color: var(--solune-muted);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.solune-community-member-utilities { display: contents; }
+.solune-community-member-menu :is(a, button) {
+  display: inline-flex;
+  min-width: 2.75rem;
+  min-height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 0.25rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.solune-community-member-menu :is(a, button):hover { color: var(--solune-text); }
+/* 메뉴 공통 규칙(:is(a, button))이 더 세서 파란 굵은 글씨가 지워졌다 — 같은 무게로 올린다. */
+.solune-community-member-menu .solune-community-member-signup,
+.solune-community-member-menu .solune-community-member-signup:hover { color: var(--solune-primary); font-weight: 700; }
+@media (max-width: 767px) {
+  /* Scoped through the parent so it outranks the `:is(a, button)` rule above,
+     which would otherwise keep these three links laid out on phones. */
+  .solune-community-member-menu .solune-community-member-utility { display: none; }
+}
+/* Safety net: however long the strip gets (long nickname, extra utilities), it
+   scrolls inside itself instead of widening the page. */
+.solune-community-service-switch-inner {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.solune-community-service-switch-inner::-webkit-scrollbar { display: none; }
+
+/* --- sticky main header ---------------------------------------------- */
+.solune-community-header-sticky {
+  position: sticky;
+  z-index: 50;
+  top: 0;
+  background: var(--solune-surface);
+}
+.solune-community-header {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  border-bottom: 1px solid color-mix(in srgb, var(--solune-border) 84%, transparent);
+  background: transparent;
+  box-shadow:
+    0 1px 3px color-mix(in srgb, var(--solune-text) 8%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--solune-text) 3%, transparent);
+}
+.solune-community-header::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: color-mix(in srgb, var(--solune-surface) 88%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+.solune-community-mainbar {
+  display: flex;
+  min-height: var(--solune-header-height);
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* 스크롤 상태(layout-shell.tsx 의 useHeaderScrollState, 레퍼런스 theme.js 와 같은 문턱).
+   8px 넘게 내리면 헤더가 본문 위에 떠 있다는 표시로 바탕을 채우고 그림자를 짙게 한다.
+   70px 넘게 내리면 바 64 -> 48px, 로고 32 -> 26px 로 .2s 동안 줄어든다(시안 비율 -25% / -19%). */
+.solune-community-header::before { transition: background-color 0.18s ease; }
+.solune-community-header.is-scrolled {
+  border-bottom-color: var(--solune-border);
+  box-shadow: var(--solune-shadow-sm), 0 4px 12px color-mix(in srgb, var(--solune-text) 7%, transparent);
+}
+.solune-community-header.is-scrolled::before { background: var(--solune-surface); }
+.solune-community-mainbar { transition: min-height 0.2s ease; }
+/* 헤더 브랜드의 로고만 줄인다. 서랍 패널도 헤더 안에 있어 범위를 좁히지 않으면 함께 줄어든다. */
+.solune-community-brand .solune-brand-logo { transition: height 0.2s ease; }
+.solune-community-header.is-condensed .solune-community-mainbar { min-height: 3rem; }
+.solune-community-header.is-condensed .solune-community-brand .solune-brand-logo { height: 1.625rem; }
+/* 헤더는 sticky 라 흐름 안에 자리를 차지한다. 줄어드는 순간 문서가 그만큼 짧아져 본문이 위로
+   튀므로(16px), 줄어든 만큼을 헤더 아래 여백으로 되돌려 흐름 높이를 그대로 둔다. */
+.solune-community-header-sticky { transition: margin-bottom 0.2s ease; }
+.solune-community-header-sticky:has(.solune-community-header.is-condensed) { margin-bottom: 1rem; }
+@media (prefers-reduced-motion: reduce) {
+  .solune-community-header::before,
+  .solune-community-mainbar,
+  .solune-community-brand .solune-brand-logo,
+  .solune-community-header-sticky { transition: none; }
+}
+
+.solune-community-brand {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--solune-text);
+}
+/* 로고는 원본 solune 테마처럼 그누보드 쪽 그림(img/logo.png, 쇼핑몰은 data/common/logo_img)이다.
+   관리자가 그림을 갈면 여기도 바뀐다. 높이만 정하고 너비는 그림 비율을 따른다. */
+.solune-brand-logo { display: block; width: auto; height: 2rem; }
+.solune-footer .solune-brand-logo { height: 30px; }
+.solune-community-drawer-brand .solune-brand-logo { height: 26px; }
+/* 로고 글자가 짙은 회색이라 어두운 바탕에서는 흰색으로 뒤집는다(원본 테마 서랍과 같은 방식). */
+:root[data-solune-theme="dark"] .solune-brand-logo { filter: brightness(0) invert(1); opacity: 0.92; }
+.solune-brand-name {
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: var(--solune-heading-letter-spacing);
+}
+
+/* --- mega menu -------------------------------------------------------- */
+/* Hover / focus-within only, no JS. The reference panel opens the same way. */
+.solune-community-mega {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-self: stretch;
+  align-items: center;
+}
+.solune-community-mega-list {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.15rem;
+  margin-left: 1rem;
+  overflow: visible;
+}
+.solune-community-mega-item { position: relative; display: flex; }
+.solune-community-mega-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 0;
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  background: transparent;
+  color: color-mix(in oklab, var(--solune-text) 78%, transparent);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.6;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.solune-community-mega-item:hover > .solune-community-mega-trigger,
+.solune-community-mega-item:focus-within > .solune-community-mega-trigger,
+.solune-community-mega-trigger:hover,
+.solune-community-mega-trigger:focus-visible {
+  background: var(--solune-primary-soft);
+  color: var(--solune-primary);
+  outline: 0;
+}
+.solune-community-mega-caret { font-size: 0.6rem; transition: transform 0.16s ease; }
+.solune-community-mega-item:hover > .solune-community-mega-trigger .solune-community-mega-caret,
+.solune-community-mega-item:focus-within > .solune-community-mega-trigger .solune-community-mega-caret {
+  transform: rotate(180deg);
+}
+.solune-community-mega-panel {
+  position: absolute;
+  z-index: 80;
+  top: 100%;
+  left: 0;
+  width: max-content;
+  min-width: 12rem;
+  max-width: min(34rem, calc(100vw - 2rem));
+  visibility: hidden;
+  border: 1px solid var(--solune-border);
+  border-radius: 0.625rem;
+  background: var(--solune-surface);
+  box-shadow: 0 18px 36px color-mix(in srgb, var(--solune-text) 10%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-0.35rem);
+  transition: opacity 0.16s, transform 0.16s, visibility 0.16s;
+}
+.solune-community-mega-item:hover > .solune-community-mega-panel,
+.solune-community-mega-item:focus-within > .solune-community-mega-panel {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+/* 메뉴를 눌러 이동하면 포인터가 칸을 벗어날 때까지 닫아 둔다(layout-shell.tsx MegaNav 의 is-dismissed). */
+.solune-community-mega-item.is-dismissed > .solune-community-mega-panel {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+.solune-community-mega-item.is-dismissed > .solune-community-mega-trigger .solune-community-mega-caret { transform: none; }
+.solune-community-mega-panel-inner { display: grid; justify-content: start; padding: 0.875rem; }
+.solune-community-mega-links { display: grid; gap: 0.1rem; }
+.solune-community-mega-link {
+  display: block;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  color: color-mix(in oklab, var(--solune-text) 82%, transparent);
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+.solune-community-mega-link:hover,
+.solune-community-mega-link:focus-visible {
+  background: var(--solune-primary-soft);
+  color: var(--solune-primary);
+}
+@media (max-width: 1023px) {
+  .solune-community-mega { display: none; }
+}
+
+/* --- header search + actions ------------------------------------------ */
+.solune-community-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+.solune-community-search-toggle {
+  display: inline-flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--solune-text);
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+.solune-community-search-toggle:hover,
+.solune-community-search-toggle:focus-visible,
+.solune-community-search-toggle[aria-expanded="true"] {
+  background: var(--solune-surface-soft);
+  color: var(--solune-primary);
+  outline: 0;
+}
+
+/* 검색 독. 머리 아래로 펼쳐지는 한 줄 — 사각에 가까운 입력, 오른쪽에 굵은 단추.
+   레퍼런스 community-search.css 와 같은 모양이다. */
+.solune-community-search-dock {
+  border-bottom: 1px solid var(--solune-border);
+  background: var(--solune-surface);
+  box-shadow: 0 12px 24px -18px rgb(15 23 42 / 0.25);
+}
+.solune-community-search-dock[hidden] { display: none; }
+.solune-community-search-dock > .solune-shell { padding-block: 1rem 1.25rem; }
+.solune-community-search-panel {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid var(--solune-border);
+  border-radius: 0.5rem;
+  padding: 0 0.5rem 0 0.75rem;
+  background: var(--solune-surface);
+  box-shadow: var(--solune-shadow-sm);
+  transition: border-color 0.16s, box-shadow 0.16s;
+}
+.solune-community-search-panel:focus-within { border-color: var(--solune-primary); box-shadow: 0 0 0 1px var(--solune-primary); }
+.solune-community-search-panel > svg { flex: none; color: var(--solune-muted); }
+.solune-community-search-panel input {
+  min-width: 0;
+  flex: 1 1 auto;
+  border: 0;
+  background: transparent;
+  padding: 0.75rem 0.5rem;
+  color: var(--solune-text);
+  font-size: 0.875rem;
+  outline: 0;
+}
+.solune-community-search-panel input::placeholder { color: var(--solune-muted); }
+.solune-community-search-panel button {
+  flex: none;
+  height: 2rem;
+  border: 0;
+  border-radius: 0.5rem;
+  padding-inline: 0.75rem;
+  background: var(--solune-primary);
+  color: var(--solune-primary-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.16s;
+}
+.solune-community-search-panel button:hover { background: var(--solune-primary-hover); }
+
+/* --- drawer (daisyUI checkbox pattern, no JS) -------------------------- */
+.solune-community-drawer.drawer {
+  display: grid;
+  order: 1;
+  flex: none;
+  grid-auto-columns: auto;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+}
+.solune-community-drawer .drawer-content {
+  display: flex;
+  grid-column-start: 1;
+  width: auto;
+  min-width: 0;
+}
+.solune-community-drawer .drawer-side { z-index: 120; }
+.solune-community-drawer-toggle {
+  display: inline-flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  min-height: auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--solune-text);
+  cursor: pointer;
+}
+.solune-community-drawer-toggle:hover,
+.solune-community-drawer-toggle:focus-visible {
+  background: var(--solune-surface-soft);
+  color: var(--solune-primary);
+  outline: 0;
+}
+.solune-community-drawer-side .drawer-overlay { border: 0; padding: 0; }
+.solune-community-drawer-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(20.5rem, 86vw);
+  height: 100dvh;
+  border-right: 1px solid var(--solune-border);
+  background: var(--solune-surface);
+  box-shadow: 8px 0 28px -12px rgb(15 23 42 / 0.28);
+  overscroll-behavior: contain;
+}
+.solune-community-drawer-head {
+  display: flex;
+  min-height: 4rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--solune-border);
+  padding: 0.9rem 1rem;
+  background: var(--solune-surface-soft);
+}
+.solune-community-drawer-brand {
+  display: inline-flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--solune-text);
+}
+.solune-community-drawer-close {
+  display: inline-flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0.5rem;
+  padding: 0;
+  background: transparent;
+  color: color-mix(in oklab, var(--solune-text) 64%, transparent);
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.solune-community-drawer-close:hover,
+.solune-community-drawer-close:focus-visible {
+  background: color-mix(in oklab, var(--solune-text) 8%, transparent);
+  color: var(--solune-text);
+}
+.solune-community-drawer-nav {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.85rem 0.75rem 1rem;
+  scrollbar-color: var(--solune-border-strong) transparent;
+  scrollbar-width: thin;
+}
+.solune-community-drawer-menu { display: grid; gap: 0.1rem; width: 100%; }
+.solune-community-drawer-menu-link {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.65rem;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.55rem;
+  color: color-mix(in oklab, var(--solune-text) 82%, transparent);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.solune-community-drawer-menu-link:hover,
+.solune-community-drawer-menu-link:focus-visible,
+.solune-community-drawer-menu-link.is-active {
+  background: var(--solune-primary-soft);
+  color: var(--solune-primary);
+}
+.solune-community-drawer-submenu { display: grid; gap: 0.1rem; padding-left: 1.1rem; }
+.solune-community-drawer-submenu-link {
+  display: flex;
+  min-height: 2.25rem;
+  align-items: center;
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.55rem;
+  color: color-mix(in oklab, var(--solune-text) 65%, transparent);
+  font-size: 0.8125rem;
+}
+.solune-community-drawer-submenu-link:hover,
+.solune-community-drawer-submenu-link:focus-visible {
+  background: var(--solune-surface-soft);
+  color: var(--solune-primary);
+}
+.solune-community-drawer-actions {
+  display: grid;
+  gap: 0.5rem;
+  border-top: 1px solid var(--solune-border);
+  padding: 0.85rem 1rem 1.1rem;
+}
+.solune-drawer-action {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid var(--solune-border);
+  border-radius: 0.5rem;
+  color: var(--solune-text-soft);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+.solune-drawer-action-primary {
+  border-color: transparent;
+  background: var(--solune-primary);
+  color: var(--solune-primary-ink);
+}
+
+/* --- footer ------------------------------------------------------------ */
+.solune-footer {
+  border-top: 1px solid var(--solune-border);
+  background: var(--solune-surface);
+}
+.solune-footer-inner { padding-block: 2rem; }
+@media (min-width: 640px) {
+  .solune-footer-inner { padding-block: 2.5rem; }
+}
+.solune-footer-top {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  border-bottom: 1px solid var(--solune-border);
+  padding-bottom: 1.75rem;
+}
+@media (min-width: 640px) {
+  .solune-footer-top { flex-direction: row; align-items: center; justify-content: space-between; }
+}
+.solune-footer-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  color: color-mix(in oklab, var(--solune-text) 64%, transparent);
+  font-size: 0.75rem;
+}
+.solune-footer-nav a:hover { color: var(--solune-primary); }
+/* 사이트 정보(사업자 정보) — 레퍼런스 .solune-footer-company: 이름표 흐리게, 값 한 단 진하게. */
+.solune-footer-company { border-bottom: 1px solid var(--solune-border); padding-block: 1.25rem; }
+.solune-footer-company-title { margin-bottom: 0.625rem; color: var(--solune-text-soft); font-size: 0.75rem; font-weight: 700; }
+.solune-footer-company-list { display: flex; flex-wrap: wrap; gap: 0.375rem 1.25rem; font-size: 0.75rem; line-height: 1.6; }
+.solune-footer-company-list > div { display: flex; min-width: 0; gap: 0.375rem; }
+.solune-footer-company-list dt { flex: none; color: var(--solune-muted); font-weight: 500; }
+.solune-footer-company-list dd { min-width: 0; color: var(--solune-text-soft); overflow-wrap: anywhere; }
+.solune-footer-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 1.25rem;
+  color: var(--solune-muted); /* 레퍼런스의 45~55% 흐림은 AA 대비(4.5:1) 미달 — muted 토큰(5.3:1) */
+  font-size: 0.75rem;
+}
+@media (min-width: 640px) {
+  .solune-footer-bottom { flex-direction: row; align-items: center; justify-content: space-between; }
+}
+
+/* 알림 — 새글과 마이페이지 사이의 링크. 안 읽은 게 있을 때만 배지가 붙는다. */
+.solune-community-member-menu .solune-community-member-notify {
+  position: relative;
+  gap: 0.3rem;
+  padding-inline: 0.35rem;
+}
+.solune-community-member-notify-icon { flex: 0 0 auto; }
+.solune-community-member-notify-unread { color: var(--solune-text); font-weight: 600; }
+.solune-community-member-notify-badge {
+  display: inline-flex;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 0.3rem;
+  border-radius: 999px;
+  background: var(--solune-primary);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+}

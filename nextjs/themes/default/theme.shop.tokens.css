@@ -1,0 +1,119 @@
+/* =====================================================================
+   Solune theme — shop ("Ondam" layer).
+
+   The reference shop (theme/solune/css/shop.css + shop-ondam.css +
+   shop-responsive.css) does not use the community's blue: it swaps the
+   palette to warm neutrals + deep forest green + terracotta, drops every
+   corner radius, and re-skins the header/footer. All of that is scoped to
+   .solune-shop-page here, exactly as the reference scopes it, so the
+   community pages keep their own tokens.
+
+   The carousels use Swiper 11, the same library and settings as the
+   reference (shop-swiper.tsx, shop-banner.tsx, shop-row.tsx,
+   shop-home-swipers.tsx; rules in theme.shop.home.css).
+   ===================================================================== */
+
+/* --- tokens ------------------------------------------------------------- */
+.solune-shop-page {
+  --shop-service-h: 41px;
+  --shop-mainbar-h: 72px;
+  --shop-mainbar-h-shrunk: 56px;
+
+  --solune-page: #ffffff;
+  --solune-surface: #ffffff;
+  --solune-surface-soft: #f2f2f0;
+  --solune-border: #e6e6e2;
+  --solune-border-strong: #d7d7d3;
+  --solune-text: #1b1a17;
+  --solune-text-soft: #4a4a46;
+  /* 옅은 글자 두 단계. 예전 #8a8a85 / #a5a5a1 는 흰 바탕에 3.5 / 2.5:1 이라 WCAG AA(4.5)에
+     못 미쳤다. 5.1 / 4.6:1 로 올린 값 — 눈에는 여전히 옅은 회색이다. */
+  --solune-muted: #6f6f69;
+  --solune-muted-soft: #75756f;
+  --solune-primary: #2f5347;
+  --solune-primary-hover: #234036;
+  --solune-primary-soft: #eef2f0;
+  --solune-primary-ink: #ffffff;
+
+  --ondam-ink: #1c1c1a;
+  --ondam-ink-soft: #2e2e2a;
+  --ondam-sale: #b6543a;
+  --ondam-sale-hover: #8f3d29;
+  --ondam-star: #c9a227;
+  --ondam-hairline: #f2f2f0;
+
+  /* daisyUI + shadcn read these; the shop is square-cornered throughout. */
+  --color-base-100: #ffffff;
+  --color-base-200: #ffffff;
+  --color-base-300: #e6e6e2;
+  --color-base-content: #1b1a17;
+  --color-primary: #2f5347;
+  --color-primary-content: #ffffff;
+  --color-neutral: #1c1c1a;
+  --color-neutral-content: #ffffff;
+  --radius-box: 0;
+  --radius-field: 0;
+  --radius-selector: 0;
+  --primary: 160 28% 25%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 160 28% 25%;
+  --radius: 0;
+  --background: 0 0% 100%;
+  --foreground: 40 7% 10%;
+  --muted: 60 4% 95%;
+  /* 흰 바탕의 작은 글자도 WCAG AA(4.5:1)를 넘도록 — 53% 는 3.5:1 이었다. --solune-muted(#6f6f69)와 같은 밝기. */
+  --muted-foreground: 40 3% 42%;
+  --border: 60 7% 89%;
+  --input: 60 7% 89%;
+
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  background: var(--solune-page);
+  color: var(--solune-text);
+}
+
+/* The reference has no dark shop; it keeps a warm dark twin for the header
+   swap. Keyed the same two ways as the community tokens. */
+:root.dark .solune-shop-page,
+:root[data-solune-theme="dark"] .solune-shop-page {
+  --solune-page: #14140f;
+  --solune-surface: #1c1c18;
+  --solune-surface-soft: #24241f;
+  --solune-border: #33332d;
+  --solune-border-strong: #45453d;
+  --solune-text: #f2f2ec;
+  --solune-text-soft: #cfcfc7;
+  --solune-muted: #9a9a92;
+  --solune-muted-soft: #85857d;
+  --solune-primary: #7fae9d;
+  --solune-primary-hover: #9cc4b5;
+  --solune-primary-soft: #24322c;
+  --solune-primary-ink: #14140f;
+
+  --ondam-ink: #0f0f0c;
+  --ondam-ink-soft: #24241f;
+  --ondam-sale: #e0866a;
+  --ondam-sale-hover: #f0a289;
+  --ondam-hairline: #2a2a24;
+
+  --color-base-100: #1c1c18;
+  --color-base-200: #14140f;
+  --color-base-300: #33332d;
+  --color-base-content: #f2f2ec;
+  --color-primary: #7fae9d;
+  --color-primary-content: #14140f;
+  --color-neutral: #0f0f0c;
+  --primary: 158 23% 59%;
+  --primary-foreground: 60 14% 7%;
+  --background: 60 14% 7%;
+  --foreground: 60 19% 94%;
+  --muted: 60 8% 13%;
+  --muted-foreground: 60 4% 59%;
+  --border: 60 6% 19%;
+  --input: 60 6% 19%;
+}
+
+/* :has() 가 없는 브라우저를 위해 .solune-shop-page 자체도 같은 바탕을 화면 높이만큼 깐다(아래 규칙). */
+body[data-g5-theme-source="default"]:has(.solune-shop-page) { background: var(--solune-page); }
+.solune-shop-page { min-height: 100vh; background: var(--solune-page); }

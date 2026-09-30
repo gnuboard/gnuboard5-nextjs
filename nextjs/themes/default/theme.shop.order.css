@@ -1,0 +1,144 @@
+/* 주문서 · 주문 상세 — 앱 마크업(src/app/shop/order/*, src/app/shop/orders/[od_id]/ClientPage.tsx)의
+   shop-order-* · shop-pay-* 손잡이.
+
+   레퍼런스 orderform.php · orderinquiryview.php (2026-09 실측, 1440px):
+   - 구역은 테두리 상자가 아니라 "제목(16px/700) + 짙은 1px 밑줄", 구역 사이 56px.
+   - 입력칸 높이 42px, 모서리 10px, 칸 이름은 12px 옅은 글자.
+   - 오른쪽 결제 상자는 모서리 16px 옅은 테두리, 총액은 큰 숫자(28px/800), 주문 단추 48px 모서리 10px.
+   - 결제수단은 모서리 10px 의 줄 상자, 고른 것은 짙은 테두리.
+   구조(무엇이 어느 칸에 있는지)는 앱 그대로 두고 모양만 맞춘다. */
+body[data-g5-theme-source="default"] .solune-shop-page {
+  .shop-order-title { margin: 32px 0 34px; font-size: 26px; font-weight: 700; letter-spacing: -0.025em; }
+
+  /* Tailwind v4 space-y-* 는 아래 여백을 주므로 둘 다 끈다. */
+  .shop-order-main > * { margin-top: 0; margin-bottom: 0; }
+  .shop-order-main > * + * { margin-top: 56px; }
+  .shop-order-grid { column-gap: 40px; }
+
+  .shop-order-section {
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    background: none;
+  }
+  .shop-order-section > h2,
+  .shop-order-section-head,
+  .shop-order-section > .mb-4:first-child {
+    margin-bottom: 22px;
+    border-bottom: 1px solid var(--solune-text);
+    padding-bottom: 14px;
+  }
+  .shop-order-section h2 { font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
+  .shop-order-section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+
+  /* 칸 이름과 입력칸 */
+  .shop-order-section label.block { margin-bottom: 7px; color: var(--solune-muted); font-size: 12px; font-weight: 500; }
+  .shop-order-section :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    min-height: 42px;
+    border-color: var(--solune-border-strong);
+    border-radius: 10px;
+    padding-inline: 13px;
+    background: var(--solune-surface);
+    font-size: 14px;
+  }
+  .shop-order-section :is(input, select, textarea):focus-visible { border-color: var(--solune-text); }
+  .shop-order-section button { border-radius: 10px; }
+
+  /* 받으시는 분: 배송지 고르기를 회색 막대 안의 칸처럼 */
+  .shop-order-address-choice { gap: 4px; border-radius: 10px; padding: 4px; background: var(--solune-surface-soft); }
+  .shop-order-address-choice button { border: 0; background: none; box-shadow: none; color: var(--solune-muted); font-weight: 500; }
+  .shop-order-address-choice button:hover { background: var(--solune-surface); color: var(--solune-text); }
+  .shop-order-address-choice button.bg-primary {
+    background: var(--solune-surface);
+    color: var(--solune-text);
+    font-weight: 700;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+  }
+
+  /* 주문 상품 */
+  .shop-order-items > * { margin-top: 0; margin-bottom: 0; }
+  .shop-order-item { gap: 18px; border-bottom: 1px solid var(--solune-border); padding: 4px 0 20px; }
+  .shop-order-item + .shop-order-item { padding-top: 20px; }
+  .shop-order-item-thumb { width: 64px; height: 64px; border-radius: 8px; background: var(--solune-surface-soft); }
+  .shop-order-item p:first-child { font-size: 14.5px; font-weight: 600; }
+  .shop-order-item-price { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; }
+
+  /* 결제수단 — 영카트 주문서(#od_pay_sl)처럼 아이콘이 붙은 타일. KCP · NICEPAY 는 간편결제 서비스마다
+     로고 칸을 따로 낸다(그 밖의 PG 는 "간편결제" 한 칸 — PG 창에서 고른다). */
+  /* 격자 대신 줄바꿈 flex — 칸 수가 폭마다 달라도 마지막 줄이 빈 칸 없이 꽉 찬다. */
+  .shop-pay-methods { display: flex; flex-wrap: wrap; gap: 8px; }
+  .shop-pay-method {
+    flex: 1 1 150px;
+    min-height: 60px;
+    gap: 12px;
+    border-color: var(--solune-border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    background: var(--solune-surface);
+    color: var(--solune-text);
+    font-size: 13.5px;
+    text-align: left;
+  }
+  .shop-pay-method-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    background: var(--solune-surface-soft);
+    color: var(--solune-text-soft);
+    transition: background-color 0.16s ease, color 0.16s ease;
+  }
+  .shop-pay-method:hover { border-color: var(--solune-text); background: var(--solune-surface); }
+  .shop-pay-method[aria-pressed="true"] {
+    border-color: var(--solune-text);
+    background: var(--solune-surface-soft);
+    color: var(--solune-text);
+    font-weight: 700;
+    box-shadow: inset 0 0 0 1px var(--solune-text);
+  }
+  .shop-pay-method[aria-pressed="true"] .shop-pay-method-icon { background: var(--solune-text); color: var(--solune-surface); }
+  /* 간편결제 서비스 칸(KCP · NICEPAY) — 로고만 가운데. 로고 그림은 흰 바탕을 전제로 그려져 있어
+     다크에서도 이 칸만은 밝은 칩으로 둔다(고른 칸은 옅은 회색). */
+  .shop-pay-method--brand { justify-content: center; }
+  .shop-pay-method--brand .shop-pay-method-logo { height: 16px; }
+  :root[data-solune-theme="dark"] & .shop-pay-method--brand { background: #fff; }
+  :root[data-solune-theme="dark"] & .shop-pay-method--brand[aria-pressed="true"] { background: #f1f0ec; }
+  @media (prefers-reduced-motion: reduce) {
+    .shop-pay-method-icon { transition: none; }
+  }
+  .shop-order-section--payment .bg-muted\/30 { border: 0; border-radius: 12px; background: var(--solune-surface-soft); }
+
+  /* 오른쪽 결제 상자 */
+  .shop-order-summary { top: 96px; border-color: var(--solune-border); border-radius: 16px; padding: 26px 24px; background: var(--solune-surface); }
+  .shop-order-summary h2 { margin-bottom: 18px; font-size: 16px; font-weight: 700; }
+  .shop-order-summary .space-y-3 > * { margin-bottom: 0; }
+  .shop-order-summary .text-muted-foreground { color: var(--solune-muted); font-size: 13px; }
+  .shop-order-summary-total { margin-top: 18px; border-top: 1px solid var(--solune-text); padding-top: 20px; }
+  .shop-order-summary-total > div { align-items: baseline; font-size: 14px; }
+  .shop-order-summary-total > div > span:last-child { color: var(--solune-text); font-size: 28px; font-weight: 800; letter-spacing: -0.03em; }
+  .shop-order-submit { height: 48px; border-radius: 10px; background: var(--solune-primary); color: var(--solune-primary-ink); font-size: 15px; font-weight: 700; }
+  .shop-order-submit:hover:not(:disabled) { background: var(--solune-primary-hover); }
+
+  /* --- 주문 상세 ------------------------------------------------------ */
+  .shop-order-detail-head { margin: 32px 0 34px; border-bottom: 1px solid var(--solune-border); padding-bottom: 18px; }
+  .shop-order-detail-head h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.025em; }
+  .shop-order-detail-head p { margin-top: 6px; color: var(--solune-muted); font-size: 13px; }
+  .shop-order-detail > .space-y-6 > * { margin-top: 0; margin-bottom: 0; }
+  .shop-order-detail > .space-y-6 > * + * { margin-top: 56px; }
+  .shop-order-detail .shop-order-section dt { color: var(--solune-muted); }
+  /* 배송 안내 상자: 공용 bg-muted 의 푸른 회색 대신 상점의 따뜻한 회색 */
+  .shop-order-detail .shop-order-section .bg-muted\/30 { border: 0; border-radius: 16px; padding: 18px 22px; background: var(--solune-surface-soft); color: var(--solune-text-soft); }
+  /* 결제 정보 오른쪽 금액 칸은 레퍼런스의 "결제 요약" 상자처럼 */
+  .shop-order-detail .shop-order-section > .grid > :last-child:not(:first-child) {
+    border: 1px solid var(--solune-border);
+    border-radius: 16px;
+    padding: 22px;
+  }
+
+  @media (max-width: 767px) {
+    .shop-order-title, .shop-order-detail-head { margin-top: 20px; margin-bottom: 24px; }
+    .shop-order-main > * + *, .shop-order-detail > .space-y-6 > * + * { margin-top: 40px; }
+    .shop-order-address-choice { flex-wrap: nowrap; overflow-x: auto; }
+    .shop-order-address-choice button { flex: 0 0 auto; }
+    .shop-order-summary { padding: 22px 18px; }
+  }
+}

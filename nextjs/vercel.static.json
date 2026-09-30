@@ -1,0 +1,229 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm ci",
+  "buildCommand": "npm run build:vercel:static",
+  "outputDirectory": "out",
+  "devCommand": "npm run dev",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "routes": [
+    {
+      "src": "/admin(?:/.*)?",
+      "status": 307,
+      "headers": {
+        "Location": "$NEXT_PUBLIC_G5_URL/adm"
+      },
+      "env": [
+        "NEXT_PUBLIC_G5_URL"
+      ]
+    },
+    {
+      "src": "/api/v1/(.*)",
+      "dest": "$NEXT_PUBLIC_API_URL/$1",
+      "env": [
+        "NEXT_PUBLIC_API_URL"
+      ]
+    },
+    {
+      "src": "/api/v1",
+      "dest": "$NEXT_PUBLIC_API_URL",
+      "env": [
+        "NEXT_PUBLIC_API_URL"
+      ]
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.tosspayments.com https://*.tosspayments.com https://testpay.kcp.co.kr https://*.kcp.co.kr https://stdpay.inicis.com https://stgstdpay.inicis.com https://*.inicis.com https://web.nicepay.co.kr https://*.nicepay.co.kr https://t1.daumcdn.net; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https: https://t1.daumcdn.net https://t1.kakaocdn.net; font-src 'self' data:; connect-src 'self' https:; frame-src https://*.tosspayments.com https://testpay.kcp.co.kr https://*.kcp.co.kr https://stdpay.inicis.com https://stgstdpay.inicis.com https://*.inicis.com https://web.nicepay.co.kr https://*.nicepay.co.kr https://postcode.map.daum.net https://postcode.map.kakao.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://*.tosspayments.com https://testpay.kcp.co.kr https://*.kcp.co.kr https://stdpay.inicis.com https://stgstdpay.inicis.com https://*.inicis.com https://web.nicepay.co.kr https://*.nicepay.co.kr; object-src 'none'"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/boards/:bo_table/rss",
+      "destination": "/boards/__g5_static__/rss"
+    },
+    {
+      "source": "/boards/:bo_table/write.txt",
+      "destination": "/boards/__g5_static__/write.txt"
+    },
+    {
+      "source": "/boards/:bo_table/write",
+      "destination": "/boards/__g5_static__/write"
+    },
+    {
+      "source": "/boards/:bo_table([0-9A-Za-z_]+)/:wr_id([0-9]+).txt",
+      "destination": "/boards/__g5_static__/0.txt"
+    },
+    {
+      "source": "/boards/:bo_table/:wr_id",
+      "destination": "/boards/__g5_static__/0"
+    },
+    {
+      "source": "/boards/:bo_table([0-9A-Za-z_]+).txt",
+      "destination": "/boards/__g5_static__.txt"
+    },
+    {
+      "source": "/boards/:bo_table",
+      "destination": "/boards/__g5_static__"
+    },
+    {
+      "source": "/content/:co_id([^/]+).txt",
+      "destination": "/content/__g5_static__.txt"
+    },
+    {
+      "source": "/content/:co_id",
+      "destination": "/content/__g5_static__"
+    },
+    {
+      "source": "/mypage/memos/:me_id([0-9]+).txt",
+      "destination": "/mypage/memos/__g5_static__.txt"
+    },
+    {
+      "source": "/mypage/memos/:me_id",
+      "destination": "/mypage/memos/__g5_static__"
+    },
+    {
+      "source": "/mypage/qas/:qa_id([0-9]+).txt",
+      "destination": "/mypage/qas/__g5_static__.txt"
+    },
+    {
+      "source": "/mypage/qas/:qa_id",
+      "destination": "/mypage/qas/__g5_static__"
+    },
+    {
+      "source": "/shop/categories/:ca_id([0-9A-Za-z]+).txt",
+      "destination": "/shop/categories/__g5_static__.txt"
+    },
+    {
+      "source": "/shop/categories/:ca_id",
+      "destination": "/shop/categories/__g5_static__"
+    },
+    {
+      "source": "/shop/events/:ev_id([0-9]+).txt",
+      "destination": "/shop/events/0.txt"
+    },
+    {
+      "source": "/shop/events/:ev_id",
+      "destination": "/shop/events/0"
+    },
+    {
+      "source": "/shop/orders/:od_id([^/]+).txt",
+      "destination": "/shop/orders/__g5_static__.txt"
+    },
+    {
+      "source": "/shop/orders/:od_id",
+      "destination": "/shop/orders/__g5_static__"
+    },
+    {
+      "source": "/shop/personalpay/:pp_id([^/]+).txt",
+      "destination": "/shop/personalpay/__g5_static__.txt"
+    },
+    {
+      "source": "/shop/personalpay/:pp_id",
+      "destination": "/shop/personalpay/__g5_static__"
+    },
+    {
+      "source": "/shop/products/:it_id.txt",
+      "destination": "/shop/products/__g5_static__.txt"
+    },
+    {
+      "source": "/shop/products/:it_id([0-9A-Za-z_-]+).txt",
+      "destination": "/shop/products/__g5_static__.txt"
+    },
+    {
+      "source": "/shop/products/:it_id",
+      "destination": "/shop/products/__g5_static__"
+    },
+    {
+      "source": "/shop/qas/my/:qa_id([0-9]+).txt",
+      "destination": "/shop/qas/my/__g5_static__.txt"
+    },
+    {
+      "source": "/shop/qas/my/:qa_id",
+      "destination": "/shop/qas/my/__g5_static__"
+    },
+    {
+      "source": "/shop/list-:ca_id([0-9A-Za-z]+).txt",
+      "destination": "/shop/categories/__g5_static__.txt"
+    },
+    {
+      "source": "/shop/list-:ca_id",
+      "destination": "/shop/categories/__g5_static__"
+    },
+    {
+      "source": "/shop/type-:type([1-5]).txt",
+      "destination": "/shop/products.txt"
+    },
+    {
+      "source": "/shop/type-:type",
+      "destination": "/shop/products"
+    },
+    {
+      "source": "/shop/:it_id((?!cart|categories|compare|couponzone|events|list-[0-9a-z]+|order|orders|payment|personalpay|products|type-[1-5]|wishlist)[^/]+).txt",
+      "destination": "/shop/products/__g5_static__.txt"
+    },
+    {
+      "source": "/shop/:it_id((?!cart|categories|compare|couponzone|events|list-[0-9a-z]+|order|orders|payment|personalpay|products|type-[1-5]|wishlist)[^/]+)",
+      "destination": "/shop/products/__g5_static__"
+    },
+    {
+      "source": "/:bo_table((?!admin|adm|api|bbs|css|data|faq|forgot-password|img|install|js|lib|login|mobile|offline|plugin|polls|recent|register|search|shop|theme|_next)[0-9A-Za-z_]+)/write.txt",
+      "destination": "/boards/__g5_static__/write.txt"
+    },
+    {
+      "source": "/:bo_table((?!admin|adm|api|bbs|css|data|faq|forgot-password|img|install|js|lib|login|mobile|offline|plugin|polls|recent|register|search|shop|theme|_next)[0-9A-Za-z_]+)/write",
+      "destination": "/boards/__g5_static__/write"
+    },
+    {
+      "source": "/:bo_table((?!admin|adm|api|bbs|css|data|faq|forgot-password|img|install|js|lib|login|mobile|offline|plugin|polls|recent|register|search|shop|theme|_next)[0-9A-Za-z_]+)/:wr_id([0-9]+).txt",
+      "destination": "/boards/__g5_static__/0.txt"
+    },
+    {
+      "source": "/:bo_table((?!admin|adm|api|bbs|css|data|faq|forgot-password|img|install|js|lib|login|mobile|offline|plugin|polls|recent|register|search|shop|theme|_next)[0-9A-Za-z_]+)/:wr_id([0-9]+)",
+      "destination": "/boards/__g5_static__/0"
+    },
+    {
+      "source": "/:bo_table((?!admin|adm|api|bbs|css|data|faq|forgot-password|img|install|js|lib|login|mobile|offline|plugin|polls|recent|register|search|shop|theme|_next)[0-9A-Za-z_]+)/:slug([^/]+).txt",
+      "destination": "/boards/__g5_static__/0.txt"
+    },
+    {
+      "source": "/:bo_table((?!admin|adm|api|bbs|css|data|faq|forgot-password|img|install|js|lib|login|mobile|offline|plugin|polls|recent|register|search|shop|theme|_next)[0-9A-Za-z_]+)/:slug([^/]+)",
+      "destination": "/boards/__g5_static__/0"
+    },
+    {
+      "source": "/:bo_table((?!admin|adm|api|bbs|css|data|faq|forgot-password|img|install|js|lib|login|mobile|offline|plugin|polls|recent|register|search|shop|theme|_next)[0-9A-Za-z_]+).txt",
+      "destination": "/boards/__g5_static__.txt"
+    },
+    {
+      "source": "/:bo_table((?!admin|adm|api|bbs|css|data|faq|forgot-password|img|install|js|lib|login|mobile|offline|plugin|polls|recent|register|search|shop|theme|_next)[0-9A-Za-z_]+)",
+      "destination": "/boards/__g5_static__"
+    }
+  ]
+}

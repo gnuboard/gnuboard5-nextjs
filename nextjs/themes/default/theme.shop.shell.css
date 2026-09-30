@@ -1,0 +1,204 @@
+/* 상점 껍데기 — 레일, 헤더(고정·축소), 본문 뼈대. theme.shop.css 가 이 순서로 묶는다. */
+
+/* --- rail --------------------------------------------------------------- */
+/* Same rail as the community (.solune-shell) so the two services line up
+   when the visitor switches between them. */
+.solune-shop-page .solune-shop-shell,
+.solune-shop-page .solune-shop-container {
+  width: min(100%, 80rem);
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+@media (min-width: 640px) {
+  .solune-shop-page .solune-shop-shell,
+  .solune-shop-page .solune-shop-container { padding-inline: 1.5rem; }
+}
+@media (min-width: 1024px) {
+  .solune-shop-page .solune-shop-shell,
+  .solune-shop-page .solune-shop-container { padding-inline: 2rem; }
+}
+
+/* --- header ------------------------------------------------------------- */
+.solune-shop-header-sticky {
+  position: fixed;
+  z-index: 60;
+  top: 0;
+  right: 0;
+  left: 0;
+  background: var(--solune-surface);
+  /* top, not transform: a transformed ancestor would re-root the fixed
+     category panel on phones. */
+  transition: top 0.2s ease;
+}
+.solune-shop-header-sticky.is-shrunk { top: calc(-1 * var(--shop-service-h)); }
+.solune-shop-header-spacer { height: calc(var(--shop-service-h) + var(--shop-mainbar-h) + 1px); }
+/* :has() 를 못 읽는 옛 브라우저(iOS 15.3 이하)는 앵커 이동이 헤더 밑으로 조금 들어갈 뿐이라 그대로 둔다. */
+html:has(.solune-shop-page) { scroll-padding-top: 72px; }
+
+.solune-shop-page .solune-shop-header {
+  position: relative;
+  z-index: 60;
+  border-bottom: 1px solid var(--solune-border);
+  background: var(--solune-surface);
+  box-shadow: 0 8px 12px -4px color-mix(in srgb, var(--solune-text) 7%, transparent);
+}
+.solune-shop-page.solune-search-active .solune-shop-header {
+  border-bottom: 0;
+  box-shadow: none;
+}
+.solune-shop-page .solune-shop-mainbar {
+  position: relative;
+  display: grid;
+  min-height: var(--shop-mainbar-h);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 40px;
+  transition: min-height 0.2s ease;
+}
+.solune-shop-header-sticky.is-shrunk .solune-shop-mainbar { min-height: var(--shop-mainbar-h-shrunk); }
+.solune-shop-page .solune-shop-brand {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--solune-text);
+}
+.solune-shop-page .solune-shop-brand .solune-brand-logo { height: 30px; transition: height 0.18s ease; }
+.solune-shop-header-sticky.is-shrunk .solune-shop-brand .solune-brand-logo { height: 24px; }
+@media (prefers-reduced-motion: reduce) {
+  .solune-shop-page .solune-shop-brand .solune-brand-logo { transition: none; }
+}
+.solune-shop-page .solune-shop-nav { display: flex; min-width: 0; align-items: center; gap: 32px; }
+
+/* category toggle: a bare outlined button that fills on hover */
+.solune-shop-page .solune-shop-category-toggle {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--solune-text);
+  border-radius: 0;
+  padding: 0 1rem;
+  background: transparent;
+  color: var(--solune-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.solune-shop-page .solune-shop-category-toggle:hover,
+.solune-shop-page .solune-shop-category-toggle:focus-visible {
+  background: var(--solune-text);
+  color: var(--solune-surface);
+}
+
+/* type nav: bare 15px links, sale in terracotta */
+.solune-shop-page .solune-shop-type-nav { display: flex; min-width: 0; align-items: center; gap: 32px; }
+.solune-shop-page .solune-shop-type-nav a {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  color: var(--solune-text);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.solune-shop-page .solune-shop-type-nav a:hover { color: var(--solune-primary); }
+.solune-shop-page .solune-shop-type-nav a:last-child { color: var(--ondam-sale); }
+.solune-shop-page .solune-shop-type-nav a:last-child:hover { color: var(--ondam-sale-hover); }
+
+/* actions: three 38px rings */
+.solune-shop-page .solune-shop-actions { display: flex; align-items: center; gap: 9px; }
+.solune-shop-page .solune-shop-search-toggle,
+.solune-shop-page .solune-shop-account,
+.solune-shop-page .solune-shop-cart {
+  position: relative;
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--solune-border);
+  border-radius: 999px;
+  padding: 0;
+  background: transparent;
+  color: var(--solune-text-soft);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+.solune-shop-page .solune-shop-search-toggle:hover,
+.solune-shop-page .solune-shop-search-toggle[aria-expanded="true"],
+.solune-shop-page .solune-shop-account:hover,
+.solune-shop-page .solune-shop-cart:hover {
+  border-color: var(--solune-primary);
+  color: var(--solune-primary);
+}
+.solune-shop-page .solune-shop-cart-count {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  display: inline-grid;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  place-items: center;
+  border-radius: 999px;
+  padding-inline: 0.25rem;
+  background: var(--ondam-sale);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+/* search dock under the header */
+.solune-shop-page .solune-shop-search-dock {
+  border-bottom: 1px solid var(--solune-border);
+  background: var(--solune-surface);
+  box-shadow: 0 8px 12px -4px color-mix(in srgb, var(--solune-text) 7%, transparent);
+}
+.solune-shop-page .solune-shop-search-dock-inner { padding-block: 1.25rem 1.5rem; }
+.solune-shop-page .solune-shop-search {
+  display: flex;
+  min-width: 0;
+  height: 44px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 999px;
+  padding-inline: 14px;
+  background: var(--solune-surface-soft);
+}
+.solune-shop-page .solune-shop-search:focus-within { box-shadow: 0 0 0 1px var(--solune-primary); }
+.solune-shop-page .solune-shop-search input {
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--solune-text);
+  font: inherit;
+  font-size: 13px;
+}
+.solune-shop-page .solune-shop-search input::placeholder { color: var(--solune-muted); }
+.solune-shop-page .solune-shop-search button {
+  display: inline-grid;
+  width: auto;
+  height: 2.75rem;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: var(--solune-muted);
+  cursor: pointer;
+}
+
+/* --- body skeleton ------------------------------------------------------ */
+.solune-shop-page .solune-shop-wrapper { flex: 1 1 auto; background: var(--solune-page); }
+.solune-shop-page .solune-shop-container {
+  display: flex;
+  flex-direction: column;
+  padding-block: 0 80px;
+}
+.solune-shop-page .shop-content { order: 1; min-width: 0; }
+.solune-shop-page .solune-shop-sidebar { order: 2; }

@@ -1,0 +1,26 @@
+/* =====================================================================
+   Solune shop ("Ondam") — index. 상점은 `.solune-shop-page` 안에서만 팔레트가 바뀌는
+   별개의 얼굴이라(초록·모서리 0) 커뮤니티 파일들과 따로 둔다. 순서가 곧 우선순위다:
+   토큰 → 껍데기 → 홈 → 푸터/반응형 → 목록 → 상세 → 장바구니.
+
+   중단점은 Tailwind 와 같은 넷만 쓴다 — 639/767/1023/1279(max), 640/768/1024/1280(min).
+   예전엔 780·860·900·1080·1199 가 섞여 있어 화면 하나가 요소마다 다른 폭에서 접혔다.
+   ===================================================================== */
+
+/* 쇼핑 홈 캐러셀(Swiper 11, MIT). 레퍼런스 테마와 같은 판이고 쓰는 모듈의 CSS 만 싣는다. */
+@import "swiper/css";
+@import "swiper/css/a11y";
+@import "swiper/css/effect-fade";
+@import "swiper/css/pagination";
+@import "swiper/css/scrollbar";
+@import "./theme.shop.tokens.css";
+@import "./theme.shop.shell.css";
+@import "./theme.shop.category.css";
+@import "./theme.shop.home.css";
+@import "./theme.shop.carousel.css";
+@import "./theme.shop.footer.css";
+@import "./theme.shop.list.css";
+@import "./theme.shop.detail.css";
+@import "./theme.shop.cart.css";
+@import "./theme.shop.coupon.css";
+@import "./theme.shop.order.css";

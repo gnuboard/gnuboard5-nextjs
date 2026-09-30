@@ -1,0 +1,119 @@
+<?php
+/**
+ * Gnuboard5 REST API - Print Reviews (오프린트미)
+ *
+ * Routes (prefix: v1/print/reviews):
+ *   GET  /v1/print/reviews?product={slug}  - 상품 리뷰 목록 + 평균 별점 (공개)
+ *   POST /v1/print/reviews                 - 리뷰 작성 (인증, client_uid 멱등)
+ *   DELETE /v1/print/reviews/{id}          - 삭제 (본인/super)
+ */
+
+if (!defined('_GNUBOARD_')) exit;
+
+$reviewTable = DB::table('print_review_table');
+
+$id = isset($printSegments[0]) && ctype_digit((string) $printSegments[0])
+    ? (int) $printSegments[0]
+    : 0;
+
+function print_decode_review(array $row): array
+{
+    $row['rating'] = (int) $row['rating'];
+    unset($row['client_uid']);
+    return $row;
+}
+
+// -------------------------------------------------------------------------
+// GET /v1/print/reviews?product={slug}
+// -------------------------------------------------------------------------
+if (!$id && $apiMethod === 'GET') {
+    $product = isset($_GET['product']) ? trim((string) $_GET['product']) : '';
+    if ($product === '') {
+        Response::error('product 파라미터가 필요합니다.', 422);
+    }
+    $page  = max(1, (int) ($_GET['page'] ?? 1));
+    $limit = min(100, max(1, (int) ($_GET['limit'] ?? 20)));
+    $offset = ($page - 1) * $limit;
+
+    $total = (int) DB::count("SELECT COUNT(*) FROM {$reviewTable} WHERE product_slug = ?", [$product]);
+    $avgRow = DB::fetch("SELECT AVG(rating) AS avg_rating FROM {$reviewTable} WHERE product_slug = ?", [$product]);
+    $avg = $avgRow && $avgRow['avg_rating'] !== null ? round((float) $avgRow['avg_rating'], 1) : 0;
+
+    $rows = DB::fetchAll(
+        "SELECT * FROM {$reviewTable} WHERE product_slug = ? ORDER BY review_id DESC LIMIT {$limit} OFFSET {$offset}",
+        [$product]
+    );
+    Response::success([
+        'items'      => array_map('print_decode_review', $rows),
+        'total'      => $total,
+        'avg_rating' => $avg,
+        'page'       => $page,
+    ]);
+}
+
+// -------------------------------------------------------------------------
+// POST /v1/print/reviews
+// -------------------------------------------------------------------------
+if (!$id && $apiMethod === 'POST') {
+    $me = Auth::requireAuth();
+    $input = get_request_body();
+
+    $errors = Validator::validate([
+        'product_slug' => 'required|max:80',
+        'content'      => 'required|max:1000',
+    ], $input);
+    if ($errors) {
+        Response::error('Validation failed.', 422, $errors);
+    }
+
+    $productSlug = trim((string) $input['product_slug']);
+    $rating = (int) ($input['rating'] ?? 5);
+    if ($rating < 1) $rating = 1;
+    if ($rating > 5) $rating = 5;
+    $content = substr(trim((string) $input['content']), 0, 1000);
+    $displayName = trim((string) ($me['mb_nick'] ?? ''));
+    if ($displayName === '') {
+        $displayName = trim((string) ($me['mb_name'] ?? ''));
+    }
+    if ($displayName === '') {
+        $displayName = (string) $me['mb_id'];
+    }
+    $mbName = substr($displayName, 0, 50);
+    $clientUid = isset($input['client_uid']) && $input['client_uid'] !== ''
+        ? substr((string) $input['client_uid'], 0, 64) : null;
+
+    if ($clientUid !== null) {
+        $existing = DB::fetch(
+            "SELECT * FROM {$reviewTable} WHERE mb_id = ? AND client_uid = ? LIMIT 1",
+            [$me['mb_id'], $clientUid]
+        );
+        if ($existing && !empty($existing['review_id'])) {
+            Response::success(print_decode_review($existing), 200);
+        }
+    }
+
+    DB::execute(
+        "INSERT INTO {$reviewTable} (product_slug, mb_id, mb_name, rating, content, client_uid)
+         VALUES (?, ?, ?, ?, ?, ?)",
+        [$productSlug, $me['mb_id'], $mbName, $rating, $content, $clientUid]
+    );
+    $newId = (int) DB::lastInsertId();
+    $row = DB::fetch("SELECT * FROM {$reviewTable} WHERE review_id = ? LIMIT 1", [$newId]);
+    Response::success(print_decode_review($row), 201);
+}
+
+// -------------------------------------------------------------------------
+// DELETE /v1/print/reviews/{id}
+// -------------------------------------------------------------------------
+if ($id && $apiMethod === 'DELETE') {
+    $me = Auth::requireAuth();
+    $row = DB::fetch("SELECT mb_id FROM {$reviewTable} WHERE review_id = ? LIMIT 1", [$id]);
+    if (!$row) Response::error('Review not found.', 404);
+    if ($row['mb_id'] !== $me['mb_id'] && Auth::adminRole($me) !== 'super') {
+        Response::error('Forbidden.', 403);
+    }
+    DB::execute("DELETE FROM {$reviewTable} WHERE review_id = ?", [$id]);
+    Response::success(['message' => '삭제되었습니다.']);
+}
+
+Response::error('Method not allowed.', 405);

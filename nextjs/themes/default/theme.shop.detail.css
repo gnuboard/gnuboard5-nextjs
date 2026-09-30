@@ -1,0 +1,159 @@
+/* 상품 상세 — 앱 마크업의 product-* 손잡이와 ProductDetailTabs 슬롯. */
+
+/* --- 상품 상세 (앱 소유 화면, product-* 손잡이) ---------------------------
+   레퍼런스 item.php (2026-09 실측): 왼쪽 712px 큰 사진(모서리 16px)과 아래 네 칸 썸네일
+   (모서리 10px), 사이 64px, 오른쪽 440px 에 브랜드 12.5 · 제목 30 · 부제 · 별점 줄 ·
+   가격 상자(위 짙은 줄, 아래 옅은 줄) · 안내 표 · 옅은 회색 둥근 상자 하나에 수량 ·
+   고른 옵션 · 총 결제금액 · [장바구니(초록 테두리)] [바로구매(초록 채움)] [♡], 단추는
+   높이 52 모서리 10. 앱 마크업의 순서는 그대로 두고 flex 의 order 로 자리를 바꾼다. */
+body[data-g5-theme-source="default"] .solune-shop-page {
+  .product-detail-grid { gap: 40px; align-items: start; }
+  @media (min-width: 768px) { .product-detail-grid { grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); } }
+  @media (min-width: 1024px) { .product-detail-grid { grid-template-columns: minmax(0, 712fr) minmax(0, 440fr); gap: 64px; } }
+
+  /* 사진: 큰 사진 모서리 16, 썸네일은 폭을 넷으로 나눈 네모(모서리 10), 고른 것만 짙은 테두리. */
+  .product-gallery-main { border-radius: 16px; background: var(--solune-surface-soft); }
+  .product-gallery-thumbs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; overflow: visible; }
+  .product-gallery-thumbs button { width: auto; height: auto; aspect-ratio: 1 / 1; border: 1px solid transparent; border-radius: 10px; overflow: hidden; }
+  .product-gallery-thumbs button[aria-current="true"] { border-color: var(--solune-text); }
+  .product-gallery-thumbs button img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* 오른쪽 패널. 유틸리티 간격(space-y-6)을 끄고 직접 둔다. */
+  .product-panel { display: flex; flex-direction: column; gap: 0; }
+  .product-panel > * + * { margin-top: 0; }
+  /* Tailwind v4 의 space-y-* 는 위가 아니라 아래 여백(margin-block-end)을 준다. 이것도 꺼야
+     칸 사이가 여기 적은 값이 되고, 수량·고른 옵션·총액 세 덩어리가 한 상자로 붙는다. */
+  .product-panel > * { margin-bottom: 0; }
+  .product-brand { order: 1; margin: 0 0 12px; color: var(--solune-text-soft); font-size: 12.5px; font-weight: 600; }
+  /* 제목이 폭을 다 쓰도록 공유 단추는 제목 아래 줄로(레퍼런스는 별점 줄 끝에 둔다). */
+  .product-title-row { order: 2; flex-direction: column; align-items: flex-start; gap: 10px; }
+  .product-title { color: var(--solune-text-soft); font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.25; }
+  .product-title-row > :not(.product-title) { flex: none; margin-top: 0; }
+  .product-subtitle { order: 3; margin: 12px 0 0; color: var(--solune-text-soft); font-size: 14px; }
+  .product-rating { order: 4; margin-top: 14px; }
+  .product-rating-stars svg { width: 18px; height: 18px; }
+  .product-rating-text { color: var(--solune-text-soft); font-size: 13px; }
+  .product-rating-text b { margin-right: 2px; color: var(--solune-text); }
+  /* 가격 상자: 위는 짙은 줄, 아래는 옅은 줄(레퍼런스 .solune-sit-price). */
+  .product-price { order: 5; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px; margin-top: 28px; border-top: 1px solid var(--solune-text); border-bottom: 1px solid var(--solune-border); padding: 22px 0; }
+  .product-price-before { order: 2; }
+  .product-price-was { order: 2; color: var(--solune-muted-soft); font-size: 14px; }
+  .product-price-off { order: 1; padding: 0; border-radius: 0; background: none; color: var(--ondam-sale); font-size: 26px; font-weight: 700; }
+  .product-price-off::after { content: ""; }
+  .product-price-now { order: 1; color: var(--solune-text-soft); font-size: 32px; font-weight: 700; letter-spacing: -0.03em; }
+  .product-price-point { order: 3; flex-basis: 100%; margin-top: 6px; color: var(--solune-muted); font-size: 12.5px; }
+
+  /* 안내 줄. 배송비 결제 상자와 제조사·원산지 표를 같은 dl 모양으로 맞춘다. */
+  .product-shipping {
+    order: 6;
+    display: grid;
+    grid-template-columns: 6rem minmax(0, 1fr);
+    gap: 0.5rem;
+    margin-top: 28px;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    background: none;
+    font-size: 13px;
+  }
+  .product-shipping > div { display: contents; }
+  .product-shipping-label { color: var(--solune-muted); font-weight: 400; }
+  .product-shipping > div > span:not(.product-shipping-label) { color: var(--solune-text); font-weight: 500; }
+  .product-shipping p { grid-column: 2; margin: 0; color: var(--solune-muted); font-size: 12px; }
+  .product-meta { order: 7; margin: 10px 0 0; border-top: 0; padding-top: 0; font-size: 13px; }
+  .product-meta-row { grid-template-columns: 6rem minmax(0, 1fr); gap: 0.5rem; }
+  .product-meta-row dt { color: var(--solune-muted); }
+  .product-meta-row dd { color: var(--solune-text); font-weight: 500; }
+  .product-stock { order: 8; margin-top: 10px; color: var(--solune-muted); font-size: 12.5px; }
+  .product-stock .text-green-700 { color: var(--solune-muted); }
+
+  /* 옵션 · 수량 */
+  .product-options { order: 9; margin-top: 28px; border-top: 1px solid var(--solune-border); padding-top: 22px; }
+  .product-panel > .space-y-2 { order: 10; margin-top: 14px; }
+  .product-options label, .product-panel > .space-y-2 label, .product-quantity label { font-size: 12.5px; font-weight: 600; }
+  .product-options select, .product-panel > .space-y-2 select { height: 44px; border-radius: 8px; border-color: var(--solune-border-strong); background-color: var(--solune-surface); }
+
+  /* 수량 · 고른 옵션 · 총 결제금액은 옅은 회색 둥근 상자 하나(레퍼런스 "선택된 옵션" 상자).
+     세 덩어리가 이어 붙어 한 상자로 보이도록 위·가운데·아래의 모서리와 여백을 나눠 준다. */
+  .product-quantity { order: 11; margin-top: 28px; border-top: 0; border-radius: 12px 12px 0 0; padding: 18px 18px 12px; background: var(--solune-surface-soft); }
+  .product-quantity > label { color: var(--solune-muted); font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; }
+  .product-quantity-controls button, .product-quantity-controls input { height: 32px; border-radius: 6px; border-color: var(--solune-border-strong); background: var(--solune-surface); }
+  .product-quantity-controls button { width: 32px; }
+  .product-selected { order: 12; margin-top: 0; padding: 0 18px 4px; background: var(--solune-surface-soft); }
+  .product-selected .rounded-lg { border-radius: 10px; background: var(--solune-surface); }
+  .product-selected > button { height: 32px; border: 1px solid var(--solune-border-strong); border-radius: 6px; background: var(--solune-surface); color: var(--solune-text-soft); font-size: 12.5px; }
+  .product-total {
+    order: 13;
+    display: flex;
+    align-items: center;
+    margin-top: 0;
+    border: 0;
+    border-radius: 0 0 12px 12px;
+    padding: 14px 18px 18px;
+    background: var(--solune-surface-soft);
+  }
+  .product-total > div { width: 100%; border-top: 1px solid var(--solune-border); padding-top: 14px; }
+  .product-total-label { color: var(--solune-text-soft); font-size: 13px; font-weight: 400; }
+  .product-total-value { color: var(--solune-text); font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+
+  /* 단추: 높이 52 · 모서리 10. 장바구니는 초록 테두리, 바로구매는 초록 채움, 찜·알림은 옅은 테두리 네모. */
+  .product-actions { order: 14; margin-top: 28px; gap: 8px; }
+  .product-actions button, .product-actions a { height: 52px; border-radius: 10px; font-size: 14px; font-weight: 500; }
+  .product-action-cart { border: 1px solid var(--solune-primary); background: var(--solune-surface); color: var(--solune-primary); }
+  .product-action-cart:hover { background: var(--solune-primary-soft, var(--solune-surface-soft)); }
+  .product-action-cart svg { display: none; }
+  .product-action-buy { background: var(--solune-primary); color: var(--color-primary-content, #fff); }
+  .product-action-buy:hover { background: var(--solune-primary-hover, var(--solune-primary)); filter: brightness(0.94); }
+  .product-action-wish, .product-action-recommend { width: 52px; flex: none; padding: 0; border-color: var(--solune-border); }
+  .product-naverpay { order: 15; margin-top: 12px; border-radius: 10px; }
+  /* 이전·다음 상품: 레퍼런스는 테두리 없는 글자 줄(위에 옅은 선, 13px 600). 상자 모양을 벗긴다. */
+  .product-siblings { order: 16; margin-top: 32px; border-top: 1px solid var(--solune-border); padding-top: 18px; }
+  .product-siblings a { border: 0; border-radius: 0; background: none; padding: 0; color: var(--solune-text-soft); font-size: 13px; font-weight: 600; }
+  .product-siblings a:hover { background: none; color: var(--solune-primary); }
+
+  /* 상세 본문 — ProductDetailTabs 슬롯(product-detail-tabs.tsx). 레퍼런스 #sit_info 의
+     실측: 본문 841 + 따라다니는 구매 상자 320, 사이 40, 위 40. 탭 띠는 왼쪽 정렬에
+     사이 32, 글자 15, 고른 탭만 굵게 + 2px 밑줄. 본문 글은 720 으로 좁혀 가운데. */
+  .solune-pdp-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; align-items: start; margin-top: 40px; }
+  .solune-pdp-main { min-width: 0; }
+  .solune-pdp-tabs { display: flex; gap: 32px; border-bottom: 1px solid var(--solune-border); overflow-x: auto; scrollbar-width: none; }
+  .solune-pdp-tabs::-webkit-scrollbar { display: none; }
+  .solune-pdp-tab { flex: none; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: none; padding: 12px 0 14px; color: var(--solune-muted); cursor: pointer; font: inherit; font-size: 15px; font-weight: 500; white-space: nowrap; }
+  .solune-pdp-tab:hover { color: var(--solune-text); }
+  .solune-pdp-tab.is-selected { border-bottom-color: var(--solune-text); color: var(--solune-text); font-weight: 700; }
+  .solune-pdp-tab-count { margin-left: 4px; color: var(--solune-muted-soft); font-size: 13px; font-weight: 500; }
+  /* 폰 폭(343px 안팎)에서는 사이 32 로 네 탭이 16px 넘친다. 좁혀서 한 줄에 넣는다. */
+  @media (max-width: 639px) { .solune-pdp-tabs { gap: 20px; } .solune-pdp-tab { font-size: 14px; } }
+  .solune-pdp-main .product-tabpanel { padding: 40px 0 0; }
+  .solune-pdp-main .product-tabpanel > .prose { max-width: 720px; margin-inline: auto; padding-top: 24px; color: var(--solune-text-soft); font-size: 15.5px; line-height: 1.85; }
+  .solune-pdp-main .product-tabpanel > .prose #sit_inf_open { border-top: 1px solid var(--solune-text); }
+  /* 구매 상자. 헤더가 줄어든 높이(56) + 24 아래에 붙는다. 넓은 화면에서만 그린다 —
+     좁은 화면은 위 패널 하나로 충분하고, 같은 단추가 두 벌 보이면 헷갈린다. */
+  .solune-pdp-aside { display: none; }
+  @media (min-width: 1024px) {
+    .solune-pdp-body.has-aside { grid-template-columns: minmax(0, 1fr) 320px; }
+    .solune-pdp-aside { display: block; position: sticky; top: calc(var(--shop-mainbar-h-shrunk) + 24px); border: 1px solid var(--solune-border); border-radius: 18px; background: var(--solune-surface); padding: 24px; }
+  }
+  .solune-pdp-aside-eyebrow { margin: 0 0 14px; color: var(--solune-muted); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; }
+  .solune-pdp-aside .product-options { margin-top: 0; border-top: 0; padding-top: 0; }
+  .solune-pdp-aside .product-quantity { margin-top: 0; }
+  .solune-pdp-aside .product-options ~ .product-quantity { margin-top: 16px; }
+  .solune-pdp-aside .product-total-value { font-size: 20px; }
+  .solune-pdp-aside .product-actions { margin-top: 18px; }
+  .solune-pdp-aside .product-actions button { height: 46px; }
+  /* 찜·추천·N Pay 는 위 패널에만. 상자는 담기와 사기만 둔다(레퍼런스 #sit_buy). */
+  .solune-pdp-aside .product-action-wish, .solune-pdp-aside .product-action-recommend, .solune-pdp-aside .product-naverpay { display: none; }
+
+  /* 관련 · 최근 본 상품. 홈의 진열 줄과 같은 카드 폭(다섯 장). */
+  .product-related { margin-top: 20px; border-top: 0; padding-top: 0; }
+  .product-related-title { margin-bottom: 14px; font-size: 16px; font-weight: 600; }
+  @media (min-width: 1024px) { .product-related-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 20px; } }
+  .product-related-grid a > div:first-child { border: 0; border-radius: 12px; }
+  .product-related-grid h3 { padding: 0 2px; font-size: 14px; font-weight: 600; }
+}
+@media (max-width: 767px) {
+  body[data-g5-theme-source="default"] .solune-shop-page .product-detail-grid { gap: 28px; }
+  body[data-g5-theme-source="default"] .solune-shop-page .product-title { font-size: 22px; }
+  body[data-g5-theme-source="default"] .solune-shop-page .product-price-now { font-size: 28px; }
+  body[data-g5-theme-source="default"] .solune-shop-page .product-tablist button { padding: 14px 4px; font-size: 13px; }
+}

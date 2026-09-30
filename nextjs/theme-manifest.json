@@ -1,0 +1,15 @@
+{
+  "themes": [
+    {
+      "source": "default",
+      "theme": "nextjs_default",
+      "installable": true,
+      "publicPackage": true,
+      "uiSmoke": true,
+      "vercel": {
+        "devPort": 3001,
+        "appUrl": "https://gnuboard5-nextjs-default.vercel.app"
+      }
+    }
+  ]
+}

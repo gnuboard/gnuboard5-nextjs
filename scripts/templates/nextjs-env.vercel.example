@@ -1,0 +1,33 @@
+# Vercel deployment example for gnuboard5-nextjs.
+#
+# In the Vercel dashboard, import this repository and set Root Directory to:
+# nextjs
+
+# Mode A: static theme/export deployment.
+# This is the current safest default for the theme preview path. Browser
+# requests on *.vercel.app use the same-origin /api/v1 proxy automatically.
+# Set NEXT_PUBLIC_API_PROXY_PATH=/api/v1 as well when using a custom Vercel
+# domain and the Gnuboard API does not allow browser CORS.
+NEXT_PUBLIC_API_URL=https://your-gnuboard.example.com/api/v1
+# Optional for server runtimes. Static Vercel proxy routes use NEXT_PUBLIC_API_URL.
+# G5_API_INTERNAL_URL=https://your-gnuboard.example.com/api/v1
+NEXT_PUBLIC_G5_URL=https://your-gnuboard.example.com
+NEXT_PUBLIC_APP_URL=https://your-project.vercel.app
+# NEXT_PUBLIC_API_PROXY_PATH=/api/v1
+NEXT_IMAGE_EXTRA_HOSTS=your-gnuboard.example.com
+
+# Keep G5_NEXT_RUNTIME unset in Mode A.
+
+# Mode B: Next server runtime deployment.
+# Use this when Vercel serves the Next app dynamically instead of only using the
+# exported theme files. This lets the root layout read auth cookies on refresh,
+# so the header can render the member state before client hydration.
+# G5_API_INTERNAL_URL must be an absolute Gnuboard API URL because server-side
+# auth lookup calls it directly during SSR.
+#
+# G5_NEXT_RUNTIME=server
+# NEXT_PUBLIC_API_URL=/api/g5
+# G5_API_INTERNAL_URL=https://your-gnuboard.example.com/api/v1
+# NEXT_PUBLIC_G5_URL=https://your-gnuboard.example.com
+# NEXT_PUBLIC_APP_URL=https://your-project.vercel.app
+# NEXT_IMAGE_EXTRA_HOSTS=your-gnuboard.example.com

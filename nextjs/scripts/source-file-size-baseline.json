@@ -1,0 +1,17 @@
+{
+  "../overlay/api/social/_bridge_common.php": 741,
+  "../overlay/api/v1/posts.php": 716,
+  "../overlay/api/v1/qas.php": 742,
+  "../overlay/api/v1/shop/common.php": 774,
+  "../overlay/api/v1/shop/naverpay.php": 709,
+  "../overlay/api/v1/shop/orders.php": 706,
+  "../overlay/theme/nextjs_default/bridge/metadata.php": 708,
+  "../overlay/theme/nextjs_default/bridge/seo.php": 858,
+  "scripts/check-local-browser.mjs": 748,
+  "scripts/check-runtime-config.mjs": 708,
+  "scripts/lib/g5-url-shape-live-guards.mjs": 717,
+  "scripts/lib/local-order-scope-checks.mjs": 718,
+  "src/app/(auth)/register/ClientPage.tsx": 775,
+  "src/app/shop/orders/[od_id]/ClientPage.tsx": 766,
+  "src/app/shop/products/[it_id]/ProductDetailClient.tsx": 734
+}

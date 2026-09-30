@@ -1,0 +1,12 @@
+Options +FollowSymLinks
+
+<FilesMatch "^\.env(\..*)?$">
+Require all denied
+</FilesMatch>
+
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php?_route=$1 [QSA,L]
+
+# CORS는 index.php에서 처리 (중복 방지)

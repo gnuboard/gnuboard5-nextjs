@@ -1,0 +1,554 @@
+<?php
+if (!defined('_GNUBOARD_')) {
+    exit;
+}
+
+// =========================================================================
+// Helper: load shop default config
+// =========================================================================
+function pg_load_config() {
+    $shopConfig = DB::fetch("SELECT * FROM " . DB::table('g5_shop_default_table') . " LIMIT 1") ?: [];
+    $siteConfig = DB::fetch("SELECT * FROM " . DB::table('config_table') . " LIMIT 1") ?: [];
+
+    return array_merge($shopConfig, $siteConfig);
+}
+
+function pg_bank_accounts($cfg) {
+    $raw = (string) ($cfg['de_bank_account'] ?? '');
+    if ($raw === '') {
+        return [];
+    }
+
+    $accounts = [];
+    foreach (preg_split('/\r\n|\r|\n/', $raw) as $line) {
+        $account = trim(html_entity_decode(strip_tags((string) $line), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        if ($account !== '') {
+            $accounts[] = $account;
+        }
+    }
+
+    return array_values(array_unique($accounts));
+}
+
+function pg_detect_test_mode($cfg, $pg_service) {
+    $override = getenv('SHOP_PG_TEST_MODE');
+    if ($override !== false && trim((string) $override) !== '') {
+        return !in_array(strtolower(trim((string) $override)), ['0', 'false', 'no', 'off', 'prod', 'production'], true);
+    }
+
+    if ($pg_service === 'toss') {
+        // 관리자 쇼핑몰 설정 '결제 테스트'(de_card_test)가 정본 — 테스트결제면 테스트, 실결제면 실결제.
+        // 키 모양으로 추측하지 않는다(실결제로 설정했는데 테스트 키면 결제를 막는다: pg_toss_client_key/secret_key).
+        return (int) ($cfg['de_card_test'] ?? 0) > 0;
+    }
+    // KCP·이니시스도 관리자 '결제 테스트'를 따른다(키 모양 추측 대신). 테스트면 각 헬퍼가 공개 테스트 상점(T0000·INIpayTest)을,
+    // 실결제면 관리자에 등록한 상점 아이디를 쓴다.
+    if ($pg_service === 'inicis') {
+        return (int) ($cfg['de_card_test'] ?? 0) > 0;
+    }
+    if ($pg_service === 'kakaopay') {
+        return (int) ($cfg['de_card_test'] ?? 0) > 0
+            || trim((string) ($cfg['de_kakaopay_mid'] ?? '')) === '';
+    }
+    if ($pg_service === 'kcp') {
+        return (int) ($cfg['de_card_test'] ?? 0) > 0;
+    }
+    if ($pg_service === 'nicepay') {
+        return (int) ($cfg['de_card_test'] ?? 0) > 0;
+    }
+
+    return true;
+}
+
+require_once __DIR__ . '/payment_toss_helpers.php';
+
+function pg_parse_pg_datetime(?string $value, ?string $time = null): string {
+    $raw = preg_replace('/[^0-9]/', '', trim((string) $value) . ($time !== null ? trim((string) $time) : ''));
+    if (strlen($raw) === 12) {
+        $raw = '20' . $raw;
+    }
+    if (strlen($raw) >= 14) {
+        return substr($raw, 0, 4) . '-' . substr($raw, 4, 2) . '-' . substr($raw, 6, 2)
+            . ' ' . substr($raw, 8, 2) . ':' . substr($raw, 10, 2) . ':' . substr($raw, 12, 2);
+    }
+
+    $ts = strtotime(trim((string) $value));
+    return $ts ? date('Y-m-d H:i:s', $ts) : date('Y-m-d H:i:s');
+}
+
+function pg_append_order_history(string $orderId, string $message): void {
+    $line = date('Y-m-d H:i:s') . ' - ' . trim($message);
+    DB::execute(
+        "UPDATE " . DB::table('g5_shop_order_table') . "
+         SET od_mod_history = CASE
+             WHEN od_mod_history = '' THEN ?
+             ELSE CONCAT(od_mod_history, '\n', ?)
+         END
+         WHERE od_id = ?",
+        [$line, $line, $orderId]
+    );
+}
+
+function pg_mark_vbank_deposited(string $provider, string $orderId, string $tno, int $amount, string $paidAt, string $depositName = '', string $bankAccount = '', array $cashReceipt = []): array {
+    if (trim($paidAt) === '') {
+        $paidAt = date('Y-m-d H:i:s');
+    }
+
+    $order = DB::fetch(
+        "SELECT * FROM " . DB::table('g5_shop_order_table') . "
+         WHERE od_id = ? LIMIT 1",
+        [$orderId]
+    );
+    if (!$order) {
+        return ['ok' => false, 'error' => 'Order not found.'];
+    }
+
+    if (($order['od_settle_case'] ?? '') !== '가상계좌') {
+        return ['ok' => false, 'error' => 'Order is not a virtual-account payment.'];
+    }
+    if ($tno !== '' && !empty($order['od_tno']) && (string) $order['od_tno'] !== $tno) {
+        return ['ok' => false, 'error' => 'Transaction id mismatch.'];
+    }
+    $expectedAmount = (int) ($order['od_misu'] ?? 0) > 0
+        ? (int) ($order['od_misu'] ?? 0)
+        : (int) ($order['od_receipt_price'] ?? 0);
+    if ($amount > 0 && $expectedAmount !== $amount) {
+        return ['ok' => false, 'error' => 'Amount mismatch.'];
+    }
+
+    if (($order['od_status'] ?? '') === '입금') {
+        return ['ok' => true, 'already' => true, 'status' => '입금'];
+    }
+    if (!in_array((string) ($order['od_status'] ?? ''), ['주문'], true)) {
+        pg_append_order_history($orderId, "{$provider} 가상계좌 입금통보 보류: 현재 주문상태 " . (string) ($order['od_status'] ?? ''));
+        return ['ok' => false, 'error' => 'Order is not waiting for deposit.'];
+    }
+
+    DB::beginTransaction();
+    try {
+        $memo = strtoupper($provider) . ' 가상계좌 입금확인 - ' . $paidAt;
+        $cashSet = '';
+        $params = [
+            '입금',
+            $amount > 0 ? $amount : $expectedAmount,
+            0,
+            $paidAt,
+            $depositName,
+            $tno !== '' ? $tno : (string) ($order['od_tno'] ?? ''),
+            // 발급 때 저장한 계좌 안내(은행명·계좌·예금주·입금기한)를 지킨다 — 통보의 계좌값은 은행 코드(BK04 등)만
+            // 오기도 해서 덮으면 안내가 망가진다. 영카트 settle_*_common.php 도 입금통보에서 od_bank_account 를 건드리지 않는다.
+            (string) ($order['od_bank_account'] ?? '') !== '' ? (string) $order['od_bank_account'] : $bankAccount,
+        ];
+
+        if (!empty($cashReceipt)) {
+            $cashSet = ', od_cash = ?, od_cash_no = ?, od_cash_info = ?';
+            $params[] = 1;
+            $params[] = (string) ($cashReceipt['no'] ?? '');
+            $params[] = serialize($cashReceipt);
+        }
+
+        $params[] = $memo;
+        $params[] = $memo;
+        $params[] = $orderId;
+
+        DB::execute(
+            "UPDATE " . DB::table('g5_shop_order_table') . "
+             SET od_status = ?, od_receipt_price = ?, od_misu = ?, od_receipt_time = ?, od_deposit_name = ?,
+                 od_tno = ?, od_bank_account = ?
+                 {$cashSet},
+                 od_shop_memo = CASE
+                     WHEN od_shop_memo = '' THEN ?
+                     ELSE CONCAT(od_shop_memo, '\n', ?)
+                 END
+             WHERE od_id = ?",
+            $params
+        );
+        DB::execute(
+            "UPDATE " . DB::table('g5_shop_cart_table') . "
+             SET ct_status = ?
+             WHERE od_id = ?",
+            ['입금', $orderId]
+        );
+        DB::commit();
+    } catch (Throwable $e) {
+        DB::rollBack();
+        return ['ok' => false, 'error' => $e->getMessage()];
+    }
+
+    shop_api_send_order_mail($orderId, 'paid');
+    shop_api_defer_order_push((string) $orderId, 'paid');
+    return ['ok' => true, 'already' => false, 'status' => '입금'];
+}
+
+function pg_notify_allowed_ips(string $provider): array {
+    $allowed = [
+        'nicepay' => ['121.133.126.10', '121.133.126.11', '211.33.136.39'],
+        'inicis' => ['203.238.37.15', '39.115.212.9', '183.109.71.153', '118.129.210.25'],
+        'kcp' => [
+            '203.238.36.58', '203.238.36.160', '203.238.36.161',
+            '203.238.36.173', '203.238.36.178',
+            '103.215.144.173', '103.215.144.174', '103.215.145.30',
+        ],
+    ];
+
+    return $allowed[$provider] ?? [];
+}
+
+function pg_notify_ip_allowed(string $provider, bool $isTestMode): bool {
+    if ($isTestMode || (getenv('SHOP_PG_NOTIFY_SKIP_IP_CHECK') ?: '') !== '') {
+        return true;
+    }
+
+    $remote = $_SERVER['REMOTE_ADDR'] ?? '';
+    $allowed = pg_notify_allowed_ips($provider);
+
+    return empty($allowed) || in_array($remote, $allowed, true);
+}
+
+function pg_text_response(string $text, int $status = 200, string $contentType = 'text/plain; charset=utf-8'): void {
+    http_response_code($status);
+    header('Content-Type: ' . $contentType);
+    echo $text;
+    exit;
+}
+
+function pg_kcp_site_cd($cfg, bool $isTestMode): string {
+    $mid = trim((string) ($cfg['de_kcp_mid'] ?? ''));
+
+    if ($isTestMode) {
+        if (preg_match('/^(T\d{4}|S\d{4})$/', $mid) === 1) {
+            return $mid;
+        }
+        return (int) ($cfg['de_escrow_use'] ?? 0) === 1 ? 'T0007' : 'T0000';
+    }
+
+    if ($mid === '') {
+        return '';
+    }
+    return strpos($mid, 'SR') === 0 ? $mid : 'SR' . $mid;
+}
+
+function pg_kcp_site_key($cfg, string $siteCd): string {
+    if ($siteCd === 'T0007') {
+        return '4Ho4YsuOZlLXUZUdOxM1Q7X__';
+    }
+    if ($siteCd === 'T0000') {
+        return '3grptw1.zW0GSo4PQdaGvsF__';
+    }
+    $siteKey = trim((string) ($cfg['de_kcp_site_key'] ?? ''));
+    if ($siteKey !== '') {
+        return $siteKey;
+    }
+    return '';
+}
+
+require_once __DIR__ . '/payment_inicis_helpers.php';
+
+require_once __DIR__ . '/payment_nicepay_helpers.php';
+
+function pg_kcp_bitmask_from_mobile_method(string $method): string {
+    $method = strtoupper(trim($method));
+    if ($method === 'CARD') {
+        return '100000000000';
+    }
+    if ($method === 'BANK') {
+        return '010000000000';
+    }
+    if ($method === 'VCNT') {
+        return '001000000000';
+    }
+    if ($method === 'MOBX') {
+        return '000010000000';
+    }
+    return '';
+}
+
+function pg_kcp_pay_type(string $settleCase, string $usePayMethod): string {
+    if ($usePayMethod === '100000000000' && in_array($settleCase, ['신용카드', '간편결제'], true)) {
+        return 'PACA';
+    }
+    if ($usePayMethod === '010000000000' && $settleCase === '계좌이체') {
+        return 'PABK';
+    }
+    if ($usePayMethod === '001000000000' && $settleCase === '가상계좌') {
+        return 'PAVC';
+    }
+    if ($usePayMethod === '000010000000' && $settleCase === '휴대폰') {
+        return 'PAMC';
+    }
+    return '';
+}
+
+function pg_kcp_mobile_payment_method(string $settleCase): string {
+    if ($settleCase === '계좌이체') {
+        return 'BANK';
+    }
+    if ($settleCase === '가상계좌') {
+        return 'VCNT';
+    }
+    if ($settleCase === '휴대폰') {
+        return 'MOBX';
+    }
+    if (in_array($settleCase, ['신용카드', '간편결제'], true)) {
+        return 'CARD';
+    }
+    return '';
+}
+
+function pg_kcp_message_to_utf8(string $message): string {
+    if ($message === '') {
+        return '';
+    }
+    if (preg_match('//u', $message)) {
+        return $message;
+    }
+    $converted = @iconv('euc-kr', 'utf-8//IGNORE', $message);
+    return $converted !== false && $converted !== '' ? $converted : $message;
+}
+
+function pg_request_origin(): string {
+    if (function_exists('api_public_request_origin')) {
+        $origin = api_public_request_origin(true);
+        if ($origin !== '') {
+            return $origin;
+        }
+    }
+
+    foreach (array('G5_WEBAPP_APP_URL', 'G5_URL') as $constantName) {
+        if (!defined($constantName) || !constant($constantName)) {
+            continue;
+        }
+        $origin = function_exists('api_public_origin_from_url')
+            ? api_public_origin_from_url(constant($constantName))
+            : '';
+        if ($origin !== '') {
+            return $origin;
+        }
+    }
+
+    return 'http://127.0.0.1';
+}
+
+function pg_api_url(string $path, array $query = []): string {
+    $path = '/' . ltrim($path, '/');
+    $origin = pg_request_origin();
+    $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+    $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/api/index.php';
+
+    if (isset($_GET['_route']) || strpos($_SERVER['REQUEST_URI'] ?? '', '_route=') !== false) {
+        $params = array_merge(['_route' => 'v1' . $path], $query);
+        return $origin . $scriptName . '?' . http_build_query($params);
+    }
+
+    $marker = '/api/v1/';
+    $markerPos = strpos($requestPath, $marker);
+    $basePath = $markerPos !== false ? substr($requestPath, 0, $markerPos) . '/api/v1' : '/api/v1';
+    $url = $origin . $basePath . $path;
+    return $query ? $url . '?' . http_build_query($query) : $url;
+}
+
+function pg_value_present($value): bool {
+    return trim((string) $value) !== '';
+}
+
+function pg_file_status(string $path): array {
+    $exists = $path !== '' && is_file($path);
+    return [
+        'path'     => $path,
+        'exists'   => $exists,
+        'readable' => $exists && is_readable($path),
+    ];
+}
+
+function pg_dir_status(string $path): array {
+    $exists = $path !== '' && is_dir($path);
+    return [
+        'path'     => $path,
+        'exists'   => $exists,
+        'writable' => $exists && is_writable($path),
+    ];
+}
+
+function pg_payment_confirm_tables(): array {
+    $keys = [
+        'g5_shop_order_table',
+        'g5_shop_cart_table',
+        'g5_shop_item_table',
+        'g5_shop_item_option_table',
+        'g5_shop_coupon_log_table',
+        'point_table',
+        'member_table',
+    ];
+
+    $tables = [];
+    foreach ($keys as $key) {
+        try {
+            $tables[$key] = DB::table($key);
+        } catch (Throwable $e) {
+            $tables[$key] = '';
+        }
+    }
+
+    return array_filter(array_unique($tables), static fn($table) => trim((string) $table) !== '');
+}
+
+function pg_payment_confirm_transaction_report(): array {
+    static $report = null;
+    if ($report !== null) {
+        return $report;
+    }
+
+    $tables = pg_payment_confirm_tables();
+    if (empty($tables)) {
+        return $report = [
+            'transactional' => false,
+            'engines' => [],
+            'missing' => ['payment tables'],
+            'reason' => 'payment tables not found',
+        ];
+    }
+
+    try {
+        $placeholders = implode(',', array_fill(0, count($tables), '?'));
+        $rows = DB::fetchAll(
+            "SELECT TABLE_NAME, ENGINE
+               FROM information_schema.TABLES
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME IN ({$placeholders})",
+            array_values($tables)
+        );
+    } catch (Throwable $e) {
+        return $report = [
+            'transactional' => false,
+            'engines' => [],
+            'missing' => array_values($tables),
+            'reason' => $e->getMessage(),
+        ];
+    }
+
+    $engines = [];
+    foreach ($rows as $row) {
+        $engines[(string) $row['TABLE_NAME']] = strtoupper((string) ($row['ENGINE'] ?? ''));
+    }
+
+    $missing = array_values(array_diff(array_values($tables), array_keys($engines)));
+    $transactionalEngines = ['INNODB', 'NDBCLUSTER'];
+    $nonTransactional = [];
+    foreach ($engines as $table => $engine) {
+        if (!in_array($engine, $transactionalEngines, true)) {
+            $nonTransactional[$table] = $engine;
+        }
+    }
+
+    return $report = [
+        'transactional' => empty($missing) && empty($nonTransactional),
+        'engines' => $engines,
+        'missing' => $missing,
+        'non_transactional' => $nonTransactional,
+        'reason' => empty($missing) && empty($nonTransactional)
+            ? 'all payment tables are transactional'
+            : 'one or more payment tables do not support transactions',
+    ];
+}
+
+function pg_payment_confirm_lock_name(string $orderId): string {
+    return 'g5pay_' . md5($orderId);
+}
+
+function pg_payment_confirm_acquire_lock(string $orderId, int $timeout = 10): array {
+    $lockName = pg_payment_confirm_lock_name($orderId);
+    try {
+        $row = DB::fetch("SELECT GET_LOCK(?, ?) AS got_lock", [$lockName, $timeout]);
+    } catch (Throwable $e) {
+        return ['ok' => false, 'lock' => $lockName, 'error' => $e->getMessage(), 'code' => 'lock_busy'];
+    }
+
+    // GET_LOCK: 1 = 잡음, 0 = 다른 confirm 이 쥐고 있어 시간 초과(진행 중), NULL = 락 자체 오류.
+    $got = isset($row['got_lock']) ? (int) $row['got_lock'] : null;
+    return [
+        'ok' => $got === 1,
+        'lock' => $lockName,
+        'error' => $got === 1 ? '' : 'Payment confirmation is already running.',
+        'code' => $got === 1 ? '' : ($got === 0 ? 'confirm_in_progress' : 'lock_busy'),
+    ];
+}
+
+function pg_payment_confirm_release_lock(string $lockName): void {
+    if ($lockName === '') {
+        return;
+    }
+    try {
+        DB::fetch("SELECT RELEASE_LOCK(?) AS released", [$lockName]);
+    } catch (Throwable $e) {
+        // Named locks are connection-scoped; connection close releases it if this fails.
+    }
+}
+
+function pg_legacy_transaction_query(string $sql): void {
+    if (!function_exists('sql_query')) {
+        return;
+    }
+    $result = sql_query($sql, false);
+    if ($result === false || $result === null) {
+        throw new RuntimeException('Legacy SQL transaction command failed: ' . $sql);
+    }
+}
+
+function pg_is_local_origin(string $origin): bool {
+    $host = strtolower((string) (parse_url($origin, PHP_URL_HOST) ?: ''));
+    if ($host === 'localhost' || $host === '::1' || preg_match('/^127\./', $host) === 1) {
+        return true;
+    }
+    return preg_match('/^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/', $host) === 1;
+}
+
+function pg_easy_pay_services(array $cfg): array {
+    $raw = (string) ($cfg['de_easy_pay_services'] ?? '');
+    if ($raw === '') {
+        return [];
+    }
+
+    $services = array_map('trim', explode(',', $raw));
+    $services = array_filter($services, static fn($service) => $service !== '');
+
+    return array_values(array_unique($services));
+}
+
+function pg_primary_easy_pay_service(array $cfg): string {
+    $services = pg_easy_pay_services($cfg);
+    if (!$services) {
+        return '';
+    }
+
+    $pgService = (string) ($cfg['de_pg_service'] ?? '');
+    $priority = $pgService === 'nicepay'
+        ? ['nicepay_naverpay', 'nicepay_kakaopay', 'nicepay_samsungpay', 'nicepay_paycopay', 'nicepay_skpay', 'nicepay_ssgpay', 'nicepay_lpay']
+        : ['nhnkcp_naverpay', 'nhnkcp_kakaopay', 'nhnkcp_payco'];
+
+    foreach ($priority as $service) {
+        if (in_array($service, $services, true)) {
+            return $service;
+        }
+    }
+
+    return (string) $services[0];
+}
+
+function pg_payment_method_flags(array $cfg): array {
+    $bankAccounts = pg_bank_accounts($cfg);
+    return [
+        'card'     => (int) ($cfg['de_card_use'] ?? 0) === 1,
+        'vbank'    => (int) ($cfg['de_vbank_use'] ?? 0) === 1,
+        'bank'     => (int) ($cfg['de_bank_use'] ?? 0) === 1 && !empty($bankAccounts),
+        'iche'     => (int) ($cfg['de_iche_use'] ?? 0) === 1,
+        'hp'       => (int) ($cfg['de_hp_use'] ?? 0) === 1,
+        'easy_pay' => (int) ($cfg['de_easy_pay_use'] ?? 0) === 1,
+        'kakaopay' => pg_kakaopay_enabled($cfg),
+    ];
+}
+
+require_once __DIR__ . '/payment_diagnostics_helpers.php';
+
+require_once __DIR__ . '/payment_kcp_approval_helpers.php';
+
+require_once __DIR__ . '/payment_bridge_helpers.php';

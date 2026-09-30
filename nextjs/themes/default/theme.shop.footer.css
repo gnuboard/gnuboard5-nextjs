@@ -1,0 +1,240 @@
+/* 상점 푸터와 껍데기·홈의 반응형 규칙. */
+
+/* --- footer ------------------------------------------------------------- */
+/* 레퍼런스 shop.tail.php: 두 칸 격자 — 왼쪽 사이트 이름(26px) · 소개, 오른쪽 위 푸터 메뉴.
+   사이트 정보와 저작권은 두 칸을 다 쓴다. 좁으면 한 칸으로 쌓는다. */
+.solune-shop-page .solune-shop-footer {
+  border-top: 1px solid var(--solune-border);
+  background: var(--solune-surface-soft);
+}
+.solune-shop-page .solune-shop-footer-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.25rem 2rem;
+  padding-block: 48px;
+}
+.solune-shop-page .solune-shop-footer-brand a { display: inline-flex; align-items: center; color: var(--solune-text); }
+.solune-shop-page .solune-shop-footer-name { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; }
+.solune-shop-page .solune-shop-footer-brand p { margin: 10px 0 0; color: var(--solune-muted); font-size: 13px; }
+.solune-shop-page .solune-shop-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: flex-end;
+  gap: 0.5rem 1rem;
+}
+.solune-shop-page .solune-shop-footer-links a { color: var(--solune-text-soft); font-size: 13px; }
+.solune-shop-page .solune-shop-footer-links a:hover { color: var(--solune-primary); }
+.solune-shop-page :is(.solune-shop-footer-info, .solune-shop-footer-company) {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--solune-border);
+  padding-top: 1.25rem;
+}
+.solune-shop-page .solune-shop-footer-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.25rem;
+  color: var(--solune-muted);
+  font-size: 12px;
+}
+/* 사이트 정보 — 커뮤니티 푸터와 같은 모양(이름표 흐리게, 값 한 단 진하게). */
+.solune-shop-page .solune-shop-footer-company-title { margin: 0 0 0.625rem; color: var(--solune-text-soft); font-size: 0.75rem; font-weight: 700; }
+.solune-shop-page .solune-shop-footer-company-list { display: flex; flex-wrap: wrap; gap: 0.375rem 1.25rem; margin: 0; font-size: 0.75rem; line-height: 1.6; }
+.solune-shop-page .solune-shop-footer-company-list > div { display: flex; min-width: 0; gap: 0.375rem; }
+.solune-shop-page .solune-shop-footer-company-list dt { flex: none; color: var(--solune-muted); font-weight: 500; }
+.solune-shop-page .solune-shop-footer-company-list dd { min-width: 0; margin: 0; color: var(--solune-text-soft); overflow-wrap: anywhere; }
+.solune-shop-page .solune-shop-footer-copy { grid-column: 1 / -1; margin: 0; color: var(--solune-muted); /* 옅은 바탕(#f2f2f0) 위라 한 단계 진하게: 4.5:1 */ font-size: 12px; }
+@media (max-width: 767px) {
+  .solune-shop-page .solune-shop-footer-inner { grid-template-columns: minmax(0, 1fr); padding-block: 32px; }
+  .solune-shop-page .solune-shop-footer-links { justify-content: flex-start; }
+}
+
+/* Nested under the themed body so these outrank theme.internal.css, whose
+   rules also start with body[data-g5-theme-source] and would otherwise win. */
+body[data-g5-theme-source="default"] {
+  /* --- inner shop pages (reference shop-ondam.css 목록 · 상세 · 장바구니) ---- */
+  /* Inner shop pages are the app's own components (shadcn slots + Tailwind).
+     The reference draws them without cards: a bare 26px title under a 12px
+     breadcrumb, square chips and buttons, 1px hairlines, black current page. */
+  .solune-shop-page main > div > nav:first-child {
+    margin: 0 0 26px;
+    padding-top: 32px;
+    color: var(--solune-muted-soft);
+    font-size: 12px;
+  }
+  .solune-shop-page main > div > nav:first-child a:hover { color: var(--solune-primary); }
+  .solune-shop-page main h1 {
+    color: var(--solune-text);
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+  }
+  /* 쇼핑몰 홈의 구역 제목(히트상품 · 고객님이 남긴 후기 …)은 28px 이라 이 규칙에서 뺀다 — 전에는
+     특이도가 더 세서 홈 제목까지 16px 로 눌렀다. */
+  .solune-shop-page main h2:not(.solune-shop-section-head h2) { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+  .solune-shop-page .page-hero {
+    border: 0;
+    border-radius: 0;
+    margin: 0 0 22px;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .solune-shop-page .page-hero-title { font-size: 26px; font-weight: 700; letter-spacing: -0.025em; }
+  .solune-shop-page .page-hero-desc { color: var(--solune-muted); font-size: 13.5px; }
+  .solune-shop-page .section-eyebrow {
+    color: var(--solune-muted-soft);
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .solune-shop-page .surface-toolbar,
+  .solune-shop-page .surface-panel {
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+  }
+  .solune-shop-page .surface-toolbar { margin-bottom: 22px; }
+  .solune-shop-page .filter-chip {
+    min-height: 0;
+    border: 1px solid var(--solune-border-strong);
+    border-radius: 0;
+    padding: 7px 12px;
+    background: var(--solune-surface);
+    color: var(--solune-text-soft);
+    font-size: 12.5px;
+    font-weight: 500;
+  }
+  .solune-shop-page .filter-chip:hover {
+    border-color: var(--solune-primary);
+    background: var(--solune-surface);
+    color: var(--solune-primary);
+  }
+  .solune-shop-page .filter-chip-active,
+  .solune-shop-page .filter-chip-active:hover {
+    border-color: var(--solune-text);
+    background: var(--solune-text);
+    color: var(--solune-surface);
+  }
+
+  /* product cards on list pages take the home card's geometry */
+  .solune-shop-page .product-card,
+  .solune-shop-page .product-list-card {
+    border: 1px solid var(--solune-border);
+    border-radius: 0;
+    background: var(--solune-surface);
+    box-shadow: none;
+    transition: border-color 0.16s;
+  }
+  .solune-shop-page .product-card:hover,
+  .solune-shop-page .product-list-card:hover {
+    border-color: var(--solune-primary);
+    background: var(--solune-surface);
+    box-shadow: none;
+    transform: none;
+  }
+  .solune-shop-page .product-image-shell { border-radius: 0; background: var(--solune-surface-soft); }
+  .solune-shop-page .product-card h3 { color: var(--solune-text); font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em; }
+  .solune-shop-page .product-badge {
+    border-radius: 0;
+    padding: 5px 8px;
+    background: var(--ondam-ink);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+  .solune-shop-page .product-badge-sale { background: var(--ondam-sale); }
+  .solune-shop-page .product-badge-pick { background: var(--solune-primary); }
+
+  /* shadcn primitives: square, hairline, forest primary */
+  .solune-shop-page [data-slot="button"],
+  .solune-shop-page .btn { border-radius: 0; font-weight: 600; letter-spacing: -0.01em; }
+  .solune-shop-page [data-slot="input"],
+  .solune-shop-page [data-slot="select-trigger"],
+  .solune-shop-page select,
+  .solune-shop-page textarea {
+    border-radius: 0;
+    border-color: var(--solune-border-strong);
+  }
+  .solune-shop-page [data-slot="card"] {
+    border-color: var(--solune-border);
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .solune-shop-page [data-slot="badge"] { border-radius: 0; }
+  .solune-shop-page table thead tr { background: var(--solune-surface-soft); }
+  .solune-shop-page table th { color: var(--solune-muted); font-size: 12.5px; font-weight: 600; }
+  .solune-shop-page table tr { border-color: var(--solune-border); }
+  .solune-shop-page main img { border-radius: 0; }
+
+  /* pagination: 34px squares, current page inked */
+  .solune-shop-page nav[aria-label="pagination"] [data-slot="button"],
+  .solune-shop-page nav[aria-label="페이지 이동"] [data-slot="button"] {
+    min-width: 34px;
+    height: 34px;
+    border: 1px solid var(--solune-border);
+    border-radius: 0;
+    background: var(--solune-surface);
+    color: var(--solune-text-soft);
+    font-size: 13px;
+  }
+  .solune-shop-page nav[aria-label="pagination"] [data-slot="button"][aria-current="page"],
+  .solune-shop-page nav[aria-label="페이지 이동"] [data-slot="button"][aria-current="page"] {
+    border-color: var(--solune-text);
+    background: var(--solune-text);
+    color: var(--solune-surface);
+    font-weight: 700;
+  }
+}
+
+/* App-owned inner pages can spill a pixel or two past the rail on phones (the
+   detail page's grid does). clip, not hidden: it trims the spill without
+   turning the container into a scroll container. The clip sits on the
+   full-width wrapper, not the 80rem column — the home banner bleeds past the
+   column on purpose and a clip there would cut it back to the column. */
+.solune-shop-page .solune-shop-wrapper { overflow-x: clip; }
+
+/* --- responsive --------------------------------------------------------- */
+@media (max-width: 1023px) {
+  .solune-shop-page .solune-shop-mainbar { gap: 20px; }
+  .solune-shop-page .solune-shop-nav { gap: 16px; }
+  .solune-shop-page .solune-shop-type-nav { gap: 14px; }
+  .solune-shop-page .solune-shop-type-nav a { font-size: 13px; }
+}
+@media (max-width: 767px) {
+  .solune-shop-page .solune-shop-type-nav { display: none; }
+}
+@media (max-width: 639px) {
+  .solune-shop-page { --shop-mainbar-h: 60px; --shop-mainbar-h-shrunk: 52px; }
+  /* 카테고리 단추 · 상품 유형은 감추고 로고 왼쪽 햄버거가 서랍을 연다(theme.shop.category.css).
+     단추가 빠진 자리만큼 로고 글자를 다시 보인다 — 레퍼런스도 좁은 화면에서 로고 전체를 둔다. */
+  .solune-shop-page .solune-shop-mainbar { gap: 0.5rem; }
+  /* six shop utilities do not fit one phone row: scroll them, keep the swap pinned.
+     The menu is a flex child, so it needs min-width: 0 or it refuses to shrink
+     and the whole strip runs off the right edge. */
+  .solune-shop-page .solune-community-member-menu { min-width: 0; flex: 1 1 auto; justify-content: flex-end; }
+  .solune-shop-page .solune-community-member-utilities {
+    display: flex;
+    min-width: 0;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 0.25rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .solune-shop-page .solune-community-member-utilities::-webkit-scrollbar { display: none; }
+  .solune-shop-page .solune-community-member-menu .solune-community-member-utility { display: inline-flex; }
+}
+@media (max-width: 1023px) {
+  .solune-shop-page .sct { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+  .solune-shop-page .sct { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .solune-shop-page .solune-shop-sidebar { grid-template-columns: minmax(0, 1fr); }
+  .solune-shop-page .solune-shop-section-head h2 { font-size: 23px; }
+  .solune-shop-page .solune-shop-product-section { padding-top: 44px; }
+}

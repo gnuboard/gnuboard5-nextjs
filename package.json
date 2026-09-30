@@ -1,0 +1,17 @@
+{
+  "name": "gnuboard5-nextjs",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "sync": "node scripts/sync-from-gnuboard.mjs",
+    "verify": "node scripts/verify-release-package.mjs",
+    "package": "node scripts/package-release.mjs",
+    "package:local": "node scripts/package-release.mjs v0.1.0-local",
+    "package:verify": "npm run package:local && npm run verify -- v0.1.0-local"
+  },
+  "license": "LGPL-2.1-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gnuboard/gnuboard5-nextjs.git"
+  }
+}

@@ -1,0 +1,354 @@
+/* 헤더 "카테고리" 펼침 메뉴 — shop-category-panel.tsx 의 solune-shop-category-* .
+   레퍼런스 shop/category.php · default_shop.css "헤더 카테고리 펼침 메뉴"(2026-09 실측):
+   헤더 아래로 흰 띠가 좌우 끝까지 흐르고, 안쪽은 본문과 같은 폭(.solune-shop-shell).
+   왼쪽 260px 이름표 줄(고른 것은 회색 바탕 + 오른쪽 2px 짙은 선), 오른쪽은 고른 분류의
+   이름 · 전체 보기 · 하위 분류(자동 칸, 180px 이상) · 추천 상품 넷. 띠 아래는 옅은 뒷막. */
+.solune-shop-page .solune-shop-category {
+  position: absolute;
+  z-index: 100;
+  top: 100%;
+  right: 0;
+  left: 0;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s, visibility 0.16s;
+}
+.solune-shop-page .solune-shop-category.is-open {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+/* 흰 바탕은 가짜 요소로 깐다. 상자 자체에 깔면 띠 아래의 뒷막이 가려진다. */
+.solune-shop-page .solune-shop-category::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-top: 1px solid var(--solune-border);
+  background: var(--solune-surface);
+  box-shadow: 0 24px 48px color-mix(in srgb, var(--solune-text) 12%, transparent);
+  content: "";
+}
+.solune-shop-page .solune-shop-category-backdrop {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  height: 100vh;
+  background: color-mix(in srgb, var(--solune-text) 32%, transparent);
+}
+.solune-shop-page .solune-shop-category-panel {
+  position: relative;
+  z-index: 1;
+  overflow-y: auto;
+  max-height: calc(100vh - 7rem);
+  padding-block: 28px 40px;
+}
+.solune-shop-page .solune-shop-category.is-open .solune-shop-category-panel {
+  animation: soluneCatPanelIn 260ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes soluneCatPanelIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: none; }
+}
+
+.solune-shop-page .solune-shop-category-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.solune-shop-page .solune-shop-category-head h2 { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+.solune-shop-page .solune-shop-category-close {
+  display: inline-grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--solune-text);
+  cursor: pointer;
+}
+.solune-shop-page .solune-shop-category-close:hover { color: var(--solune-primary); }
+
+.solune-shop-page .solune-shop-category-split {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  gap: 0 40px;
+  align-items: start;
+}
+/* 왼쪽 이름표 줄. 오른쪽 실선은 목록이 긋고, 고른 칸은 그 위에 2px 제 선을 얹는다. */
+.solune-shop-page .solune-shop-category-rail {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--solune-border);
+}
+.solune-shop-page .solune-shop-category-rail button {
+  display: flex;
+  width: calc(100% + 1px);
+  height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 0;
+  border-right: 2px solid transparent;
+  margin-right: -1px;
+  background: none;
+  color: var(--solune-muted);
+  cursor: pointer;
+  padding: 0 16px;
+  font-size: 14px;
+  text-align: left;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+.solune-shop-page .solune-shop-category-rail button:hover { background: var(--solune-surface-soft); color: var(--solune-text); }
+.solune-shop-page .solune-shop-category-rail button[aria-selected="true"] {
+  border-right-color: var(--solune-text);
+  background: var(--solune-surface-soft);
+  color: var(--solune-text);
+  font-weight: 700;
+}
+.solune-shop-page .solune-shop-category-caret { flex: none; font-size: 12px; opacity: 0; }
+.solune-shop-page .solune-shop-category-rail button[aria-selected="true"] .solune-shop-category-caret { opacity: 1; }
+.solune-shop-page .solune-shop-category-pane.is-off { display: none; }
+
+.solune-shop-page .solune-shop-category-pane-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  border-bottom: 1px solid var(--solune-text);
+  padding-bottom: 14px;
+  margin-bottom: 6px;
+}
+.solune-shop-page .solune-shop-category-pane-name { font-size: 16px; font-weight: 700; }
+.solune-shop-page .solune-shop-category-all { color: var(--solune-muted); font-size: 13px; white-space: nowrap; }
+.solune-shop-page .solune-shop-category-all:hover { color: var(--solune-primary); text-decoration: underline; text-underline-offset: 3px; }
+.solune-shop-page .solune-shop-category-subs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 2px 24px;
+}
+.solune-shop-page .solune-shop-category-subs a {
+  display: flex;
+  height: 42px;
+  align-items: center;
+  border-bottom: 1px solid var(--solune-surface-soft);
+  color: var(--solune-text-soft);
+  padding: 0 4px;
+  font-size: 14px;
+  transition: color 0.16s ease, padding-left 0.16s ease;
+}
+.solune-shop-page .solune-shop-category-subs a:hover,
+.solune-shop-page .solune-shop-category-subs a:focus-visible { color: var(--solune-text); padding-left: 8px; }
+.solune-shop-page .solune-shop-category-none { margin-top: 14px; color: var(--solune-muted); font-size: 13px; }
+.solune-shop-page .solune-shop-category-empty { padding: 2rem; color: var(--solune-muted); text-align: center; }
+
+/* 추천 상품 넷 — 하위 분류 아래 빈 자리를 채우는 가벼운 미리보기. */
+.solune-shop-page .solune-shop-category-picks { margin-top: 28px; border-top: 1px solid var(--solune-border); padding-top: 18px; }
+.solune-shop-page .solune-shop-category-picks-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.solune-shop-page .solune-shop-category-picks-eyebrow {
+  display: block;
+  color: var(--solune-primary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  line-height: 1;
+}
+.solune-shop-page .solune-shop-category-picks-head h3 { margin-top: 7px; font-size: 15px; font-weight: 800; letter-spacing: -0.02em; }
+.solune-shop-page .solune-shop-category-picks-all { flex: none; color: var(--solune-muted); font-size: 12px; white-space: nowrap; }
+.solune-shop-page .solune-shop-category-picks-all:hover,
+.solune-shop-page .solune-shop-category-picks-all:focus-visible { color: var(--solune-primary); text-decoration: underline; text-underline-offset: 3px; }
+.solune-shop-page .solune-shop-category-picks-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.solune-shop-page .solune-shop-category-pick { display: grid; min-width: 0; gap: 8px; color: var(--solune-text); }
+.solune-shop-page .solune-shop-category-pick-image {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  aspect-ratio: 1;
+  background: var(--solune-surface-soft);
+}
+.solune-shop-page .solune-shop-category-pick-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.18s ease;
+}
+.solune-shop-page .solune-shop-category-pick:hover .solune-shop-category-pick-image img,
+.solune-shop-page .solune-shop-category-pick:focus-visible .solune-shop-category-pick-image img { transform: scale(1.035); }
+.solune-shop-page .solune-shop-category-pick-name {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--solune-text-soft);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.solune-shop-page .solune-shop-category-pick-price { font-size: 13px; font-weight: 800; line-height: 1.2; }
+.solune-shop-page .solune-shop-category-pick:focus-visible { outline: 2px solid var(--solune-primary); outline-offset: 4px; }
+.solune-shop-page .solune-shop-category-pick-skeleton { aspect-ratio: 1; background: var(--solune-surface-soft); }
+.solune-shop-page .solune-shop-category-picks-empty {
+  display: flex;
+  min-height: 126px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--solune-surface-soft);
+  color: var(--solune-text-soft);
+  padding: 18px 20px;
+  font-size: 13px;
+}
+.solune-shop-page .solune-shop-category-picks-empty a { flex: none; color: var(--solune-primary); font-size: 12px; font-weight: 750; }
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .solune-shop-page .solune-shop-category-split { grid-template-columns: minmax(180px, 220px) minmax(0, 1fr); gap: 0 24px; }
+  .solune-shop-page .solune-shop-category-picks-list { gap: 8px; }
+  .solune-shop-page .solune-shop-category-pick-name { font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .solune-shop-page .solune-shop-category.is-open .solune-shop-category-panel { animation: none; }
+}
+
+/* --- 좁은 화면(640px 미만): 햄버거 + 왼쪽 서랍 ------------------------------
+   레퍼런스 shop-responsive.css · default_shop.css 맨 끝. 손가락에는 hover 가 없어 얹어서 여는
+   큰 패널이 맞지 않는다 — "카테고리" 단추 · 상품 유형 · 펼침 패널을 감추고, 로고 왼쪽 햄버거가
+   서랍(shop-drawer.tsx)을 연다. 메인바는 햄버거 · 로고 · 오른쪽 아이콘의 세 칸. */
+.solune-shop-page .solune-shop-drawer-toggle { display: none; }
+.solune-shop-page .solune-shop-drawer { display: none; }
+
+@media (max-width: 639px) {
+  .solune-shop-page .solune-shop-nav,
+  .solune-shop-page .solune-shop-category { display: none; }
+  .solune-shop-page .solune-shop-mainbar { grid-template-columns: auto auto minmax(0, 1fr); gap: 0.5rem; }
+  .solune-shop-page .solune-shop-actions { justify-self: end; }
+  .solune-shop-page .solune-shop-drawer-toggle {
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    margin-left: -10px;
+    border: 0;
+    background: none;
+    color: var(--solune-text);
+    cursor: pointer;
+  }
+  .solune-shop-page .solune-shop-drawer-toggle:hover,
+  .solune-shop-page .solune-shop-drawer-toggle:focus-visible { color: var(--solune-primary); }
+
+  .solune-shop-page .solune-shop-drawer { position: fixed; z-index: 210; inset: 0; display: block; visibility: hidden; pointer-events: none; }
+  .solune-shop-page .solune-shop-drawer.is-open { visibility: visible; pointer-events: auto; }
+}
+.solune-shop-page .solune-shop-drawer-overlay {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--solune-text) 40%, transparent);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.solune-shop-page .solune-shop-drawer.is-open .solune-shop-drawer-overlay { opacity: 1; }
+/* 머리는 제자리, 목록만 스크롤한다. */
+.solune-shop-page .solune-shop-drawer-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(20rem, 86vw);
+  height: 100dvh;
+  border-right: 1px solid var(--solune-border);
+  background: var(--solune-surface);
+  box-shadow: 16px 0 36px color-mix(in srgb, var(--solune-text) 20%, transparent);
+  overscroll-behavior: contain;
+  transform: translateX(-100%);
+  transition: transform 0.24s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.solune-shop-page .solune-shop-drawer.is-open .solune-shop-drawer-panel { transform: none; }
+/* 머리 높이는 좁은 화면의 메인바(60px)와 같다 — 서랍이 열릴 때 로고가 제자리에서 이어져 보인다. */
+.solune-shop-page .solune-shop-drawer-head {
+  display: flex;
+  min-height: 60px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--solune-border);
+  padding: 0 6px 0 16px;
+}
+.solune-shop-page .solune-shop-drawer-brand { display: inline-flex; min-width: 0; align-items: center; gap: 0.55rem; color: var(--solune-text); font-weight: 850; }
+.solune-shop-page .solune-shop-drawer-brand .solune-brand-logo { height: 26px; }
+.solune-shop-page .solune-shop-drawer-close {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  color: var(--solune-muted);
+  cursor: pointer;
+}
+.solune-shop-page .solune-shop-drawer-close:hover,
+.solune-shop-page .solune-shop-drawer-close:focus-visible { color: var(--solune-text); }
+.solune-shop-page .solune-shop-drawer-nav {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 8px 24px;
+  scrollbar-color: var(--solune-border-strong) transparent;
+  scrollbar-width: thin;
+}
+.solune-shop-page .solune-shop-drawer-title { padding: 18px 12px 4px; color: var(--solune-muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; }
+.solune-shop-page .solune-shop-drawer-title + .solune-shop-drawer-menu { padding-bottom: 8px; }
+.solune-shop-page .solune-shop-drawer-menu + .solune-shop-drawer-title { margin-top: 8px; border-top: 1px solid var(--solune-border); }
+.solune-shop-page .solune-shop-drawer-empty { padding: 8px 12px; color: var(--solune-muted); font-size: 13px; }
+/* 첫 줄 — 큰 분류 이름과 상품 유형. 손가락 크기(44px). */
+.solune-shop-page .solune-shop-drawer-menu > li > a,
+.solune-shop-page .solune-shop-drawer-menu summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  color: var(--solune-text);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  list-style: none;
+}
+.solune-shop-page .solune-shop-drawer-menu summary::-webkit-details-marker { display: none; }
+.solune-shop-page .solune-shop-drawer-menu summary svg { flex: none; color: var(--solune-muted); transition: transform 0.18s ease; }
+.solune-shop-page .solune-shop-drawer-menu details[open] > summary { color: var(--solune-primary); }
+.solune-shop-page .solune-shop-drawer-menu details[open] > summary svg { transform: rotate(180deg); }
+.solune-shop-page .solune-shop-drawer-menu > li > a:hover,
+.solune-shop-page .solune-shop-drawer-menu > li > a:focus-visible,
+.solune-shop-page .solune-shop-drawer-menu summary:hover,
+.solune-shop-page .solune-shop-drawer-menu summary:focus-visible { background: var(--solune-surface-soft); color: var(--solune-primary); }
+/* 펼친 하위 분류 — 왼쪽 얇은 레일. 첫 줄은 "전체 보기". */
+.solune-shop-page .solune-shop-drawer-menu details > ul { margin: 2px 0 8px 14px; border-left: 1px solid var(--solune-border); padding-left: 8px; }
+.solune-shop-page .solune-shop-drawer-menu details > ul a {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 4px 10px;
+  color: var(--solune-text-soft);
+  font-size: 14px;
+}
+.solune-shop-page .solune-shop-drawer-menu details > ul a:hover,
+.solune-shop-page .solune-shop-drawer-menu details > ul a:focus-visible { background: var(--solune-surface-soft); color: var(--solune-text); }
+.solune-shop-page .solune-shop-drawer-menu details > ul a.solune-shop-drawer-all { color: var(--solune-primary); font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) {
+  .solune-shop-page .solune-shop-drawer-overlay,
+  .solune-shop-page .solune-shop-drawer-panel,
+  .solune-shop-page .solune-shop-drawer-menu summary svg { transition: none; }
+}

@@ -1,0 +1,124 @@
+/* 상점 홈 캐러셀 — Swiper 11 (레퍼런스 shop-carousel.css 와 같은 값).
+   배너 모양은 theme.shop.home.css 의 banner 절에 있고, 여기는 Swiper 가 붙이는 클래스
+   (잠김 · 끝 · 진행 막대 · 쪽 점 · 걸친 칸)에 거는 규칙과 줄마다의 칸 · 단추 자리다.
+   theme.shop.home.css 다음에 싣는다 — 같은 무게의 규칙은 여기가 이긴다. */
+
+/* --- 공통 ------------------------------------------------------------------ */
+/* Swiper 는 --swiper-* 라는 제 변수로 색과 크기를 받는다. 클래스를 덮어쓰기보다 그 변수를 우리
+   토큰으로 채우는 쪽이 업그레이드에 강하다(레퍼런스와 같은 값). */
+.solune-shop-page .swiper {
+  --swiper-theme-color: var(--solune-primary);
+  --swiper-pagination-color: var(--solune-primary);
+  --swiper-pagination-bullet-inactive-color: var(--solune-text);
+  --swiper-pagination-bullet-inactive-opacity: 0.25;
+  --swiper-pagination-bullet-size: 0.5rem;
+  --swiper-pagination-bullet-horizontal-gap: 0.25rem;
+}
+/* 한 장이면 Swiper 가 스스로 단추 · 표시를 잠근다. 잠긴 것은 감춘다. */
+.solune-shop-page .swiper-button-lock,
+.solune-shop-page .swiper-pagination-lock { display: none; }
+
+/* --- 분류 칩 줄 ---------------------------------------------------------- */
+/* 칩 아래 넘김 표시 — 화살표 둘과 끌 수 있는 막대를 한 덩어리로 모은다. */
+.solune-shop-page .solune-catrow-pager { display: flex; align-items: center; justify-content: stretch; gap: 1rem; margin-top: 18px; }
+.solune-shop-page .solune-catrow-nav {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--solune-border);
+  border-radius: 999px;
+  background: var(--solune-surface);
+  color: var(--solune-text-soft);
+  cursor: pointer;
+  transition: border-color 0.16s, background 0.16s, color 0.16s;
+}
+.solune-shop-page .solune-catrow-nav:hover { border-color: var(--solune-primary); background: var(--solune-primary-soft); color: var(--solune-primary); }
+/* 끝에 닿으면 Swiper 가 disabled 를 붙인다. 눌러도 아무 일이 없다는 것을 흐리게 알린다. */
+.solune-shop-page .solune-catrow-nav.swiper-button-disabled { opacity: 0.35; cursor: default; }
+.solune-shop-page .solune-catrow-nav.swiper-button-disabled:hover { border-color: var(--solune-border); background: var(--solune-surface); color: var(--solune-text-soft); }
+.solune-shop-page .solune-catrow-scrollbar {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--solune-border);
+  cursor: grab;
+}
+.solune-shop-page .solune-catrow-scrollbar:active { cursor: grabbing; }
+.solune-shop-page .solune-catrow-scrollbar .swiper-scrollbar-drag { border-radius: 999px; background: var(--solune-primary); }
+/* 분류가 한 줄에 다 들어가면 Swiper 가 막대를 잠근다. 통째로 감춘다. */
+.solune-shop-page .solune-catrow-pager:has(.swiper-scrollbar-lock) { display: none; }
+
+/* Swiper 가 서기 전에는 제 CSS 의 .swiper-slide { width: 100% } 가 남아 한 장이 줄을 통째로
+   차지하고 줄 높이도 부푼다. 그 틈에도 한 줄로 보이게 받쳐 둔다(배너는 뺀다 — 거기서는 한 장이
+   줄을 다 차지하는 것이 세워진 뒤의 모습과 같다). */
+.solune-shop-page :is(.solune-catrow-swiper, .solune-review-swiper, .solune-shop-swiper):not(.swiper-initialized) .swiper-slide {
+  width: auto;
+  max-width: 33.333%;
+}
+
+/* --- 진열 줄 (히트 · 최신 · 추천 · 할인 · 많이 보고 계신 상품) ------------- */
+/* 한 줄에 다 들어가면 넘길 것이 없다. Swiper 가 잠그면 화살표를 통째로 감춘다. */
+.solune-shop-page .solune-shop-product-section:has(.swiper-button-lock) .solune-shop-swiper-nav { display: none; }
+
+/* 진행 막대. 머리 아래에 이미 있는 1px 선을 트랙으로 쓴다. Swiper 번들 CSS 가 이 상자를
+   `top: 0; height: 4px; background: rgba(0,0,0,.25)` 로 두므로 top 을 되돌려야 아래 선에 겹친다. */
+.solune-shop-page .solune-shop-swiper-progress {
+  position: absolute;
+  z-index: 1;
+  top: auto;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  width: auto;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: none;
+}
+.solune-shop-page .solune-shop-swiper-progress .swiper-pagination-progressbar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--solune-primary);
+  transform: scale(0);
+  transform-origin: left top;
+}
+.solune-shop-page .solune-shop-swiper-progress.swiper-pagination-lock { display: none; }
+
+/* 줄의 칸 폭은 Swiper 가 정한다(레퍼런스 soluneShopRows 의 slidesPerView · spaceBetween).
+   격자용 규칙(--sct-cols 로 칸을 나누는 것)이 그대로 걸리면 Swiper 가 계산한 너비를 덮으므로
+   Swiper 줄에서는 격자를 끈다. 칸은 줄 높이를 채워 카드 아래 선이 가지런하다. */
+.solune-shop-page .solune-shop-swiper { overflow: hidden; }
+.solune-shop-page .solune-shop-swiper .sct.swiper-wrapper {
+  display: flex;
+  grid-template-columns: none;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.solune-shop-page .solune-shop-swiper .swiper-slide { display: flex; height: auto; }
+.solune-shop-page .solune-shop-swiper .swiper-slide > .sct_li { flex: 1; }
+/* 마지막 한 장은 반쯤 걸쳐 옅게 둔다. watchSlidesProgress 를 켜면 Swiper 가 조금이라도 걸친 칸에
+   swiper-slide-visible, 통째로 들어온 칸에 swiper-slide-fully-visible 을 붙인다. 오른쪽 끝(뒤에 보이는
+   형제가 없는 칸)만 잡아야 소수점이 쌓여 -0.02px 에 선 왼쪽 칸까지 옅어지지 않는다.
+   카드 전체가 아니라 그림만 옅게 한다 — 전체를 반투명하게 하면 글자 대비가 1.5~2.3:1 로 떨어진다. */
+.solune-shop-page .solune-shop-swiper[data-solune-swiper-peek] .swiper-slide-visible:not(.swiper-slide-fully-visible):not(:has(~ .swiper-slide-visible)) .sct_img img { opacity: 0.45; }
+.solune-shop-page .solune-shop-swiper .sct_img img { transition: opacity 0.28s ease; }
+@media (max-width: 767px) {
+  .solune-shop-page :is(.solune-shop-swiper-prev, .solune-shop-swiper-next) { width: 36px; height: 36px; }
+}
+
+/* --- 후기 줄 ------------------------------------------------------------ */
+/* 폭은 Swiper 가 잡는다(한 쪽에 1 · 2 · 3 · 4장). 카드는 줄 높이를 채운다. */
+.solune-shop-page .solune-review-swiper { position: relative; overflow: hidden; }
+.solune-shop-page .ondam-review-grid { display: flex; }
+.solune-shop-page .solune-review-swiper .swiper-slide { display: flex; height: auto; }
+.solune-shop-page .solune-review-swiper .swiper-slide >

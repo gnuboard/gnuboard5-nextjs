@@ -1,0 +1,583 @@
+/* 안쪽 페이지 — 둘째 장. 게시판 목록 페이지의 틀 · 글쓰기 · 로그인/회원가입 · 마이페이지 프로필 · 알약 탭 ·
+   FAQ · 통합 검색 · 주문 카드. theme.internal.css 가 테마 파일 크기 한도(650줄)를 넘어 끝부분을 그대로
+   옮겼다. theme.css 가 바로 뒤에 싣으므로 규칙 순서(= 같은 무게에서 누가 이기는지)는 나누기 전과 같다. */
+
+/* --- 게시판 목록 페이지의 틀 (레퍼런스 list.skin.php, 2026-09 실측) -------------
+   제목 아래에 "N 개의 글 · X 페이지", 오른쪽에 RSS · 글쓰기 버튼(38px, 모서리 9px).
+   그 아래 카드 하나: 옅은 바탕의 분류 칩 띠 → 표 → 쪽 넘김, 카드 아래 가운데 검색 폼.
+   앱 마크업은 그대로 두고, 제목 줄은 격자로 · 나머지는 order 로 자리를 바꾼다.
+   머리띠와 안내줄을 display: contents 로 풀어 그 자식들을 격자 칸에 바로 놓는다. */
+body[data-g5-theme-source="default"] .board-list-page {
+  display: flex;
+  flex-direction: column;
+  padding-top: 0;
+}
+/* 게시판 목록·글보기의 빵부스러기: 레퍼런스처럼 글자만(집 모양 없이) 14px 한 줄로.
+   앱은 터치용으로 링크마다 44px 최소 크기를 두는데 "홈" 뒤가 크게 벌어진다.
+   WCAG 2.2 AA 최소(24px)로 줄인다. */
+/* 경로 표시(Breadcrumb): 커뮤니티 쪽 페이지 전부(오른쪽 레일이 있는 안쪽 페이지와 마이페이지)에 같은 모양 — 전에는 몇 페이지(게시판 · 글 보기 · 마이페이지 · FAQ · 검색 ·
+   글쓰기)만 이름으로 골라 새글 · 내용 · 설문 등은 앱 기본값(py-3 · 44px 칸 · 집 아이콘)이 남아 제목까지 36px 가 더 벌어졌다. */
+body[data-g5-theme-source="default"] .solune-wrapper main nav[aria-label="Breadcrumb"] { gap: 8px; padding: 0 0 8px; color: var(--solune-text-soft); font-size: 14px; }
+body[data-g5-theme-source="default"] .solune-wrapper main nav[aria-label="Breadcrumb"] a { min-width: 0; min-height: 24px; }
+body[data-g5-theme-source="default"] .solune-wrapper main nav[aria-label="Breadcrumb"] a:first-child svg { display: none; }
+body[data-g5-theme-source="default"] .solune-wrapper main nav[aria-label="Breadcrumb"] > svg { width: 12px; height: 12px; }
+body[data-g5-theme-source="default"] .board-list-page > * { margin: 0; }
+body[data-g5-theme-source="default"] .board-list-page > nav { order: 1; margin-bottom: 1rem; }
+body[data-g5-theme-source="default"] .board-list-page:not(.board-list-embedded) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  column-gap: 0.5rem;
+}
+body[data-g5-theme-source="default"] .board-list-page:not(.board-list-embedded) > * { grid-column: 1 / -1; }
+body[data-g5-theme-source="default"] .board-list-page:not(.board-list-embedded) > nav { grid-row: 1; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-hero,
+body[data-g5-theme-source="default"] .board-list-page .board-list-hero > div,
+body[data-g5-theme-source="default"] .board-list-page:not(.board-list-embedded) .board-list-summary { display: contents; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-hero > div > div:first-child { grid-column: 1; grid-row: 2; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-hero .section-eyebrow,
+body[data-g5-theme-source="default"] .board-list-page .board-list-hero .page-hero-desc { display: none; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-hero .page-hero-title { font-size: 1.75rem; font-weight: 800; line-height: 1.3; letter-spacing: -0.03em; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-actions { grid-column: 3; grid-row: 2 / 4; align-self: center; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-write { height: 38px; border-radius: 9px; padding-inline: 14px; font-size: 13px; font-weight: 700; }
+body[data-g5-theme-source="default"] .board-list-page:not(.board-list-embedded) .board-list-summary-text { grid-column: 1; grid-row: 3; margin-top: 0.3rem; color: var(--solune-text-soft); font-size: 15px; font-weight: 500; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-summary-text b { color: var(--solune-text-soft); font-size: 16px; font-weight: 700; }
+body[data-g5-theme-source="default"] .board-list-page:not(.board-list-embedded) .board-list-rss { grid-column: 2; grid-row: 2 / 4; align-self: center; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-rss {
+  width: 38px;
+  height: 38px;
+  border-color: var(--solune-border);
+  border-radius: 9px;
+  background: var(--solune-surface);
+  color: var(--solune-muted);
+}
+body[data-g5-theme-source="default"] .board-list-page .board-list-rss:hover { border-color: var(--solune-primary); background: var(--solune-primary-soft); color: var(--solune-primary); }
+/* 제목 줄 아래 여백. 격자 줄 사이 간격 대신 칩 띠(또는 카드)의 위 여백으로 준다. */
+body[data-g5-theme-source="default"] .board-list-page:not(.board-list-embedded) .board-list-categories,
+body[data-g5-theme-source="default"] .board-list-page:not(.board-list-embedded):not(:has(.board-list-categories)) > :is(.board-list-card, .gallery-grid, .surface-panel:not(.board-list-search)) { margin-top: 1.5rem; }
+/* 글보기 아래 목록은 레퍼런스처럼 칩 띠부터 시작한다 — 글 수 · RSS 줄은 없다. */
+body[data-g5-theme-source="default"] .board-list-embedded .board-list-summary { display: none; }
+
+/* 카드의 머리: 분류 칩 띠. 옅은 바탕, 위쪽 모서리만 둥글고 아래 줄이 표와 가른다. */
+body[data-g5-theme-source="default"] .board-list-page .board-list-categories {
+  order: 4;
+  gap: 0.4rem;
+  border: 1px solid var(--solune-border);
+  border-bottom-color: var(--solune-border);
+  border-radius: 1rem 1rem 0 0;
+  padding: 12px 16px;
+  background: var(--solune-surface-soft);
+  box-shadow: none;
+}
+/* 폰에서도 칩은 한 줄로 두고 옆으로 넘긴다(앱 기본은 세로로 쌓는다). */
+body[data-g5-theme-source="default"] .board-list-page .board-list-categories { flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-categories::-webkit-scrollbar { display: none; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-categories .filter-chip { flex: none; height: 32px; padding: 0 13px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-keyhint { display: none; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-card { order: 5; overflow: hidden; border-radius: 1rem; padding: 0; gap: 0; box-shadow: none; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-card > * { padding: 0; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-categories ~ .board-list-card { border-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
+body[data-g5-theme-source="default"] .board-list-page:has(.board-list-pagination) .board-list-card { border-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+/* 칸 너비를 머리글이 정한다. 말줄임 제목이 제 길이만큼 표를 밀어 날짜 칸이 카드 밖으로 잘리지 않게. */
+body[data-g5-theme-source="default"] .board-list-page .board-list-table { table-layout: fixed; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-table thead tr { border-bottom: 1px solid var(--solune-border); background: transparent; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-table th { height: 40px; padding: 10px 7px; color: var(--solune-muted); font-size: 12px; font-weight: 500; }
+@media (min-width: 768px) {
+  /* 앱 머리글은 1024px 아래에서 조회 칸을 숨기지만 테마의 줄은 늘 그 칸을 그린다. 칸 수를 맞춘다. */
+  body[data-g5-theme-source="default"] .board-list-page .board-list-table th.board-col-hit { display: table-cell; }
+}
+
+/* 글보기 아래 목록(.board-list-embedded). 머리띠·빵부스러기가 없으니 카드가 위에서 시작한다. */
+body[data-g5-theme-source="default"] .board-list-embedded { margin-top: 2rem; }
+body[data-g5-theme-source="default"] .board-list-embedded .board-list-card { border-radius: 1rem; }
+body[data-g5-theme-source="default"] .board-list-embedded .board-list-categories ~ .board-list-card { border-radius: 0 0 1rem 1rem; }
+
+/* 앱의 '이미지 준비중' 자리표시 글자. 앱 기본색(#667085 on #eef2f6)은 4.4:1 이라 살짝 모자란다. */
+body[data-g5-theme-source="default"] .g5-product-image-fallback { color: var(--solune-text-soft); }
+
+/* 목록의 글 한 줄 — BoardListRow 슬롯(board-list-row.tsx). 레퍼런스 list.skin 의
+   .cb-row 실측(2026-09): 줄 높이 53(위아래 13px, 양끝 20px), 칸은 번호 40 · 제목 ·
+   글쓴이 110 · 조회 56 · 날짜 56 에 칸 사이 14px(날짜는 지난해 글의 'YYYY-MM-DD'가 들어가게 조금 넓힌다). 제목 15px 600 한 줄 말줄임, 앞에
+   분류 알약(옅은 파랑 바탕 · 파랑 11.5px 600 · 모서리 5px), 뒤에 댓글 수(파랑 12.5px
+   600 글자만)와 NEW/HOT(10.5px 900 알약). 번호 13px 옅게 가운데, 조회·날짜 13px
+   오른쪽 맞춤. 공지 줄은 옅은 파랑 바탕에 파랑 제목. 마우스를 올리면 옅은 바탕과
+   왼쪽 3px 색줄. 머리글은 앱 것이라 칸 너비만 여기서 맞춘다. */
+body[data-g5-theme-source="default"] .board-list-page .board-list-table th.board-col-num { width: 67px; padding-left: 20px; text-align: center; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-table th.board-col-subject { padding-left: 7px; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-table th.board-col-author { width: 124px; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-table th.board-col-hit { width: 70px; text-align: right; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-table th.board-col-date { width: 100px; padding-right: 20px; text-align: right; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-table th:first-child:not(.board-col-num) { width: 38px; padding-left: 20px; }
+body[data-g5-theme-source="default"] .solune-blr { border-bottom: 1px solid var(--solune-border); transition: background-color 0.16s ease; }
+body[data-g5-theme-source="default"] .solune-blr:last-child { border-bottom: 0; }
+/* 왼쪽 색줄은 첫 칸에 건다 — <tr> 에 ::before 를 두면 표가 그것을 칸 하나로 세어 열이 밀린다. */
+body[data-g5-theme-source="default"] .solune-blr > td:first-child { position: relative; }
+body[data-g5-theme-source="default"] .solune-blr > td:first-child::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--solune-primary); opacity: 0; transition: opacity 0.16s ease; }
+body[data-g5-theme-source="default"] .solune-blr:hover { background: var(--solune-surface-soft); }
+body[data-g5-theme-source="default"] .solune-blr:hover > td:first-child::before { opacity: 0.48; }
+body[data-g5-theme-source="default"] .solune-blr.is-notice { background: var(--solune-primary-soft); }
+body[data-g5-theme-source="default"] .solune-blr.is-notice:hover { background: color-mix(in srgb, var(--solune-primary) 9%, var(--solune-primary-soft)); }
+body[data-g5-theme-source="default"] .solune-blr > td { padding: 13px 7px; vertical-align: middle; }
+body[data-g5-theme-source="default"] .solune-blr > td:first-child { padding-left: 20px; }
+body[data-g5-theme-source="default"] .solune-blr > td.solune-blr-check { padding-right: 0; text-align: center; }
+body[data-g5-theme-source="default"] .solune-blr > td.solune-blr-rail { text-align: center; }
+body[data-g5-theme-source="default"] .solune-blr-no { color: var(--solune-muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+body[data-g5-theme-source="default"] .solune-blr-rail .solune-blr-flag { letter-spacing: 0; }
+body[data-g5-theme-source="default"] .solune-blr.is-current { background: color-mix(in srgb, var(--solune-primary-soft) 60%, var(--solune-surface)); } /* 옅은 글자(#667085)가 4.5:1 을 넘게 바탕을 조금 밝힌다 */
+body[data-g5-theme-source="default"] .solune-blr-no.is-current { color: var(--solune-primary); font-size: 11.5px; font-weight: 700; }
+body[data-g5-theme-source="default"] .solune-blr-body { min-width: 0; }
+body[data-g5-theme-source="default"] .solune-blr-title-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
+body[data-g5-theme-source="default"] .solune-blr-title { display: block; min-width: 0; overflow: hidden; color: var(--solune-text); font-size: 15px; font-weight: 600; line-height: 26px; text-overflow: ellipsis; white-space: nowrap; transition: color 0.14s ease; }
+body[data-g5-theme-source="default"] .solune-blr:hover .solune-blr-title, body[data-g5-theme-source="default"] .solune-blr-title:focus-visible, body[data-g5-theme-source="default"] .solune-blr.is-notice .solune-blr-title { color: var(--solune-primary); }
+body[data-g5-theme-source="default"] .solune-blr.is-visited .solune-blr-title { color: var(--solune-muted); font-weight: 500; }
+body[data-g5-theme-source="default"] .solune-blr-reply { margin-right: 4px; color: var(--solune-muted); }
+body[data-g5-theme-source="default"] .solune-blr-cmt { flex: none; color: var(--solune-primary); font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+body[data-g5-theme-source="default"] .solune-blr-flag { display: inline-flex; flex: none; height: 18px; align-items: center; border-radius: 5px; padding: 0 6px; font-size: 10.5px; font-weight: 900; letter-spacing: 0.06em; line-height: 1; }
+body[data-g5-theme-source="default"] .solune-blr-flag.is-new { background: var(--solune-primary-soft); color: var(--solune-primary); }
+body[data-g5-theme-source="default"] .solune-blr-flag.is-hot { background: color-mix(in srgb, var(--solune-danger) 14%, var(--solune-surface)); color: color-mix(in srgb, var(--solune-danger) 70%, var(--solune-text)); } /* 10.5px 굵은 글자. 글자색 쪽으로 섞어 밝은 모드에선 진해지고 어두운 모드에선 밝아진다: 5:1 */
+body[data-g5-theme-source="default"] .solune-blr-cat { display: inline-flex; flex: none; align-items: center; height: 20px; margin-right: 2px; border-radius: 5px; padding: 0 7px; background: var(--solune-primary-soft); color: var(--solune-primary); font-size: 11.5px; font-weight: 600; line-height: 1; text-decoration: none; transition: background-color 0.14s ease, color 0.14s ease; }
+body[data-g5-theme-source="default"] a.solune-blr-cat:hover { background: var(--solune-primary); color: var(--solune-primary-ink); }
+body[data-g5-theme-source="default"] .solune-blr-author { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body[data-g5-theme-source="default"] .solune-blr-avatar { display: inline-grid; width: 22px; height: 22px; place-items: center; overflow: hidden; margin-right: 6px; border-radius: 50%; background: var(--solune-primary-soft); color: var(--solune-primary); font-size: 10.5px; font-weight: 800; vertical-align: middle; }
+body[data-g5-theme-source="default"] .solune-blr.is-notice .solune-blr-avatar { background: var(--solune-surface); }
+body[data-g5-theme-source="default"] .solune-blr-avatar img { width: 100%; height: 100%; object-fit: cover; }
+body[data-g5-theme-source="default"] .solune-blr-name { color: var(--solune-muted); font-size: 13px; font-weight: 500; vertical-align: middle; }
+body[data-g5-theme-source="default"] .solune-blr-name img { display: none; } /* 아바타는 왼쪽에 우리가 그렸다 */
+body[data-g5-theme-source="default"] .solune-blr-name :is(a, button, span) { color: inherit; font-size: inherit; font-weight: inherit; } /* 앱이 넘기는 글쓴이 노드(회원 메뉴 단추)의 굵기·색을 이름 칸에 맞춘다 */
+body[data-g5-theme-source="default"] .solune-blr-hit { color: var(--solune-muted); font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+body[data-g5-theme-source="default"] .solune-blr > td.solune-blr-date { padding-right: 20px; color: var(--solune-muted); font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+/* 폰 폭: 표를 블록으로 풀고 줄을 격자로 바꿔 글쓴이 · 조회 · 날짜를 제목 아래 한 줄로 접는다
+   (레퍼런스 767px 이하). <tr> 만 격자로 두면 표가 첫 열 너비로 눌러 버려 표 전체를 푼다. */
+@media (max-width: 767px) {
+  body[data-g5-theme-source="default"] .board-list-page .board-list-table, body[data-g5-theme-source="default"] .board-list-page .board-list-table thead, body[data-g5-theme-source="default"] .board-list-page .board-list-table tbody { display: block; width: 100%; }
+  body[data-g5-theme-source="default"] .board-list-page .board-list-table thead tr { display: grid; grid-template-columns: 38px minmax(0, 1fr); column-gap: 12px; padding: 0 16px; }
+  body[data-g5-theme-source="default"] .board-list-page .board-list-table thead th:not(.board-col-author):not(.board-col-hit):not(.board-col-date) { display: block; width: auto; padding-inline: 0; }
+  body[data-g5-theme-source="default"] .solune-blr { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto auto; align-items: start; padding: 13px 16px; column-gap: 12px; row-gap: 7px; }
+  body[data-g5-theme-source="default"] .solune-blr.has-check { grid-template-columns: 18px 38px minmax(0, 1fr) auto auto; }
+  /* 칸 너비·안쪽 여백을 여기서 풀어야 한다 — 위의 `> td.solune-blr-*` 규칙과 같은 무게로 맞춘다. */
+  body[data-g5-theme-source="default"] .solune-blr > td, body[data-g5-theme-source="default"] .solune-blr > td:is(.solune-blr-check, .solune-blr-rail, .solune-blr-body, .solune-blr-author, .solune-blr-hit, .solune-blr-date) { display: block; width: auto; padding: 0; }
+  body[data-g5-theme-source="default"] .solune-blr-check { grid-column: 1; grid-row: 1 / span 2; }
+  /* 오른쪽에서 세어 선택 칸이 있든 없든 같은 자리에 선다. */
+  body[data-g5-theme-source="default"] .solune-blr > td.solune-blr-rail { grid-column: -5; grid-row: 1 / span 2; padding-top: 2px; }
+  body[data-g5-theme-source="default"] .solune-blr-body { grid-column: -4 / -1; grid-row: 1; }
+  body[data-g5-theme-source="default"] .solune-blr-title { overflow: visible; line-height: 1.42; overflow-wrap: anywhere; white-space: normal; }
+  body[data-g5-theme-source="default"] .solune-blr-title-line { align-items: flex-start; flex-wrap: wrap; }
+  body[data-g5-theme-source="default"] .solune-blr-author { grid-column: -4; grid-row: 2; }
+  body[data-g5-theme-source="default"] .solune-blr-hit { grid-column: -3; grid-row: 2; }
+  body[data-g5-theme-source="default"] .solune-blr-date { grid-column: -2; grid-row: 2; }
+  body[data-g5-theme-source="default"] .solune-blr-author, body[data-g5-theme-source="default"] .solune-blr-hit, body[data-g5-theme-source="default"] .solune-blr-date { display: flex; align-items: center; min-height: 24px; text-align: left; }
+  body[data-g5-theme-source="default"] .solune-blr > td.solune-blr-hit, body[data-g5-theme-source="default"] .solune-blr > td.solune-blr-date { padding-left: 12px; }
+  body[data-g5-theme-source="default"] .solune-blr > td.solune-blr-date { padding-right: 0; }
+  /* 레퍼런스 폰 목록: 제목 · 댓글 수 · 표식이 첫 줄, 분류 알약은 그 아래 줄. 머리글 줄은 없다.
+     줄 끝의 빈 ::after(너비 100%)가 줄을 끊고, 분류는 order 로 그 뒤에 선다. */
+  body[data-g5-theme-source="default"] .board-list-page .board-list-table thead { display: none; }
+  body[data-g5-theme-source="default"] .solune-blr-title-line::after { content: ""; order: 9; flex-basis: 100%; height: 0; }
+  body[data-g5-theme-source="default"] .solune-blr-title-line { row-gap: 0; }
+  body[data-g5-theme-source="default"] .solune-blr-cat { order: 10; margin-top: 5px; }
+}
+body[data-g5-theme-source="default"] .board-list-page .board-list-pagination {
+  order: 6;
+  border: 1px solid var(--solune-border);
+  border-top: 1px solid var(--solune-border);
+  border-radius: 0 0 1rem 1rem;
+  padding: 1.25rem;
+  background: var(--solune-surface);
+}
+/* 쪽 번호(게시판 목록 · 새글): 레퍼런스 .solune-pg-btn — 34px 네모(모서리 8px), 13px, 옅은 테두리. 지금 쪽은 파랑으로 채운다. */
+body[data-g5-theme-source="default"] :is(.board-list-pagination, .recent-pagination) a {
+  min-width: 34px;
+  height: 34px;
+  border: 1px solid var(--solune-border);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: var(--solune-surface);
+  color: var(--solune-muted);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: none;
+}
+body[data-g5-theme-source="default"] :is(.board-list-pagination, .recent-pagination) a:hover { border-color: var(--solune-primary); background: var(--solune-primary-soft); color: var(--solune-primary); }
+body[data-g5-theme-source="default"] :is(.board-list-pagination, .recent-pagination) a[aria-current="page"] { border-color: var(--solune-primary); background: var(--solune-primary); color: var(--solune-primary-ink); font-weight: 600; }
+body[data-g5-theme-source="default"] :is(.board-list-pagination, .recent-pagination) a svg { width: 14px; height: 14px; }
+/* 첫 쪽의 "이전" · 끝 쪽의 "다음"은 못 누르는 링크다. 앱은 opacity-50 으로 흐리는데 글자 대비가 3:1 아래로
+   떨어져(axe color-contrast) 흐리기 대신 옅은 테두리 + 옅은 글자색으로 못 누른다는 것을 알린다. */
+body[data-g5-theme-source="default"] :is(.board-list-pagination, .recent-pagination) a.opacity-50 {
+  border-color: var(--recent-line, var(--solune-border));
+  background: var(--solune-surface-soft);
+  color: var(--solune-muted);
+  opacity: 1;
+}
+body[data-g5-theme-source="default"] .board-list-page .board-list-pagination ~ * { order: 7; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-search {
+  order: 8;
+  margin-top: 1.25rem;
+  border: 0;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+body[data-g5-theme-source="default"] .board-list-page .board-list-search form { justify-content: center; margin-bottom: 0; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-search form > * { border-radius: 0.5rem; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-search form button[type="submit"] { background: var(--solune-text); color: var(--solune-surface); font-weight: 700; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-search form button[type="submit"]:hover { background: var(--solune-primary); }
+body[data-g5-theme-source="default"] .board-list-page > [class*="ErrorState"],
+body[data-g5-theme-source="default"] .board-list-page > .surface-panel:not(.board-list-search) { order: 5; }
+body[data-g5-theme-source="default"] .board-list-page .gallery-grid { order: 5; }
+
+/* --- 글쓰기 (레퍼런스 write.skin, 2026-09) ---------------------------------
+   앱 마크업의 board-write-* 손잡이. 레퍼런스: 카드 밖 큰 제목(26px)과 아래 가는 줄, 흰 카드
+   안에 44px 입력칸(모서리 10), 필수 칸 이름 뒤 빨간 *, 링크는 이름을 왼쪽 칸에, 맨 아래
+   옅은 바탕 띠에 [취소] [작성완료]. */
+body[data-g5-theme-source="default"] .board-write-page { padding-top: 0; }
+body[data-g5-theme-source="default"] .board-write-card { overflow: hidden; gap: 0; border: 1px solid var(--solune-border); border-radius: 16px; padding: 0; box-shadow: none; }
+body[data-g5-theme-source="default"] .board-write-head { border-bottom: 1px solid var(--solune-border); padding: 22px 2rem; } /* 본문은 안쪽 카드 공통 규칙(.solune-inner-shell card-content)의 2rem 을 따른다 */
+body[data-g5-theme-source="default"] .board-write-title { color: var(--solune-text); font-size: 1.5rem; font-weight: 800; letter-spacing: -0.03em; }
+body[data-g5-theme-source="default"] .board-write-head button { height: 36px; border-radius: 9px; border-color: var(--solune-border); background: var(--solune-surface); font-size: 13px; }
+body[data-g5-theme-source="default"] .board-write-body { padding-top: 26px; padding-bottom: 0; }
+body[data-g5-theme-source="default"] .board-write-body > * + * { margin-top: 0; }
+body[data-g5-theme-source="default"] .board-write-body > * { margin-bottom: 0; }
+body[data-g5-theme-source="default"] .board-write-field + .board-write-field,
+body[data-g5-theme-source="default"] .board-write-field + .board-write-options { margin-top: 20px; }
+body[data-g5-theme-source="default"] .board-write-field > label { color: var(--solune-text); font-size: 13px; font-weight: 600; }
+/* 필수 칸: 제목·내용(레퍼런스는 분류도 필수지만 앱은 분류를 비워도 보낸다 — 앱 규칙을 따른다). */
+body[data-g5-theme-source="default"] :is(.board-write-subject, .board-write-content) > label::after { content: " *"; color: var(--solune-danger); }
+body[data-g5-theme-source="default"] .board-write-field :is(input:not([type="checkbox"]):not([type="file"]), [role="combobox"]) { width: 100%; height: 44px; border-color: var(--solune-border-strong); border-radius: 10px; background: var(--solune-surface); font-size: 14px; }
+body[data-g5-theme-source="default"] .board-write-field textarea { border-color: var(--solune-border-strong); border-radius: 10px; }
+body[data-g5-theme-source="default"] .board-write-content .tiptap-editor, body[data-g5-theme-source="default"] .board-write-content > div:last-child { border-radius: 10px; }
+/* 첨부 칸부터는 "링크와 첨부" 구역 — 위와 가는 줄로 나눈다. */
+body[data-g5-theme-source="default"] .board-write-files { margin-top: 28px !important; border-top: 1px solid var(--solune-border); padding-top: 24px; }
+@media (min-width: 768px) {
+  body[data-g5-theme-source="default"] .board-write-link { display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: center; column-gap: 14px; }
+  /* space-y-2 는 Tailwind v4 에서 아래 여백을 주므로 격자 칸에서는 둘 다 끈다. */
+  body[data-g5-theme-source="default"] .board-write-link > * { margin-top: 0; margin-bottom: 0; }
+  body[data-g5-theme-source="default"] .board-write-link > label { color: var(--solune-muted); font-size: 12.5px; }
+  body[data-g5-theme-source="default"] .board-write-link + .board-write-link { margin-top: 12px; }
+}
+body[data-g5-theme-source="default"] .board-write-options { padding-top: 0; }
+body[data-g5-theme-source="default"] .board-write-options label { color: var(--solune-text-soft); font-size: 13px; }
+/* 맨 아래 띠: 카드 폭 끝까지 옅은 바탕, 위에 가는 줄. */
+body[data-g5-theme-source="default"] .board-write-actions { margin: 28px -2rem 0; border-top: 1px solid var(--solune-border); padding: 16px 2rem; background: var(--solune-surface-soft); }
+body[data-g5-theme-source="default"] .board-write-actions button { height: 44px; min-width: 88px; border-radius: 10px; font-size: 14px; font-weight: 700; }
+body[data-g5-theme-source="default"] .board-write-actions button[type="button"] { border-color: var(--solune-border); background: var(--solune-surface); color: var(--solune-text-soft); }
+@media (max-width: 767px) {
+  body[data-g5-theme-source="default"] .board-write-head { padding: 18px 1.25rem; }
+  body[data-g5-theme-source="default"] .board-write-body { padding-top: 20px; }
+  body[data-g5-theme-source="default"] .board-write-actions { margin-inline: -1.25rem; padding: 14px 1.25rem; }
+  body[data-g5-theme-source="default"] .board-write-actions button { flex: 1; }
+}
+
+/* 추천 · 비추천: 레퍼런스처럼 엄지 모양을 앞에 둔다(글자 "추천 0"은 그대로 — 화면 읽기 프로그램용). */
+body[data-g5-theme-source="default"] .board-view-vote :is(.post-vote-good, .post-vote-nogood)::before {
+  content: "";
+  width: 15px;
+  height: 15px;
+  background: currentColor;
+  mask: var(--solune-thumb) center / contain no-repeat;
+}
+body[data-g5-theme-source="default"] .board-view-vote .post-vote-good { --solune-thumb: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 10v12'/%3E%3Cpath d='M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z'/%3E%3C/svg%3E"); }
+body[data-g5-theme-source="default"] .board-view-vote .post-vote-nogood { --solune-thumb: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 14V2'/%3E%3Cpath d='M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z'/%3E%3C/svg%3E"); }
+
+/* --- 로그인 · 회원가입 카드 (레퍼런스 bbs/login.php, 2026-09 실측) -----------------
+   앱 마크업의 auth-* · login-* 손잡이. 구조는 그대로 두고 모양만: 폭 536 카드(안쪽 40, 모서리 17,
+   옅은 파란 테두리와 넓은 그림자), 왼쪽 정렬 33px 제목(부제 없음), 이름표 14.4px 700,
+   58px 입력칸(모서리 10), 60px 로그인 단추(모서리 11), 소셜은 한 줄씩 40px. */
+body[data-g5-theme-source="default"] .auth-shell { max-width: 536px; }
+body[data-g5-theme-source="default"] .auth-shell:has(.auth-card--register) { max-width: 640px; }
+body[data-g5-theme-source="default"] .auth-card {
+  gap: 0;
+  border: 1px solid rgb(176 193 218 / 0.55);
+  border-radius: 17px;
+  padding: 40px 40px 36px;
+  background: var(--solune-surface);
+  box-shadow: 0 24px 56px rgb(47 79 137 / 0.14);
+}
+body[data-g5-theme-source="default"] .auth-card-head { padding: 0 0 28px; text-align: left; }
+body[data-g5-theme-source="default"] .auth-card-title { color: var(--solune-text); font-size: 2.08rem; font-weight: 800; letter-spacing: -0.045em; line-height: 1.3; }
+body[data-g5-theme-source="default"] .auth-card-desc { display: none; }
+body[data-g5-theme-source="default"] .auth-card-body, body[data-g5-theme-source="default"] .auth-card [data-slot="card-content"] { padding: 0; } /* 회원가입 본문(CardContent)은 앱 기본 안쪽 여백을 가진다 — 제목과 같은 줄에 맞춘다 */
+body[data-g5-theme-source="default"] .auth-card :is(label:not(.login-remember)) { color: var(--solune-text); font-size: 14.4px; font-weight: 700; }
+body[data-g5-theme-source="default"] .auth-card input:is([type="text"], [type="password"], [type="email"], [type="tel"], :not([type])) { height: 52px; border-color: var(--solune-border-strong); border-radius: 10px; padding-inline: 16px; font-size: 15px; }
+body[data-g5-theme-source="default"] .auth-card--login input:is([type="text"], [type="password"]) { height: 58px; }
+body[data-g5-theme-source="default"] .auth-card .login-field + .login-field { margin-top: 22px; }
+/* 자동로그인: 상자를 벗기고 한 줄로(설명은 숨김 — 이름표에 뜻이 있다). */
+body[data-g5-theme-source="default"] .auth-card .login-remember { align-items: center; border: 0; padding: 4px 0 0; background: none; font-size: 13.5px; }
+body[data-g5-theme-source="default"] .auth-card .login-remember span span:first-child { color: var(--solune-text-soft); font-weight: 500; }
+body[data-g5-theme-source="default"] .auth-card .login-remember span span:last-child { display: none; }
+body[data-g5-theme-source="default"] .auth-card .login-remember input { accent-color: var(--solune-primary); }
+body[data-g5-theme-source="default"] .auth-card .login-submit,
+body[data-g5-theme-source="default"] .auth-card--register button[type="submit"] { height: 60px; border-radius: 11px; font-size: 16px; font-weight: 800; box-shadow: 0 4px 10px -4px color-mix(in srgb, var(--solune-primary) 55%, transparent); }
+/* 소셜: 두 칸 격자 → 한 줄씩(레퍼런스 40px 줄). 구분선 글자는 왼쪽 굵은 제목으로. */
+body[data-g5-theme-source="default"] .auth-card--login .social-login { margin-top: 8px; border-top: 1px solid var(--solune-border); padding-top: 24px; }
+body[data-g5-theme-source="default"] .auth-card--login .social-login > .relative { display: block; }
+body[data-g5-theme-source="default"] .auth-card--login .social-login > .relative > .flex-grow { display: none; }
+body[data-g5-theme-source="default"] .auth-card--login .social-login > .relative > span { margin: 0; color: var(--solune-text); font-size: 13.5px; font-weight: 700; }
+body[data-g5-theme-source="default"] .auth-card--login .social-login > .grid { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+body[data-g5-theme-source="default"] .auth-card--login .social-login > .grid > * { grid-column: 1 / -1; height: 40px; min-height: 40px; justify-content: flex-start; border-radius: 6px; padding-inline: 14px; font-size: 14px; } /* 홀수 마지막 단추의 두 칸 차지(col-span-2)가 한 칸 격자에 보이지 않는 둘째 칸을 만든다 — 모두 한 칸 전체로 */
+body[data-g5-theme-source="default"] .auth-card--login .login-page-links { border-top: 1px solid var(--solune-border); padding-top: 22px; }
+@media (max-width: 639px) {
+  body[data-g5-theme-source="default"] .auth-card { padding: 28px 20px 24px; }
+  body[data-g5-theme-source="default"] .auth-card-title { font-size: 1.75rem; }
+}
+
+/* --- 마이페이지 위 프로필 (레퍼런스 shop/mypage.php 의 짙은 띠) ------------------
+   흰 상자 → 짙은 띠 + 흰 글자, 오른쪽 통계는 크게. 띠 색은 밝은·어두운 모드 모두 같은 짙은 색. */
+body[data-g5-theme-source="default"] .mypage-profile { border: 0; border-radius: 12px; padding: 28px 32px; background: #1c1c1a; color: #fff; }
+body[data-g5-theme-source="default"] .mypage-profile h1 { color: #fff; font-size: 1.5rem; font-weight: 800; }
+body[data-g5-theme-source="default"] .mypage-profile :is(.text-muted-foreground, h1 span) { color: rgb(255 255 255 / 0.62); }
+body[data-g5-theme-source="default"] .mypage-profile-stats { gap: 28px; text-align: center; }
+body[data-g5-theme-source="default"] .mypage-profile-stats p:first-child { font-size: 12px; }
+body[data-g5-theme-source="default"] .mypage-profile-stats p:last-child { color: #fff; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; }
+body[data-g5-theme-source="default"] .mypage-nav { border-radius: 12px; }
+body[data-g5-theme-source="default"] .mypage-stat-card { border-radius: 12px; box-shadow: none; }
+body[data-g5-theme-source="default"] .mypage-stat-card:hover { border-color: var(--solune-primary); box-shadow: none; }
+
+/* --- 알약 탭 (FAQ 분류 · 1:1 문의 상태 등, 앱의 g5-tabs 손잡이) ----------------------
+   앱은 밑줄 탭. 레퍼런스(faq.php · qalist.php)는 둥근 알약 줄이고 고른 것만 채운다. */
+body[data-g5-theme-source="default"] .g5-tabs { gap: 8px; border-bottom: 0; padding-bottom: 2px; }
+body[data-g5-theme-source="default"] .g5-tab { display: inline-flex; height: 34px; align-items: center; margin: 0; border: 1px solid var(--solune-border); border-radius: 999px; padding: 0 15px; background: var(--solune-surface); color: var(--solune-text-soft); font-size: 13px; font-weight: 600; white-space: nowrap; }
+body[data-g5-theme-source="default"] .g5-tab:hover { border-color: var(--solune-primary); color: var(--solune-primary); }
+body[data-g5-theme-source="default"] .g5-tab:is([aria-current="page"], [aria-pressed="true"]) { border-color: var(--solune-primary); background: var(--solune-primary); color: var(--solune-primary-ink); }
+body[data-g5-theme-source="default"] .faq-tabs .g5-tab[aria-current="page"] { border-color: var(--solune-text); background: var(--solune-text); color: var(--solune-surface); } /* 레퍼런스 FAQ 는 검은 알약 */
+
+/* --- FAQ (레퍼런스 bbs/faq.php) ---------------------------------------------------
+   Q 동그라미 대신 01·02… 번호(CSS 카운터 — 쪽마다 01 부터), 줄 끝 펼침 화살표, 제목 15px 600,
+   답은 옅은 바탕에 번호 칸만큼 들여서. */
+body[data-g5-theme-source="default"] .faq-head h1 { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.03em; }
+body[data-g5-theme-source="default"] .faq-search input { height: 44px; border-color: var(--solune-border-strong); border-radius: 10px; }
+body[data-g5-theme-source="default"] .faq-search button { height: 44px; border-radius: 10px; background: var(--solune-text); color: var(--solune-surface); font-weight: 700; }
+body[data-g5-theme-source="default"] .faq-page [data-slot="card"]:has(.faq-list) { border-radius: 16px; box-shadow: none; }
+body[data-g5-theme-source="default"] .faq-list { counter-reset: faq; padding: 0; } /* 안쪽 여백은 안쪽 카드 공통 규칙(2rem)이 준다 */
+body[data-g5-theme-source="default"] .faq-item { counter-increment: faq; }
+body[data-g5-theme-source="default"] .faq-q { align-items: center; gap: 14px; padding: 17px 4px; }
+body[data-g5-theme-source="default"] .faq-q:hover { background: none; }
+body[data-g5-theme-source="default"] .faq-q::-webkit-details-marker { display: none; }
+body[data-g5-theme-source="default"] .faq-q::before { content: counter(faq, decimal-leading-zero); flex: none; width: 22px; color: var(--solune-muted); font: 600 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+body[data-g5-theme-source="default"] .faq-q-badge { display: none; }
+body[data-g5-theme-source="default"] .faq-q-text { color: var(--solune-text); font-size: 15px; font-weight: 600; }
+body[data-g5-theme-source="default"] .faq-q:hover .faq-q-text { color: var(--solune-primary); }
+body[data-g5-theme-source="default"] .faq-q::after { content: ""; flex: none; width: 16px; height: 16px; background: var(--solune-muted); mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat; transition: transform 0.18s ease; }
+body[data-g5-theme-source="default"] .faq-item[open] > .faq-q::after { transform: rotate(180deg); }
+body[data-g5-theme-source="default"] .faq-a { border-top: 0; border-radius: 10px; margin: 0 0 16px; padding: 18px 20px 18px 40px; background: var(--solune-surface-soft); }
+
+/* --- 통합 검색 결과 (레퍼런스 bbs/search.php) ---------------------------------------
+   제목 아래 가는 줄, 44px 검색칸, 게시판마다 둥근 카드(머리 아래 줄), 결과 줄 제목 15px 600 · 미리보기 13px. */
+body[data-g5-theme-source="default"] .search-title { margin-bottom: 22px; border-bottom: 1px solid var(--solune-border); padding-bottom: 18px; font-size: 1.75rem; font-weight: 800; letter-spacing: -0.03em; }
+body[data-g5-theme-source="default"] .search-form input { height: 44px; border-color: var(--solune-border-strong); border-radius: 10px; }
+body[data-g5-theme-source="default"] .search-form button { height: 44px; border-radius: 10px; font-weight: 700; }
+body[data-g5-theme-source="default"] .search-group { gap: 0; border-radius: 16px; padding: 0; box-shadow: none; }
+body[data-g5-theme-source="default"] .search-group-head { border-bottom: 1px solid var(--solune-border); padding: 16px 22px 14px; }
+body[data-g5-theme-source="default"] .search-group-head [data-slot="card-title"] { font-size: 15px; font-weight: 700; }
+body[data-g5-theme-source="default"] .search-group-head [data-slot="badge"] { border-radius: 999px; background: var(--solune-primary-soft); color: var(--solune-primary); font-size: 11.5px; }
+body[data-g5-theme-source="default"] .search-group [data-slot="card-content"] { padding: 4px 22px 18px; }
+body[data-g5-theme-source="default"] .search-item { padding: 16px 0; }
+body[data-g5-theme-source="default"] .search-item a { color: var(--solune-text); font-size: 15px; font-weight: 600; }
+body[data-g5-theme-source="default"] .search-item p { margin-top: 6px; color: var(--solune-muted); font-size: 13px; }
+body[data-g5-theme-source="default"] .search-item > span { border-radius: 5px; background: var(--solune-primary-soft); padding: 2px 7px; color: var(--solune-primary); font-size: 11.5px; font-weight: 600; }
+
+/* --- 주문 카드 (마이페이지 · 주문내역, 레퍼런스 shop/orderinquiry.php) -------------------
+   금액 셋을 회색 상자 격자에서 오른쪽의 큰 숫자 줄로. 카드 모서리 16. 폰 폭은 앱 모양 그대로. */
+body[data-g5-theme-source="default"] .order-card { border-radius: 16px; background: var(--solune-surface); }
+body[data-g5-theme-source="default"] .order-card:hover { border-color: var(--solune-primary); background: var(--solune-surface); }
+body[data-g5-theme-source="default"] .order-card-thumb { border-radius: 8px; }
+@media (min-width: 768px) {
+  body[data-g5-theme-source="default"] .order-card { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto 20px; align-items: center; column-gap: 20px; padding: 20px 24px; }
+  body[data-g5-theme-source="default"] .order-card-body { display: contents; }
+  body[data-g5-theme-source="default"] .order-card-body > :not(.order-card-amounts) { grid-column: 2; }
+  body[data-g5-theme-source="default"] .order-card-body > * + * { margin-top: 0; }
+  body[data-g5-theme-source="default"] .order-card-thumb { grid-column: 1; grid-row: 1 / span 2; }
+  body[data-g5-theme-source="default"] .order-card-amounts { display: flex; grid-column: 3; grid-row: 1 / span 2; gap: 22px; text-align: right; }
+  body[data-g5-theme-source="default"] .order-card-amounts > div { border-radius: 0; background: none; padding: 0; }
+  body[data-g5-theme-source="default"] .order-card-amounts > div > p:first-child { font-size: 11px; }
+  body[data-g5-theme-source="default"] .order-card-amounts > div > p:last-child { margin-top: 4px; font-size: 15px; font-weight: 700; }
+  body[data-g5-theme-source="default"] .order-card-go { grid-column: 4; grid-row: 1 / span 2; }
+}
+
+/* --- 새글 (레퍼런스 skin/new/basic, 2026-09 실측) -----------------------------------------------
+   앱 마크업은 src/app/recent/*(recent-* 손잡이). 제목 옆 건수 한 줄 · 접히는 상세검색 패널 ·
+   도구 줄과 표와 페이지 넘김을 한 테두리에 담은 카드. 표는 그리드로 세워 머리와 줄이 같은 눈금
+   (선택 30 · 그룹 88 · 게시판 108 · 제목 1fr · 이름 152 · 일시 68)을 쓰고, 카드가 680px 보다 좁으면
+   같은 마크업을 카드 목록(게시판 / 제목 / 이름 · 일시)으로 다시 앉힌다. */
+body[data-g5-theme-source="default"] .recent-page {
+  --recent-line: color-mix(in oklch, var(--solune-border) 55%, var(--solune-surface));
+  --recent-amber: #7a5c00;
+  --recent-amber-bg: #fff4d1;
+  --recent-cols: 88px 108px minmax(0, 1fr) 152px 68px;
+}
+:root[data-solune-theme="dark"] body[data-g5-theme-source="default"] .recent-page {
+  --recent-amber: #f0d089;
+  --recent-amber-bg: #3a2f12;
+}
+body[data-g5-theme-source="default"] .recent-page .recent-head { border-color: var(--solune-border); }
+/* 경로 표시와 제목 줄 사이는 게시판 목록과 같은 16px(앱의 space-y-5 는 20px). */
+body[data-g5-theme-source="default"] .recent-page > nav[aria-label="Breadcrumb"] { margin-bottom: 16px; }
+body[data-g5-theme-source="default"] .recent-page .recent-summary { font-size: 13px; }
+
+/* 상세검색 */
+body[data-g5-theme-source="default"] .recent-search {
+  overflow: hidden;
+  border-color: var(--solune-border);
+  border-radius: 12px;
+  background: var(--solune-surface);
+}
+body[data-g5-theme-source="default"] .recent-search-head { padding: 14px 18px; }
+body[data-g5-theme-source="default"] .recent-search-head:hover { background: var(--solune-surface-soft); }
+body[data-g5-theme-source="default"] .recent-search-title { font-size: 14.5px; letter-spacing: -0.01em; }
+body[data-g5-theme-source="default"] .recent-search-hint { font-size: 12.5px; }
+body[data-g5-theme-source="default"] .recent-search-chevron { transition: transform 0.2s ease; }
+body[data-g5-theme-source="default"] .recent-search-head[aria-expanded="true"] .recent-search-chevron { transform: rotate(180deg); }
+body[data-g5-theme-source="default"] .recent-search-form { gap: 12px; padding: 6px 18px 18px; border-color: var(--recent-line); }
+body[data-g5-theme-source="default"] .recent-search-form select,
+body[data-g5-theme-source="default"] .recent-search-form input {
+  border-color: var(--solune-border);
+  border-radius: 8px;
+  background: var(--solune-surface);
+  font-size: 13.5px;
+}
+body[data-g5-theme-source="default"] .recent-search-form input:focus {
+  border-color: var(--solune-primary);
+  outline: 0;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--solune-primary) 20%, transparent);
+}
+body[data-g5-theme-source="default"] .recent-search-submit { border-radius: 8px; background: var(--solune-primary); color: var(--solune-primary-ink); font-size: 13.5px; }
+body[data-g5-theme-source="default"] .recent-search-submit:hover { background: var(--solune-primary-hover); }
+
+/* 목록 카드 — 컨테이너 질의로 좁아지면 카드 목록으로 */
+body[data-g5-theme-source="default"] .recent-card {
+  container: recent / inline-size;
+  border-color: var(--solune-border);
+  border-radius: 12px;
+  background: var(--solune-surface);
+}
+body[data-g5-theme-source="default"] .recent-card.has-tools { --recent-cols: 30px 88px 108px minmax(0, 1fr) 152px 68px; }
+body[data-g5-theme-source="default"] .recent-tools { padding: 12px 20px; border-color: var(--recent-line); }
+body[data-g5-theme-source="default"] .recent-checkall { color: var(--solune-text-soft); font-size: 13px; }
+body[data-g5-theme-source="default"] .recent-chk { width: 15px; height: 15px; margin: 0; accent-color: var(--solune-primary); cursor: pointer; }
+body[data-g5-theme-source="default"] .recent-del {
+  height: 32px;
+  border-color: var(--solune-border);
+  border-radius: 4px;
+  background: var(--solune-surface);
+  color: var(--solune-danger);
+  font-size: 12.5px;
+}
+body[data-g5-theme-source="default"] .recent-del:not(:disabled):hover {
+  border-color: var(--solune-danger);
+  background: color-mix(in oklch, var(--solune-danger) 8%, var(--solune-surface));
+}
+body[data-g5-theme-source="default"] .recent-del:disabled { color: var(--solune-muted); }
+
+body[data-g5-theme-source="default"] .recent-table { display: block; border-collapse: collapse; }
+body[data-g5-theme-source="default"] .recent-table :is(thead, tbody) { display: block; }
+body[data-g5-theme-source="default"] .recent-table tr {
+  display: grid;
+  grid-template-columns: var(--recent-cols);
+  gap: 16px;
+  align-items: center;
+}
+body[data-g5-theme-source="default"] .recent-table thead tr {
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--solune-border);
+  background: var(--solune-surface-soft);
+}
+body[data-g5-theme-source="default"] .recent-table th {
+  padding: 0;
+  color: var(--solune-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-align: left;
+}
+body[data-g5-theme-source="default"] .recent-table .recent-th-date { text-align: right; }
+body[data-g5-theme-source="default"] .recent-table tbody tr { padding: 13px 20px; border-bottom: 1px solid var(--recent-line); }
+body[data-g5-theme-source="default"] .recent-table tbody tr:last-child { border-bottom: 0; }
+body[data-g5-theme-source="default"] .recent-table tbody tr:hover { background: var(--solune-surface-soft); }
+body[data-g5-theme-source="default"] .recent-table tbody tr:has(.recent-empty) { display: block; padding: 0; }
+body[data-g5-theme-source="default"] .recent-table tbody tr:has(.recent-empty):hover { background: none; }
+body[data-g5-theme-source="default"] .recent-table td { min-width: 0; padding: 0; line-height: 1.45; }
+body[data-g5-theme-source="default"] .recent-table .recent-empty { display: block; padding: 56px 0; color: var(--solune-muted); font-size: 14px; }
+body[data-g5-theme-source="default"] .recent-td-chk { display: flex; align-items: center; }
+body[data-g5-theme-source="default"] :is(.recent-td-group, .recent-td-board) { overflow: hidden; font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
+body[data-g5-theme-source="default"] .recent-td-group a { color: var(--solune-muted); }
+body[data-g5-theme-source="default"] .recent-td-group a:hover { color: var(--solune-text); }
+body[data-g5-theme-source="default"] .recent-td-board a { color: var(--solune-primary); font-weight: 600; }
+body[data-g5-theme-source="default"] .recent-td-board a:hover { text-decoration: underline; text-underline-offset: 2px; }
+body[data-g5-theme-source="default"] .recent-td-subject { display: flex; min-width: 0; align-items: center; gap: 8px; }
+body[data-g5-theme-source="default"] .recent-title {
+  overflow: hidden;
+  color: var(--solune-text);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body[data-g5-theme-source="default"] .recent-title:hover { color: var(--solune-primary); }
+body[data-g5-theme-source="default"] .recent-tag { flex: none; padding: 2px 5px; border-radius: 3px; font-size: 11px; font-weight: 700; line-height: 1.4; white-space: nowrap; }
+body[data-g5-theme-source="default"] .recent-tag-comment { background: var(--recent-amber-bg); color: var(--recent-amber); }
+body[data-g5-theme-source="default"] .recent-tag-mine {
+  border: 1px solid color-mix(in oklch, var(--solune-primary) 30%, var(--solune-surface));
+  background: var(--solune-primary-soft);
+  color: var(--solune-primary);
+}
+body[data-g5-theme-source="default"] .recent-td-name { display: flex; min-width: 0; align-items: center; gap: 7px; color: var(--solune-text-soft); font-size: 13px; }
+body[data-g5-theme-source="default"] .recent-writer { display: flex; min-width: 0; align-items: center; gap: 7px; color: inherit; }
+body[data-g5-theme-source="default"] button.recent-writer:hover { color: var(--solune-primary); text-decoration: none; }
+body[data-g5-theme-source="default"] .recent-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body[data-g5-theme-source="default"] .recent-initial {
+  display: flex;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--solune-surface-soft);
+  color: var(--solune-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+body[data-g5-theme-source="default"] .recent-td-date { color: var(--solune-muted); font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: right; }
+body[data-g5-theme-source="default"] .recent-pagination { border-color: var(--recent-line); }
+@media (prefers-reduced-motion: reduce) {
+  body[data-g5-theme-source="default"] .recent-search-chevron { transition: none; }
+}
+
+/* 카드가 680px 보다 좁으면(여섯 칸이 제목에게 남길 자리가 없어지는 폭) 카드 목록으로 — 게시판 표 · 댓글 ·
+   내 글 한 줄, 제목 한 줄, 이름과 일시 한 줄. 그룹은 뺀다(분류가 둘이면 제목이 설 자리가 없다). */
+@container recent (max-width: 680px) {
+  body[data-g5-theme-source="default"] .recent-tools { padding: 12px 14px; }
+  body[data-g5-theme-source="default"] .recent-table thead { display: none; }
+  body[data-g5-theme-source="default"] .recent-table tbody tr {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "chk board board"
+      "chk title title"
+      "chk name date";
+    gap: 6px 10px;
+    align-items: start;
+    padding: 14px;
+  }
+  body[data-g5-theme-source="default"] .recent-card:not(.has-tools) .recent-table tbody tr {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "board board"
+      "title title"
+      "name date";
+  }
+  body[data-g5-theme-source="default"] .recent-td-chk { grid-area: chk; align-self: start; padding-top: 3px; }
+  body[data-g5-theme-source="default"] .recent-td-board { grid-area: board; }
+  body[data-g5-theme-source="default"] .recent-td-group { display: none; }
+  body[data-g5-theme-source="default"] .recent-td-subject { grid-area: title; align-items: flex-start; }
+  body[data-g5-theme-source="default"] .recent-title { overflow: visible; font-size: 15.5px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.4; white-space: normal; }
+  body[data-g5-theme-source="default"] .recent-td-name { grid-area: name; font-size: 12px; }
+  body[data-g5-theme-source="default"] .recent-initial { width: 18px; height: 18px; font-size: 9.5px; }
+  body[data-g5-theme-source="default"] .recent-td-date { grid-area: date; align-self: center; font-size: 12px; }
+  body[data-g5-theme-source="default"] .recent-td-board a {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--solune-primary-soft);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  body[data-g5-theme-source="default"] .recent-td-board a:hover { text-decoration: none; }
+}

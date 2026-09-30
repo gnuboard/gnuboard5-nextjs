@@ -1,0 +1,172 @@
+import { apiUrl } from "@/lib/config";
+import { requestShare } from "@/lib/request-share";
+import { fetchApiData, fetchApiResult } from "@/lib/api-response";
+import type { ApiResult } from "@/lib/api-response";
+import {
+  boardListSchema,
+  boardSchema,
+  postDetailSchema,
+  writePostListSchema,
+} from "@/lib/schemas";
+import type { Board, Comment, PostFile, WritePost } from "@/lib/types";
+
+export interface PostNavItem {
+  wr_id: number;
+  wr_subject: string;
+  wr_seo_title?: string;
+}
+
+export interface PostDetail extends WritePost {
+  files?: PostFile[];
+  comments?: Comment[];
+  prev_post?: PostNavItem | null;
+  next_post?: PostNavItem | null;
+}
+
+export type PostDetailResult = ApiResult<PostDetail>;
+
+export interface GetBoardsOptions {
+  revalidate?: number;
+  group?: string;
+}
+
+export function getBoards(options: number | GetBoardsOptions = 30): Promise<Board[]> {
+  const revalidate = typeof options === "number" ? options : options.revalidate ?? 30;
+  const group = typeof options === "number" ? "" : options.group?.trim() ?? "";
+  const params = new URLSearchParams();
+  if (group) params.set("group", group);
+
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+
+  return fetchApiData(apiUrl(`/boards${suffix}`), boardListSchema, [], {
+    next: { revalidate },
+  });
+}
+
+/** 게시판 정보는 글 보기와 그 아래 목록이 거의 동시에 부른다 — 브라우저에서 잠깐 나눠 쓴다. */
+const SHARED_BOARD_TTL_MS = 30_000;
+
+export function getBoard(boTable: string, revalidate = 30): Promise<Board | null> {
+  return requestShare.get(
+    `board:${boTable}`,
+    SHARED_BOARD_TTL_MS,
+    async () => {
+      const result = await fetchApiResult(apiUrl(`/boards/${boTable}`), boardSchema, {
+        next: { revalidate },
+      });
+
+      return result.ok ? result.data : null;
+    },
+    (board) => board === null
+  );
+}
+
+export async function getBoardPosts({
+  boTable,
+  page,
+  perPage,
+  sfl,
+  stx,
+  sca,
+  revalidate = 30,
+}: {
+  boTable: string;
+  page?: number;
+  perPage?: number;
+  sfl?: string;
+  stx?: string;
+  sca?: string;
+  revalidate?: number;
+}): Promise<{ list: WritePost[]; total: number; totalPage: number; error?: string }> {
+  const params = new URLSearchParams();
+  if (page) params.set("page", String(page));
+  if (perPage) params.set("per_page", String(perPage));
+  if (sfl) params.set("sfl", sfl);
+  if (stx) params.set("stx", stx);
+  if (sca) params.set("sca", sca);
+
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  const result = await fetchApiResult(
+    apiUrl(`/boards/${boTable}/posts${suffix}`),
+    writePostListSchema,
+    { next: { revalidate } }
+  );
+
+  if (!result.ok) {
+    return {
+      list: [],
+      total: 0,
+      totalPage: 1,
+      error: result.error,
+    };
+  }
+
+  return {
+    list: result.data,
+    total: result.meta?.total ?? 0,
+    totalPage: result.meta?.last_page ?? 1,
+  };
+}
+
+export async function getPostDetailResult({
+  boTable,
+  wrId,
+  token,
+}: {
+  boTable: string;
+  wrId: string;
+  token?: string;
+}): Promise<PostDetailResult> {
+  const result = await fetchApiResult(
+    apiUrl(`/posts/${boTable}/${wrId}`),
+    postDetailSchema,
+    {
+      ...(token ? { cache: "no-store" as const } : { next: { revalidate: 30 } }),
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }
+  );
+
+  return result.ok ? { ...result, data: result.data as unknown as PostDetail } : result;
+}
+
+export async function getPostDetail({
+  boTable,
+  wrId,
+  token,
+}: {
+  boTable: string;
+  wrId: string;
+  token?: string;
+}): Promise<PostDetail | null> {
+  const result = await getPostDetailResult({ boTable, wrId, token });
+
+  return result.ok ? result.data : null;
+}
+
+export async function getPostDetailBySeoResult({
+  boTable,
+  slug,
+}: {
+  boTable: string;
+  slug: string;
+}): Promise<PostDetailResult> {
+  const result = await fetchApiResult(
+    apiUrl(`/posts/${boTable}/seo/${encodeURIComponent(slug)}`),
+    postDetailSchema,
+    { next: { revalidate: 30 } }
+  );
+
+  return result.ok ? { ...result, data: result.data as unknown as PostDetail } : result;
+}
+
+export async function getPostDetailBySeo({
+  boTable,
+  slug,
+}: {
+  boTable: string;
+  slug: string;
+}): Promise<PostDetail | null> {
+  const result = await getPostDetailBySeoResult({ boTable, slug });
+
+  return result.ok ? result.data : null;
+}

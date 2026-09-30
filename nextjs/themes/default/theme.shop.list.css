@@ -1,0 +1,197 @@
+/* 상품 목록 — ShopListHeader 슬롯과 목록 페이지의 격자·줄 모양. */
+
+/* --- 상품 목록 머리 (ShopListHeader 슬롯) --------------------------------
+   레퍼런스 list.php: 제목, #sct_location 빵부스러기(집 › 분류 ▾), #sct_ct_1 하위
+   분류 알약, #sct_sortlst 정렬 줄 + #sct_lst 리스트/갤러리 전환.
+   theme.internal.css 보다 앞서도록 body 아래 묶는다. */
+body[data-g5-theme-source="default"] {
+  .solune-shop-page .solune-shop-page-title { margin: 32px 0 26px; }
+  .solune-shop-page .solune-shop-page-title h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.025em; }
+
+  /* 빵부스러기. 층마다 그 층의 형제 분류가 펼쳐진다(영카트 #sct_location 의 select). */
+  .solune-shop-page .solune-shop-crumb {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    min-height: 40px;
+    margin: 20px 0 36px; /* 레퍼런스 #sct_location (2026-09 실측) */
+    color: var(--solune-muted);
+    font-size: 13px;
+  }
+  .solune-shop-page .solune-shop-crumb-home { display: inline-grid; width: 24px; height: 24px; place-items: center; color: var(--solune-text-soft); }
+  .solune-shop-page .solune-shop-crumb-home:hover { color: var(--solune-primary); }
+  .solune-shop-page .solune-shop-crumb-item { display: inline-flex; align-items: center; gap: 4px; }
+  .solune-shop-page .solune-shop-crumb-sep { color: var(--solune-muted-soft); }
+  .solune-shop-page .solune-shop-crumb-current { padding: 0 6px; color: var(--solune-text); font-weight: 600; }
+  .solune-shop-page .solune-shop-crumb-level { position: relative; }
+  .solune-shop-page .solune-shop-crumb-level > button {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 6px;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: var(--solune-text);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .solune-shop-page .solune-shop-crumb-level > button:hover,
+  .solune-shop-page .solune-shop-crumb-level.is-open > button { background: var(--solune-surface-soft); color: var(--solune-primary); }
+  .solune-shop-page .solune-shop-crumb-level > button svg { color: var(--solune-muted); transition: transform 0.16s; }
+  .solune-shop-page .solune-shop-crumb-level.is-open > button svg { transform: rotate(180deg); }
+  .solune-shop-page .solune-shop-crumb-level ul {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 20;
+    min-width: 180px;
+    max-height: 320px;
+    margin: 0;
+    padding: 6px;
+    overflow: auto;
+    list-style: none;
+    border: 1px solid var(--solune-border);
+    border-radius: 8px;
+    background: var(--solune-surface);
+    box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.25);
+  }
+  .solune-shop-page .solune-shop-crumb-level ul a {
+    display: block;
+    padding: 8px 10px;
+    border-radius: 5px;
+    color: var(--solune-text-soft);
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .solune-shop-page .solune-shop-crumb-level ul a:hover { background: var(--solune-surface-soft); color: var(--solune-primary); }
+  .solune-shop-page .solune-shop-crumb-level ul a[aria-current="page"] { background: var(--solune-primary-soft); color: var(--solune-primary); font-weight: 700; }
+
+  /* 하위 분류 알약. 개수는 이름 뒤 괄호 안이다. */
+  .solune-shop-page .solune-shop-subcats { margin-bottom: 16px; }
+  .solune-shop-page .solune-shop-subcats ul { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .solune-shop-page .solune-shop-subcats a {
+    display: inline-flex;
+    min-height: 36px;
+    align-items: center;
+    border: 1px solid var(--solune-border-strong);
+    border-radius: 0;
+    background: var(--solune-surface);
+    padding: 0 12px;
+    color: var(--solune-text-soft);
+    font-size: 12.5px;
+    font-weight: 400;
+    white-space: nowrap;
+    transition: border-color 0.16s, color 0.16s, background 0.16s;
+  }
+  .solune-shop-page .solune-shop-subcats a:hover,
+  .solune-shop-page .solune-shop-subcats a:focus-visible { border-color: var(--solune-primary); background: var(--solune-primary-soft); color: var(--solune-primary); }
+  .solune-shop-page .solune-shop-list-filters { margin-bottom: 14px; }
+
+  /* 정렬 줄. 왼쪽 정렬 칩, 오른쪽 개수와 리스트/갤러리 전환. */
+  .solune-shop-page .solune-shop-sortbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 44px;
+  }
+  .solune-shop-page .solune-shop-sorts { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .solune-shop-page .solune-shop-sorts button {
+    min-height: 36px;
+    border: 1px solid var(--solune-border-strong);
+    border-radius: 0;
+    background: var(--solune-surface);
+    padding: 0 12px;
+    color: var(--solune-text-soft);
+    font: inherit;
+    font-size: 12.5px;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: border-color 0.16s, color 0.16s, background 0.16s;
+  }
+  .solune-shop-page .solune-shop-sorts button:hover,
+  .solune-shop-page .solune-shop-sorts button:focus-visible { border-color: var(--solune-primary); color: var(--solune-primary); }
+  .solune-shop-page .solune-shop-sorts button[aria-pressed="true"] { border-color: var(--solune-primary); background: var(--solune-primary); color: var(--color-primary-content, #fff); }
+  .solune-shop-page .solune-shop-sort-side { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .solune-shop-page .solune-shop-sort-side form { flex: 1 1 240px; }
+  .solune-shop-page .solune-shop-sort-side input { border-radius: 0; }
+  .solune-shop-page .sct_nb { color: var(--solune-muted); font-size: 12.5px; }
+  .solune-shop-page .solune-shop-viewtoggle { display: flex; gap: 4px; margin: 0; padding: 0; list-style: none; }
+  .solune-shop-page .solune-shop-viewtoggle button {
+    display: inline-grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border: 1px solid var(--solune-border);
+    border-radius: 0;
+    background: var(--solune-surface);
+    color: var(--solune-muted);
+    cursor: pointer;
+    transition: border-color 0.16s, color 0.16s, background 0.16s;
+  }
+  .solune-shop-page .solune-shop-viewtoggle button:hover { border-color: var(--solune-primary); color: var(--solune-primary); }
+  .solune-shop-page .solune-shop-viewtoggle button[aria-pressed="true"] { border-color: var(--solune-primary); background: var(--solune-primary-soft); color: var(--solune-primary); }
+
+  /* 장바구니·쿠폰존 등 앱 화면의 빵부스러기: 글자만(집 모양 없이) 한 줄. 앱은 링크마다 터치용
+     44px 최소 크기를 두어 "홈" 뒤가 크게 벌어진다 — WCAG 2.2 AA 최소(24px)로 줄인다(게시판과 같게). */
+  .solune-shop-page nav[aria-label="Breadcrumb"] { gap: 8px; padding: 0 0 8px; color: var(--solune-text-soft); font-size: 13px; }
+  .solune-shop-page nav[aria-label="Breadcrumb"] a { min-width: 0; min-height: 24px; }
+  .solune-shop-page nav[aria-label="Breadcrumb"] a:first-child svg { display: none; }
+  .solune-shop-page nav[aria-label="Breadcrumb"] > svg { width: 12px; height: 12px; }
+
+  /* 상품 격자. 레퍼런스 .sct 는 카드 사이 22px(폰 폭은 12px). */
+  .solune-shop-page .shop-product-list { gap: 12px; }
+  @media (min-width: 1024px) { .solune-shop-page .shop-product-list { gap: 22px; } }
+
+  /* 리스트뷰. 앱이 격자에 data-view="list" 를 붙이면 한 줄 한 칸으로 바꾸고
+     카드를 가로로 눕힌다 — 왼쪽 9rem 사진, 오른쪽에 브랜드·이름·가격·별점. */
+  .solune-shop-page .shop-product-list[data-view="list"] { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .solune-shop-page .shop-product-list[data-view="list"] .sct_li {
+    display: grid;
+    grid-template-columns: 9rem minmax(0, 1fr);
+    grid-template-rows: auto auto auto 1fr;
+    align-items: start;
+    column-gap: 20px;
+    padding: 12px;
+  }
+  .solune-shop-page .shop-product-list[data-view="list"] .sct_img { grid-row: 1 / span 4; width: 9rem; aspect-ratio: 1 / 1; }
+  .solune-shop-page .shop-product-list[data-view="list"] .ondam-card-brand { padding: 4px 0 0; }
+  .solune-shop-page .shop-product-list[data-view="list"] .sct_txt { padding: 0; font-size: 15.5px; }
+  .solune-shop-page .shop-product-list[data-view="list"] .ondam-card-prices { padding: 0; }
+  /* 별점 줄은 늘 넷째 줄(1fr)의 바닥에 둔다. 브랜드가 없는 카드는 셋째 줄이 비지만
+     auto 줄이라 높이가 0 이라 티가 나지 않는다. */
+  .solune-shop-page .shop-product-list[data-view="list"] .ondam-card-meta { grid-row: 4; grid-column: 2; align-self: end; margin: 0; padding: 10px 0 0; }
+}
+@media (max-width: 767px) {
+  body[data-g5-theme-source="default"] .solune-shop-page .solune-shop-page-title { margin-top: 20px; }
+  body[data-g5-theme-source="default"] .solune-shop-page .solune-shop-page-title h1 { font-size: 22px; }
+  body[data-g5-theme-source="default"] .solune-shop-page .solune-shop-subcats ul { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+  body[data-g5-theme-source="default"] .solune-shop-page .solune-shop-subcats ul::-webkit-scrollbar { display: none; }
+  body[data-g5-theme-source="default"] .solune-shop-page .solune-shop-sorts { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  body[data-g5-theme-source="default"] .solune-shop-page .solune-shop-sorts::-webkit-scrollbar { display: none; }
+  body[data-g5-theme-source="default"] .solune-shop-page .solune-shop-sorts button { white-space: nowrap; }
+  body[data-g5-theme-source="default"] .solune-shop-page .shop-product-list[data-view="list"] .sct_li { grid-template-columns: 5.5rem minmax(0, 1fr); column-gap: 12px; padding: 8px; }
+  body[data-g5-theme-source="default"] .solune-shop-page .shop-product-list[data-view="list"] .sct_img { width: 5.5rem; }
+}
+
+/* 전체 상품 · 유형별 목록(히트·추천·신상·인기·할인): 레퍼런스 listtype.php 는 넓은 화면에서 한 줄에 다섯. */
+@media (min-width: 1280px) {
+  body[data-g5-theme-source="default"] .solune-shop-page .shop-product-list--all:not([data-view="list"]) { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+
+/* 폰: 넓은 화면 여백(빵부스러기 36, 정렬 줄 44)을 줄이고, 하위 분류·정렬 단추는 한 줄 가로 넘김.
+   줄바꿈이 안 되던 정렬 단추가 화면 밖으로 잘렸다. */
+@media (max-width: 767px) {
+  body[data-g5-theme-source="default"] .solune-shop-page .solune-shop-page-title { margin: 20px 0 14px; }
+  body[data-g5-theme-source="default"] .solune-shop-page .solune-shop-crumb { min-height: 32px; margin: 8px 0 18px; }
+  body[data-g5-theme-source="default"] .solune-shop-page .solune-shop-sortbar { margin-bottom: 22px; }
+  body[data-g5-theme-source="default"] .solune-shop-page :is(.solune-shop-subcats ul, .solune-shop-sorts) { flex-wrap: nowrap; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  body[data-g5-theme-source="default"] .solune-shop-page :is(.solune-shop-subcats ul, .solune-shop-sorts)::-webkit-scrollbar { display: none; }
+  body[data-g5-theme-source="default"] .solune-shop-page :is(.solune-shop-subcats a, .solune-shop-sorts button) { flex: none; }
+  body[data-g5-theme-source="default"] .solune-shop-page .solune-shop-sortbar > * { min-width: 0; max-width: 100%; }
+}

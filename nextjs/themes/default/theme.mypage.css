@@ -1,0 +1,55 @@
+/* 마이페이지 · 쇼핑 하위 화면 — 앱 마크업의 wishlist-* · mypage-coupon-* 손잡이.
+   (프로필 띠 · 주문 카드는 theme.internal.css 에 있다.)
+
+   레퍼런스 shop/wishlist.php (2026-09 실측, 1440px): 큰 사진 격자가 아니라 두 칸짜리 줄 카드.
+   [사진 80×80] [이름 15px/700 · 가격 · 안내] [단추], 카드 테두리 1px, 안쪽 여백 14px. */
+body[data-g5-theme-source="default"] .wishlist-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+@media (min-width: 1024px) {
+  body[data-g5-theme-source="default"] .wishlist-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+body[data-g5-theme-source="default"] .wishlist-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid var(--solune-border);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--solune-surface);
+}
+body[data-g5-theme-source="default"] .wishlist-card:hover { border-color: var(--solune-border-strong); }
+body[data-g5-theme-source="default"] .wishlist-link { display: flex; min-width: 0; flex: 1; align-items: center; gap: 16px; }
+body[data-g5-theme-source="default"] .wishlist-thumb { width: 80px; height: 80px; flex: 0 0 80px; border-radius: 8px; }
+body[data-g5-theme-source="default"] .wishlist-thumb img { transform: none; }
+body[data-g5-theme-source="default"] .wishlist-info { min-width: 0; margin-top: 0; }
+body[data-g5-theme-source="default"] .wishlist-info h3 { font-size: 15px; font-weight: 700; }
+body[data-g5-theme-source="default"] .wishlist-actions { flex: 0 0 auto; flex-direction: column; margin-top: 0; }
+body[data-g5-theme-source="default"] .wishlist-actions button { border-radius: 8px; }
+/* 담을 수 없는 상품(옵션 선택 필요 등)의 단추는 옅은 파랑 대신 회색 테두리 단추로 */
+body[data-g5-theme-source="default"] .wishlist-actions button:disabled:first-child {
+  border-color: var(--solune-border);
+  background: var(--solune-surface-soft);
+  color: var(--solune-muted);
+  opacity: 1;
+  box-shadow: none;
+}
+
+/* 쿠폰함: 금액 칸이 좁아(112px) 큰 금액이 세 줄로 깨지던 것 — 칸을 넓히고 글자를 줄여 한 줄로. */
+body[data-g5-theme-source="default"] .mypage-coupon { border-radius: 12px; box-shadow: none; }
+body[data-g5-theme-source="default"] .mypage-coupon-stub { width: auto; min-width: 7rem; max-width: 45%; padding-inline: 18px; }
+body[data-g5-theme-source="default"] .mypage-coupon-amount { font-size: clamp(1.05rem, 2.2vw, 1.5rem); white-space: nowrap; letter-spacing: -0.03em; }
+
+/* 마이페이지 틀. 오른쪽 레일이 없는 전폭 화면이라 앱의 container(max-w-6xl 1280px · 좌우 16px)를 그대로
+   쓰면 헤더 기둥(--solune-shell 1280px · 좌우 32px)보다 양쪽이 16px 씩 넓었다. 헤더와 같은 기둥으로 맞춘다
+   (theme.shell.css 의 .solune-shell 과 같은 값). */
+body[data-g5-theme-source="default"] .solune-wrapper main > .mypage-page {
+  width: min(100%, var(--solune-shell));
+  max-width: none;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+@media (min-width: 640px) {
+  body[data-g5-theme-source="default"] .solune-wrapper main > .mypage-page { padding-inline: 1.5rem; }
+}
+@media (min-width: 1024px) {
+  body[data-g5-theme-source="default"] .solune-wrapper main > .mypage-page { padding-inline: 2rem; }
+}

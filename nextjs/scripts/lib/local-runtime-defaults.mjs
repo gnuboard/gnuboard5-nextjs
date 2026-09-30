@@ -1,0 +1,232 @@
+export const DEFAULT_SITEMAP_EXPECTED_PATHS =
+  '/content/company,/shop/1446772772,/shop/list-2010101010';
+
+export const DEFAULT_SITEMAP_FORBIDDEN_PARTS =
+  '/shop/products/1446772772,/shop/categories/2010101010';
+
+export const DEFAULT_PRIVATE_NOINDEX_PATHS =
+  '/login,/login/social-callback,/register,/register/result,/forgot-password,/offline,/members/demo,/mypage,/free/write,/shop/login,/shop/register,/shop/register/result,/shop/cart,/shop/compare,/shop/largeimage?it_id=1446772772&no=1,/shop/search?q=TH,/shop/order,/shop/orders,/shop/payment/fail,/shop/payment/success,/shop/qas/new,/shop/qas/my/7,/shop/wishlist';
+
+export const DEFAULT_PUBLIC_METADATA_PATHS =
+  '/,/boards,/faq,/recent,/polls,/search,/shop,/free/6,/shop/1446772772,/shop/list-2010101010,/shop/reviews,/shop/qas,/shop/content/company';
+
+export const DEFAULT_LEGACY_SHOP_PASSTHROUGH_PATHS =
+  '/shop/bannerhit.php?bn_id=1,/shop/taxsave.php,/shop/naverpay/naverpay_order.php,/shop/price/naver.php,/shop/kcp/pp_ax_hub.php,/mobile/shop/toss/returnurl.php?orderId=demo,/mobile/shop/samsungpay/orderform.1.php';
+
+export const DEFAULT_LEGACY_SHOP_REDIRECTS = [
+  '/mobile=>/',
+  '/mobile/=>/',
+  '/mobile/index.php=>/',
+  '/mobile/group.php?gr_id=shop&page=2=>/boards?page=2&group=shop',
+  '/mobile/content.php?co_id=company=>/content/company',
+  '/mobile/content.php?co_id=company&service=shop=>/shop/content/company',
+  '/mobile/content.php?co_seo_title=%ED%9A%8C%EC%82%AC%EC%86%8C%EA%B0%9C=>/content/%ED%9A%8C%EC%82%AC%EC%86%8C%EA%B0%9C/',
+  '/bbs/board.php?bo_table=free&page=2=>/free?page=2',
+  '/bbs/board.php?bo_table=free&wr_id=6=>/free/6',
+  '/bbs/write.php?bo_table=free=>/free/write',
+  '/bbs/content.php?co_id=company=>/content/company',
+  '/bbs/content.php?co_id=company&service=shop=>/shop/content/company',
+  '/bbs/group.php?gr_id=shop&page=2=>/boards?page=2&group=shop',
+  '/bbs/faq.php?fm_id=1=>/faq?fm_id=1',
+  '/bbs/new.php?gr_id=shop&page=2=>/recent?gr_id=shop&page=2',
+  '/bbs/search.php?stx=delivery&sfl=wr_subject&bo_table=free&page=2=>/search?sfl=wr_subject&bo_table=free&page=2&q=delivery',
+  '/bbs/login.php?url=%2Ffree%3Fpage%3D2=>/login?redirect=%2Ffree%3Fpage%3D2',
+  '/bbs/login.php?url=%2Fshop%2Fwishlist=>/shop/login?redirect=%2Fshop%2Fwishlist',
+  '/bbs/register.php=>/register',
+  '/bbs/register_form.php=>/register',
+  '/bbs/register_result.php=>/register/result',
+  '/bbs/password_lost.php=>/forgot-password',
+  '/bbs/poll_result.php?po_id=3=>/polls?po_id=3',
+  '/bbs/qalist.php?page=2=>/mypage/qas?page=2',
+  '/bbs/qaview.php?qa_id=7=>/mypage/qas/7',
+  '/bbs/qawrite.php=>/mypage/qas/new',
+  '/bbs/qawrite.php?w=u&qa_id=7=>/mypage/qas/7',
+  '/bbs/qawrite.php?w=r&qa_id=7=>/mypage/qas/new?reply_to=7',
+  '/bbs/memo.php?kind=send&page=2=>/mypage/memos?page=2&type=send',
+  '/bbs/memo_form.php?me_recv_mb_id=demo=>/mypage/memos/new?recv=demo',
+  '/bbs/memo_view.php?me_id=9&kind=send=>/mypage/memos/9?type=send',
+  '/bbs/profile.php?mb_id=demo=>/members/demo',
+  '/bbs/point.php=>/mypage/points',
+  '/bbs/scrap.php=>/mypage/scraps',
+  '/mobile/shop=>/shop/',
+  '/mobile/shop/index.php=>/shop/',
+  '/mobile/shop/cart.php=>/shop/cart',
+  '/mobile/shop/wishlist.php=>/shop/wishlist',
+  '/mobile/shop/item.php?it_id=1446772772=>/shop/1446772772',
+  '/mobile/shop/iteminfo.php?it_id=1446772772&info=qa=>/shop/1446772772?tab=qa',
+  '/mobile/shop/itemqa.php?it_id=1446772772=>/shop/1446772772?tab=qa',
+  '/mobile/shop/itemqaform.php?it_id=1446772772=>/shop/1446772772?tab=qa&form=qa',
+  '/mobile/shop/itemrecommend.php?it_id=1446772772=>/shop/1446772772?modal=recommend',
+  '/mobile/shop/itemstocksms.php?it_id=1446772772=>/shop/1446772772?modal=restock',
+  '/mobile/shop/itemuse.php?it_id=1446772772=>/shop/1446772772?tab=reviews',
+  '/mobile/shop/itemuseform.php?it_id=1446772772=>/shop/1446772772?tab=reviews&form=review',
+  '/mobile/shop/category.php?ca_id=2010101010&page=2=>/shop/list-2010101010?page=2',
+  '/mobile/shop/list.php?ca_id=2010101010&page=2=>/shop/list-2010101010?page=2',
+  '/mobile/shop/listtype.php?type=2&page=3=>/shop/type-2?page=3',
+  '/mobile/shop/coupon.php=>/mypage/coupons',
+  '/mobile/shop/event.php?ev_id=1=>/shop/events/1',
+  '/mobile/shop/largeimage.php?it_id=1446772772&no=1=>/shop/largeimage?it_id=1446772772&no=1',
+  '/mobile/shop/mypage.php=>/mypage',
+  '/mobile/shop/orderaddress.php=>/mypage/addresses',
+  '/mobile/shop/orderform.php?sw_direct=1=>/shop/order?direct=1',
+  '/mobile/shop/orderinquiry.php=>/shop/orders',
+  '/mobile/shop/orderinquiryview.php?od_id=202606030001=>/shop/orders/202606030001',
+  '/mobile/shop/personalpay.php=>/shop/personalpay',
+  '/mobile/shop/personalpayform.php?pp_id=demo=>/shop/personalpay/demo/pay',
+  '/mobile/shop/personalpayresult.php?pp_id=demo=>/shop/personalpay/demo',
+  '/mobile/shop/search.php?q=TH&qcaid=2010101010=>/shop/search?q=TH&qcaid=2010101010',
+  '/shop/item.php?it_id=1446772772=>/shop/1446772772',
+  '/shop/iteminfo.php?it_id=1446772772&info=use=>/shop/1446772772?tab=reviews',
+  '/shop/category.php?ca_id=2010101010=>/shop/list-2010101010',
+  '/shop/list.php?ca_id=2010101010&page=2=>/shop/list-2010101010?page=2',
+  '/shop/listtype.php?type=1&page=2=>/shop/type-1?page=2',
+  '/shop/event.php?ev_id=1=>/shop/events/1',
+  '/shop/orderform.php?sw_direct=1=>/shop/order?direct=1',
+  '/shop/orderinquiryview.php?od_id=202606030001=>/shop/orders/202606030001',
+  '/shop/orderinquirycancel.php?od_id=202606030001=>/shop/orders/202606030001',
+  '/shop/personalpayform.php?pp_id=demo=>/shop/personalpay/demo/pay',
+  '/shop/personalpayresult.php?pp_id=demo=>/shop/personalpay/demo',
+].join(',');
+
+export const DEFAULT_CANONICAL_REDIRECTS =
+  '/community=>/,/organic=>/shop,/boards/free=>/free,/boards/free/6=>/free/6,/boards/free/write=>/free/write,/boards/free/rss=>/rss/free,/shop/products/1446772772=>/shop/1446772772,/shop/categories/2010101010=>/shop/list-2010101010,/shop/products?it_type1=1=>/shop/type-1';
+
+export const DEFAULT_AUTH_CONTEXT_REDIRECTS =
+  '/login?redirect=%2Fshop%2Fwishlist=>/shop/login?redirect=%2Fshop%2Fwishlist,/register?service=shop=>/shop/register,/mypage/qas/new?service=shop=>/shop/qas/new,/mypage/qas/7?service=shop=>/shop/qas/my/7';
+
+export const DEFAULT_RSC_PAYLOADS =
+  '/index.txt=>/,/free.txt=>/free,/shop/products/1446772772.txt=>/shop/1446772772,/shop/1446772772.txt=>/shop/1446772772,/shop/list-2010101010.txt=>/shop/list-2010101010,/shop/type-1.txt=>/shop/type-1,/shop/reviews.txt=>/shop/reviews,/shop/qas.txt=>/shop/qas,/shop/search.txt=>/shop/search,/shop/largeimage.txt=>/shop/largeimage';
+
+export const DEFAULT_STATIC_FALLBACK_ROUTE_CHECKS = [
+  {
+    path: '/content/company',
+    payload: '/content/company.txt',
+    paramName: 'co_id',
+    value: 'company',
+    placeholder: '__g5_static__',
+    routePartsBefore: ['content'],
+  },
+  {
+    path: '/shop/content/company',
+    payload: '/shop/content/company.txt',
+    paramName: 'co_id',
+    value: 'company',
+    placeholder: '__g5_static__',
+    routePartsBefore: ['shop', 'content'],
+  },
+  {
+    path: '/free',
+    payload: '/free.txt',
+    paramName: 'bo_table',
+    value: 'free',
+    placeholder: '__g5_static__',
+    routePartsBefore: ['boards'],
+  },
+  {
+    path: '/free/6',
+    payload: '/free/6.txt',
+    paramName: 'bo_table',
+    value: 'free',
+    placeholder: '__g5_static__',
+    routePartsBefore: ['boards'],
+    routePartsAfter: ['6'],
+  },
+  {
+    path: '/free/6',
+    payload: '/free/6.txt',
+    paramName: 'wr_id',
+    value: '6',
+    placeholder: '__g5_static__',
+    routePartsBefore: ['boards', 'free'],
+  },
+  {
+    path: '/free/write',
+    payload: '/free/write.txt',
+    paramName: 'bo_table',
+    value: 'free',
+    placeholder: '__g5_static__',
+    routePartsBefore: ['boards'],
+    routePartsAfter: ['write'],
+  },
+  {
+    path: '/members/demo',
+    payload: '/members/demo.txt',
+    paramName: 'mb_id',
+    value: 'demo',
+    placeholder: '__g5_static__',
+    routePartsBefore: ['members'],
+  },
+  {
+    path: '/mypage/qas/7',
+    payload: '/mypage/qas/7.txt',
+    paramName: 'qa_id',
+    value: '7',
+    placeholder: '__g5_static__',
+    routePartsBefore: ['mypage', 'qas'],
+  },
+  {
+    path: '/mypage/memos/9',
+    payload: '/mypage/memos/9.txt',
+    paramName: 'me_id',
+    value: '9',
+    placeholder: '__g5_static__',
+    routePartsBefore: ['mypage', 'memos'],
+  },
+  {
+    path: '/shop/1446772772',
+    payload: '/shop/1446772772.txt',
+    paramName: 'it_id',
+    value: '1446772772',
+    placeholder: '__g5_static__',
+    routePartsBefore: ['shop'],
+  },
+  {
+    path: '/shop/qas/my/7',
+    payload: '/shop/qas/my/7.txt',
+    paramName: 'qa_id',
+    value: '7',
+    placeholder: '__g5_static__',
+    routePartsBefore: ['shop', 'qas', 'my'],
+  },
+  {
+    path: '/shop/list-2010101010',
+    payload: '/shop/list-2010101010.txt',
+    paramName: 'ca_id',
+    value: '2010101010',
+    placeholder: '__g5_static__',
+    routePartsBefore: ['shop', 'categories'],
+  },
+  {
+    path: '/shop/orders/20990101000001',
+    payload: '/shop/orders/20990101000001.txt',
+    paramName: 'od_id',
+    value: '20990101000001',
+    placeholder: '__g5_static__',
+    routePartsBefore: ['shop', 'orders'],
+  },
+  {
+    path: '/shop/personalpay/demo',
+    payload: '/shop/personalpay/demo.txt',
+    paramName: 'pp_id',
+    value: 'demo',
+    placeholder: '__g5_static__',
+    routePartsBefore: ['shop', 'personalpay'],
+  },
+  {
+    path: '/shop/personalpay/demo/pay',
+    payload: '/shop/personalpay/demo/pay.txt',
+    paramName: 'pp_id',
+    value: 'demo',
+    placeholder: '__g5_static__',
+    routePartsBefore: ['shop', 'personalpay'],
+    routePartsAfter: ['pay'],
+  },
+  {
+    path: '/shop/events/1',
+    payload: '/shop/events/1.txt',
+    paramName: 'ev_id',
+    value: '1',
+    placeholder: '0',
+    routePartsBefore: ['shop', 'events'],
+  },
+];

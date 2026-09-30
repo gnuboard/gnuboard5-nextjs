@@ -1,0 +1,514 @@
+/* =====================================================================
+   Solune theme — inner pages (board list / view / write, search, recent,
+   mypage, shop).
+
+   Those pages are the app's own components. They are built out of a small
+   set of shared classes declared in src/app/globals.css (.page-hero,
+   .surface-panel, .surface-toolbar, .section-*, .board-post-row,
+   .filter-chip, .product-*) plus shadcn primitives. Most of globals.css
+   already reads the tokens this theme remaps, but a number of rules carry
+   hard-coded green hexes from the default theme. This layer repaints those,
+   and matches the reference site's board geometry (rounded 0.75rem panel with
+   a primary hairline on top, soft header row, pill pagination).
+
+   Everything is scoped to the themed <body> so no other theme source is
+   affected.
+   ===================================================================== */
+
+body[data-g5-theme-source="default"] {
+  /* Inner pages inherit the community page floor, like the reference site. */
+  background: var(--solune-page);
+}
+
+/* The shop shell paints a green-tinted vertical wash from the default theme.
+   Solune keeps the same flat page floor everywhere. */
+body[data-g5-theme-source="default"] .naver-shell { background: var(--solune-page); }
+
+/* --- inner page rail ----------------------------------------------------- */
+/* Inner pages ship their own `.site-container px-4 py-8` wrapper. Inside the
+   Solune rail that wrapper would add a second gutter and a second max-width,
+   so it is flattened to the grid column it now lives in. */
+body[data-g5-theme-source="default"] .solune-inner-shell .solune-main-content .site-container {
+  max-width: none;
+  padding-inline: 0;
+}
+body[data-g5-theme-source="default"] .solune-inner-shell .solune-main-content > * > .site-container,
+body[data-g5-theme-source="default"] .solune-inner-shell .solune-main-content > .site-container {
+  padding-block: 0;
+}
+
+/* 어떤 페이지는 `.site-container` 대신 Tailwind 의 `.container mx-auto` 로 폭을
+   잡는다(검색·글쓰기·콘텐츠 등 스무 곳 남짓). 앱의 전역 규칙이 그 폭을
+   `--container-width` 로 못박아 두는데(!important), 그 값은 화면 전체를 기준으로
+   한 값이라 레일이 있는 칸 안에서는 칸을 넘어 레일 위를 덮는다.
+   !important 로 맞받는 대신 그 규칙이 읽는 변수를 칸 안에서만 바꾼다. */
+body[data-g5-theme-source="default"] .solune-inner-shell .solune-main-content {
+  --container-width: 100%;
+}
+body[data-g5-theme-source="default"] .solune-inner-shell .solune-main-content .container {
+  width: 100%;
+  /* 본문 칸은 그리드다. 그리드 항목의 기본값 min-width:auto 는 "내용보다 좁아지지
+     말라"는 뜻이라, 긴 문장 하나가 칸을 밀어내고 max-width 도 무력해진다. */
+  min-width: 0;
+  margin-inline: 0;
+  padding-inline: 0;
+}
+/* `.container py-8` 의 위아래 32px 이 껍데기(.solune-content-shell)의 32px 위에 겹쳐
+   빵부스러기가 레퍼런스보다 32px 아래에 섰다(실측: 머리 아래 41 vs 73). 껍데기 것만 남긴다. */
+body[data-g5-theme-source="default"] .solune-inner-shell .solune-main-content > .container,
+body[data-g5-theme-source="default"] .solune-inner-shell .solune-main-content > * > .container {
+  padding-block: 0;
+}
+
+/* --- page shells -------------------------------------------------------- */
+body[data-g5-theme-source="default"] .page-hero {
+  border: 1px solid var(--solune-border);
+  border-radius: var(--solune-radius-md);
+  /* The stock hero paints a green-tinted gradient; Solune keeps a flat card. */
+  background: var(--solune-surface);
+  box-shadow: var(--solune-shadow-sm);
+}
+body[data-g5-theme-source="default"] .page-hero-title {
+  color: var(--solune-text);
+  letter-spacing: var(--solune-heading-letter-spacing);
+}
+body[data-g5-theme-source="default"] .page-hero-desc { color: var(--solune-text-soft); }
+/* Inside the rail the reference leads with a bare page title instead of a card,
+   so the hero flattens there (shop and mypage keep their card). */
+body[data-g5-theme-source="default"] .solune-inner-shell .page-hero {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+body[data-g5-theme-source="default"] .solune-inner-shell .page-hero-title { font-size: 2rem; }
+body[data-g5-theme-source="default"] .section-eyebrow { color: var(--solune-muted); }
+
+body[data-g5-theme-source="default"] :is(.surface-panel, .surface-toolbar) {
+  border-color: var(--solune-border);
+  border-radius: var(--solune-radius-md);
+  background: var(--solune-surface);
+  box-shadow: var(--solune-shadow-sm);
+}
+
+
+/* --- section headers ---------------------------------------------------- */
+body[data-g5-theme-source="default"] .section-header { border-bottom-color: var(--solune-border); }
+body[data-g5-theme-source="default"] .section-title {
+  padding-left: 0;
+  color: var(--solune-text);
+  letter-spacing: var(--solune-heading-letter-spacing);
+}
+/* The stock title paints a green accent bar; the reference headings have none. */
+body[data-g5-theme-source="default"] .section-title::before { content: none; }
+body[data-g5-theme-source="default"] .section-more {
+  border-radius: var(--solune-radius-pill);
+  color: var(--solune-muted);
+}
+body[data-g5-theme-source="default"] .section-more:hover {
+  background: var(--solune-primary-soft);
+  color: var(--solune-primary);
+}
+
+/* --- list rows ---------------------------------------------------------- */
+body[data-g5-theme-source="default"] :is(.board-post-row, .latest-post-row, .compact-trend-post) {
+  border-color: var(--solune-border);
+}
+body[data-g5-theme-source="default"] :is(.board-post-row, .latest-post-row, .compact-trend-post):hover {
+  background: var(--solune-primary-soft);
+}
+body[data-g5-theme-source="default"] .trend-rank { color: var(--solune-primary); }
+body[data-g5-theme-source="default"] .empty-soft { color: var(--solune-muted); }
+body[data-g5-theme-source="default"] .naver-meta { color: var(--solune-muted); }
+
+/* --- board tables ------------------------------------------------------- */
+body[data-g5-theme-source="default"] .surface-panel table { width: 100%; }
+body[data-g5-theme-source="default"] .surface-panel thead tr {
+  border-bottom: 1px solid var(--solune-border);
+  background: var(--solune-surface-soft);
+}
+body[data-g5-theme-source="default"] .surface-panel thead th {
+  height: 3.2rem;
+  color: var(--solune-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+body[data-g5-theme-source="default"] .surface-panel tbody tr { border-color: var(--solune-border); }
+body[data-g5-theme-source="default"] .surface-panel tbody tr:hover { background: var(--solune-primary-soft); }
+body[data-g5-theme-source="default"] .surface-panel tbody td { color: var(--solune-text-soft); }
+body[data-g5-theme-source="default"] .surface-panel tbody td a:hover { color: var(--solune-primary); }
+
+/* --- chips, filters, cards ---------------------------------------------- */
+body[data-g5-theme-source="default"] .filter-chip {
+  border-color: var(--solune-border);
+  background: var(--solune-surface);
+  color: var(--solune-text-soft);
+}
+body[data-g5-theme-source="default"] .filter-chip:hover {
+  border-color: var(--solune-primary);
+  background: var(--solune-primary-soft);
+  color: var(--solune-primary);
+}
+body[data-g5-theme-source="default"] .filter-chip-active {
+  border-color: var(--solune-primary);
+  background: var(--solune-primary);
+  color: var(--solune-primary-ink);
+}
+body[data-g5-theme-source="default"] :is(.product-card, .product-list-card) {
+  border-color: var(--solune-border);
+  border-radius: var(--solune-radius-sm);
+  background: var(--solune-surface);
+}
+body[data-g5-theme-source="default"] :is(.product-card, .product-list-card):hover {
+  border-color: var(--solune-primary);
+  background: var(--solune-surface);
+  box-shadow: var(--solune-shadow-lift);
+}
+body[data-g5-theme-source="default"] .metric-chip { border-color: var(--solune-border); }
+
+/* --- shadcn surfaces ----------------------------------------------------- */
+/* Cards, popovers and dialogs read --card/--border, which the token layer
+   already remaps; only the corner radius needs matching to the reference. */
+body[data-g5-theme-source="default"] :is([data-slot="card"], .card-surface) {
+  border-radius: var(--solune-radius-md);
+  box-shadow: var(--solune-shadow-sm);
+}
+
+/* --- form controls ------------------------------------------------------- */
+body[data-g5-theme-source="default"] :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) {
+  border-radius: var(--solune-radius-sm);
+}
+body[data-g5-theme-source="default"] :is(input, select, textarea):focus-visible {
+  border-color: var(--solune-primary);
+  outline-color: var(--solune-primary);
+}
+
+/* --- pagination ---------------------------------------------------------- */
+/* Pagination is a row of shadcn buttons; the reference uses pills with a solid
+   primary current page and a soft hover. */
+body[data-g5-theme-source="default"] nav[aria-label="pagination"] button,
+body[data-g5-theme-source="default"] nav[aria-label="페이지 이동"] button {
+  border-radius: var(--solune-radius-pill);
+  font-weight: 800;
+}
+
+/* --- board view (reference #bo_v) ---------------------------------------- */
+/* 슬롯이 그리는 판. 레퍼런스 view.skin 은 카드 위에 게시판 이름과 목록 단추를
+   두고 그 아래 흰 카드가 온다. 슬롯은 카드 안에 그려지므로 카드의 껍데기를
+   벗기고(테두리·그림자 없음) 안의 덩어리들이 스스로 카드 모양을 이룬다 —
+   머리가 위 모서리, 도구줄이 아래 모서리를 둥글린다. 이 테마는 BoardViewHeader
+   슬롯을 늘 채우므로 카드 클래스만으로 충분하다(:has 불필요). */
+body[data-g5-theme-source="default"] .solune-inner-shell .board-view-card {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  gap: 0;
+  background: none;
+  box-shadow: none;
+}
+body[data-g5-theme-source="default"] .board-view-card > :not(.solune-view-boardbar) {
+  border-left: 1px solid var(--solune-border);
+  border-right: 1px solid var(--solune-border);
+  background: var(--solune-surface);
+}
+body[data-g5-theme-source="default"] .board-view-card > .solune-view-head {
+  border-top: 1px solid var(--solune-border);
+  border-radius: var(--solune-radius-md) var(--solune-radius-md) 0 0;
+}
+body[data-g5-theme-source="default"] .board-view-card > .board-view-toolbar {
+  border-top: 1px solid var(--solune-border);
+  border-bottom: 1px solid var(--solune-border);
+  border-radius: 0 0 var(--solune-radius-md) var(--solune-radius-md);
+  padding: 18px 44px;
+  background: var(--solune-surface-soft);
+}
+body[data-g5-theme-source="default"] .board-view-card > [data-slot="separator"] { display: none; }
+body[data-g5-theme-source="default"] .solune-inner-shell .board-view-card > .board-view-content { padding: 1.75rem 44px 2rem; }
+body[data-g5-theme-source="default"] .solune-inner-shell .board-view-card > .board-view-vote { padding: 0.5rem 44px 2.25rem; }
+body[data-g5-theme-source="default"] .board-view-vote button {
+  min-width: 5.6rem;
+  height: 40px;
+  border-color: var(--solune-border);
+  border-radius: var(--solune-radius-pill);
+  padding-inline: 14px;
+  background: var(--solune-surface-soft);
+  color: var(--solune-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+body[data-g5-theme-source="default"] .board-view-vote button:hover { border-color: var(--solune-primary); background: var(--solune-primary-soft); color: var(--solune-primary); }
+body[data-g5-theme-source="default"] .board-view-toolbar-btn {
+  height: 36px;
+  border-color: var(--solune-border);
+  border-radius: 8px;
+  padding-inline: 14px;
+  background: var(--solune-surface);
+  color: var(--solune-text-soft);
+  font-size: 13px;
+  font-weight: 600;
+}
+body[data-g5-theme-source="default"] .board-view-toolbar-btn:hover { border-color: var(--solune-primary); color: var(--solune-primary); }
+/* 답글 · 글쓰기: 레퍼런스 .cv-btn — 흰 바탕 · 옅은 테두리 36px. 앱의 outline 단추는 회색으로 채워진다. */
+body[data-g5-theme-source="default"] :is(.board-view-toolbar-reply, .board-view-toolbar-write) {
+  height: 36px;
+  border: 1px solid var(--solune-border);
+  border-radius: 8px;
+  padding-inline: 14px;
+  background: var(--solune-surface);
+  color: var(--solune-text-soft);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: none;
+}
+body[data-g5-theme-source="default"] :is(.board-view-toolbar-reply, .board-view-toolbar-write):hover { border-color: var(--solune-primary); background: var(--solune-primary-soft); color: var(--solune-primary); }
+body[data-g5-theme-source="default"] .board-view-toolbar-list { height: 36px; border-radius: 8px; padding-inline: 16px; font-size: 13px; font-weight: 600; }
+/* 도구줄에 목록·글쓰기가 있으니 카드 아래 영어 단추 줄은 접는다. */
+body[data-g5-theme-source="default"] .board-view-page .board-view-footer { display: none; }
+
+/* 카드 위 줄: 게시판 이름(크게)과 목록 단추. */
+body[data-g5-theme-source="default"] .solune-view-boardbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.25rem 0 1rem;
+}
+body[data-g5-theme-source="default"] .solune-view-boardname {
+  color: var(--solune-text);
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+body[data-g5-theme-source="default"] .solune-view-boardname:hover { color: var(--solune-primary); }
+body[data-g5-theme-source="default"] .solune-view-listbtn {
+  display: inline-flex;
+  height: 2.25rem;
+  align-items: center;
+  border: 1px solid var(--solune-border);
+  border-radius: 0.5rem;
+  padding-inline: 0.9rem;
+  background: var(--solune-surface);
+  color: var(--solune-text);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+body[data-g5-theme-source="default"] .solune-view-listbtn:hover { border-color: var(--solune-primary); color: var(--solune-primary); }
+
+/* BoardViewHeader 슬롯(board-view-header.tsx)이 그리는 머리·작성자 바. 레퍼런스
+   view.skin(.cv-head) 2026-09 실측: 안쪽 40px 44px 28px, 분류는 옅은 파랑 알약
+   (12px 700, 높이 24), 글 번호는 옅은 글자(12.5px), 제목 34px 700, 제목과 작성자 사이
+   가는 줄은 좌우 여백 안쪽에 긋는다. 작성자는 40px 사진 + 14.5px 700 이름 + 12.5px 날짜. */
+body[data-g5-theme-source="default"] .solune-view-head {
+  padding: 40px 44px 28px;
+}
+body[data-g5-theme-source="default"] .solune-view-kicker-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+body[data-g5-theme-source="default"] .solune-view-cate {
+  display: inline-flex;
+  height: 24px;
+  align-items: center;
+  border-radius: var(--solune-radius-pill);
+  padding: 0 10px;
+  background: var(--solune-primary-soft);
+  color: var(--solune-primary);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+body[data-g5-theme-source="default"] .solune-view-kicker { color: var(--solune-muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+body[data-g5-theme-source="default"] .solune-view-title {
+  margin: 0;
+  color: var(--solune-text);
+  font-size: clamp(1.5rem, 1rem + 1.6vw, 2.125rem);
+  font-weight: 700;
+  line-height: 1.32;
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
+}
+body[data-g5-theme-source="default"] .solune-view-info {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.25rem;
+  border-top: 0;
+  border-bottom: 0;
+  padding: 0 44px 8px;
+  background: var(--solune-surface);
+}
+body[data-g5-theme-source="default"] .solune-view-info::before { content: ""; flex-basis: 100%; height: 1px; margin-bottom: 1.1rem; background: var(--solune-border); }
+body[data-g5-theme-source="default"] .solune-view-head:has(+ .solune-view-info) { padding-bottom: 28px; }
+body[data-g5-theme-source="default"] .solune-view-author { display: flex; min-width: 0; align-items: center; gap: 10px; }
+body[data-g5-theme-source="default"] .solune-view-avatar {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  font-size: 1rem;
+}
+body[data-g5-theme-source="default"] .solune-view-author-body { display: grid; min-width: 0; gap: 3px; color: var(--solune-muted); font-size: 12.5px; line-height: 1.35; }
+body[data-g5-theme-source="default"] .solune-view-author-body strong { color: var(--solune-text-soft); font-size: 14.5px; font-weight: 700; }
+body[data-g5-theme-source="default"] .solune-view-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 1.1rem;
+  color: var(--solune-muted);
+  font-size: 13px;
+}
+body[data-g5-theme-source="default"] .solune-view-stat b { margin-left: 0.3rem; color: var(--solune-text); font-weight: 700; }
+@media (max-width: 767px) {
+  body[data-g5-theme-source="default"] .solune-view-head { padding: 1.75rem 1.25rem 1.25rem; }
+  body[data-g5-theme-source="default"] .solune-view-info { padding: 0 1.25rem 0.5rem; }
+}
+body[data-g5-theme-source="default"] .solune-inner-shell [data-slot="card-header"] h1 {
+  color: var(--solune-text);
+  font-size: clamp(1.65rem, 3vw, 2.35rem);
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: var(--solune-heading-letter-spacing);
+  overflow-wrap: anywhere;
+}
+body[data-g5-theme-source="default"] .solune-inner-shell [data-slot="card-header"] [data-slot="badge"] {
+  border-color: color-mix(in srgb, var(--solune-primary) 24%, var(--solune-border));
+  border-radius: var(--solune-radius-pill);
+  color: var(--solune-primary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+/* 위 규칙은 테두리만 있는 표(예: 300P)를 전제로 글자를 파랑으로 칠한다. 바탕이 채워진 표(설문 "진행중" 등
+   bg-primary)에 그대로 걸리면 파랑 위 파랑 글자가 되어 보이지 않았다 — 채운 표는 흰 글자로 둔다. */
+body[data-g5-theme-source="default"] .solune-inner-shell [data-slot="card-header"] [data-slot="badge"].bg-primary {
+  border-color: var(--solune-primary);
+  color: var(--solune-primary-ink);
+}
+body[data-g5-theme-source="default"] .solune-inner-shell [data-slot="separator"] { background: var(--solune-border); }
+body[data-g5-theme-source="default"] .solune-inner-shell [data-slot="card-content"] { padding-inline: 2rem; }
+body[data-g5-theme-source="default"] .solune-inner-shell [data-slot="card-content"] .prose {
+  max-width: none;
+  color: var(--solune-text-soft);
+  font-size: 1rem;
+  line-height: 1.85;
+}
+body[data-g5-theme-source="default"] .solune-inner-shell .prose a {
+  color: var(--solune-accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--solune-accent) 35%, transparent);
+  text-underline-offset: 0.16em;
+}
+body[data-g5-theme-source="default"] .solune-inner-shell .prose img { border-radius: var(--solune-radius-sm); }
+/* comments card: the reference gives the heading a soft strip with a count pill */
+body[data-g5-theme-source="default"] .solune-inner-shell [data-slot="card-content"] > h3:first-child {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: -1.5rem -2rem 1.25rem;
+  border-bottom: 1px solid var(--solune-border);
+  padding: 1rem 2rem;
+  background: var(--solune-surface-soft);
+  color: var(--solune-text);
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+body[data-g5-theme-source="default"] .solune-inner-shell textarea {
+  border-radius: var(--solune-radius-sm);
+  border-color: var(--solune-border-strong);
+}
+@media (max-width: 767px) {
+  body[data-g5-theme-source="default"] .solune-inner-shell .board-view-card > :is(.board-view-content, .board-view-vote, .board-view-toolbar) { padding-inline: 1.25rem; }
+  body[data-g5-theme-source="default"] .solune-inner-shell [data-slot="card-content"] { padding-inline: 1.25rem; }
+  body[data-g5-theme-source="default"] .solune-inner-shell [data-slot="card-content"] > h3:first-child { margin-inline: -1.25rem; padding-inline: 1.25rem; }
+}
+
+/* --- typography ---------------------------------------------------------- */
+body[data-g5-theme-source="default"] :is(h1, h2, h3, h4) {
+  letter-spacing: var(--solune-heading-letter-spacing);
+}
+/* Board view bodies come from the editor; keep the reading measure and rhythm
+   close to the reference article styles. */
+body[data-g5-theme-source="default"] .prose,
+body[data-g5-theme-source="default"] .post-content {
+  color: var(--solune-text-soft);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+body[data-g5-theme-source="default"] :is(.prose, .post-content) a { color: var(--solune-primary); }
+
+/* --- 게시판 목록 -----------------------------------------------------------
+   레퍼런스는 한 줄이 세 층으로 읽힌다: 번호(옅게) · 제목(진하게, 댓글 수는 파랗게)
+   · 그 아래 분류 칩. 오른쪽 끝의 조회 수 앞에는 눈 모양이 붙는다. */
+body[data-g5-theme-source="default"] {
+  .board-row-category {
+    /* 제목 옆이 아니라 아래 줄에 놓는다 — 제목이 길어도 칩이 밀려나지 않는다. */
+    display: table;
+    margin-top: 0.3rem;
+    border: 1px solid var(--solune-border);
+    border-radius: 999px;
+    background: var(--solune-surface-soft);
+    padding: 0.05rem 0.45rem;
+    color: var(--solune-muted);
+    font-size: 0.68rem;
+    font-weight: 600;
+  }
+
+  /* 제목 칸은 두 줄이 되므로 세로 여백을 조금 준다. */
+  table td { vertical-align: middle; }
+
+  /* 번호는 정보가 아니라 표식이라 눈에 덜 띄게. */
+  table tbody td:first-child { color: var(--solune-muted-soft); font-size: 0.8rem; }
+
+  /* 제목은 이 표에서 유일하게 진한 글자다. */
+  table tbody td a { color: var(--solune-text); font-weight: 600; }
+  table tbody td a:hover { color: var(--solune-primary); }
+
+  /* 댓글 수는 배지가 아니라 제목에 붙는 숫자처럼 보이게. */
+  table tbody td a [data-slot="badge"] {
+    border: 0;
+    background: transparent;
+    color: var(--solune-primary);
+    padding: 0;
+    font-weight: 700;
+  }
+
+  /* 조회 칸은 아이콘이 붙는 만큼 자리를 넓혀 준다. 안 그러면 숫자가 줄바꿈된다. */
+  table :is(th, td):is(.board-col-hit, .board-col-date) { white-space: nowrap; }
+  table th.board-col-hit { width: 5.5rem; }
+
+  /* 필터 칩은 왼쪽에 모은다. 넓게 퍼지면 고르는 자리로 안 보인다. */
+  .surface-toolbar { justify-content: flex-start; gap: 0.4rem; }
+
+  /* 조회 수 앞의 눈 모양 — 숫자만 있으면 무엇의 수인지 알기 어렵다. */
+  table tbody td.board-col-hit::before {
+    content: "";
+    display: inline-block;
+    width: 0.85em;
+    height: 0.85em;
+    margin-right: 0.3em;
+    vertical-align: -0.1em;
+    background: currentColor;
+    opacity: 0.55;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+}
+
+/* 분류 칩의 건수. 레퍼런스는 이름과 숫자를 한 알약 안에 넣되 숫자만 옅게 둔다. */
+body[data-g5-theme-source="default"] {
+  .filter-chip-count {
+    margin-left: 0.3rem;
+    color: var(--solune-muted-soft);
+    font-weight: 600;
+    opacity: 1;
+  }
+  .filter-chip-active .filter-chip-count {
+    color: color-mix(in srgb, var(--color-primary-content, #fff) 78%, transparent);
+  }
+}

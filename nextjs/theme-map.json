@@ -1,0 +1,9 @@
+{
+  "generatedFrom": "theme-manifest.json",
+  "edit": "Do not edit this generated file directly. Update theme-manifest.json and run npm run generate:theme-maps.",
+  "themes": {
+    "nextjs_default": {
+      "source": "default"
+    }
+  }
+}

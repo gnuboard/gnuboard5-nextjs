@@ -1,0 +1,9 @@
+{
+  "sourceBranches": [
+    "main"
+  ],
+  "publicPackageBranches": [
+    "main"
+  ],
+  "publicPackageDir": "."
+}
