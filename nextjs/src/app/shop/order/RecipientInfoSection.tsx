@@ -18,7 +18,6 @@ type RecipientInfoSectionProps = {
   openAddressModal: () => void;
   recipient: AddressForm;
   updateRecipient: AddressFieldUpdater;
-  openPostcode: (target: PostcodeTarget) => void;
   isMemberOrder: boolean;
   saveAsNewAddress: boolean;
   setSaveAsNewAddress: (checked: boolean) => void;
@@ -44,7 +43,6 @@ export function RecipientInfoSection({
   openAddressModal,
   recipient,
   updateRecipient,
-  openPostcode,
   isMemberOrder,
   saveAsNewAddress,
   setSaveAsNewAddress,
@@ -74,7 +72,6 @@ export function RecipientInfoSection({
         addressSelection={addressSelection}
         recipient={recipient}
         updateRecipient={updateRecipient}
-        openPostcode={openPostcode}
         isMemberOrder={isMemberOrder}
         saveAsNewAddress={saveAsNewAddress}
         setSaveAsNewAddress={setSaveAsNewAddress}

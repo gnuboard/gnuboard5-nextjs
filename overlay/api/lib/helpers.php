@@ -203,6 +203,26 @@ function format_datetime($datetime)
  * @param  string $mb_id
  * @return string|null  URL or null if no icon exists
  */
+/**
+ * 회원이미지 URL — 그누보드 회원정보 수정의 "회원이미지"(data/member_image/앞두글자/<아이콘이름>.gif).
+ * 회원아이콘(get_member_icon_url)과는 다른 파일이다. 바꿔 올리면 주소가 달라지도록 수정 시각을 붙인다.
+ */
+function get_member_image_url($mb_id)
+{
+    if (!$mb_id) {
+        return null;
+    }
+
+    $name = function_exists('get_mb_icon_name') ? get_mb_icon_name($mb_id) : $mb_id;
+    $relative = '/member_image/' . substr($mb_id, 0, 2) . '/' . $name . '.gif';
+
+    if (!is_file(G5_DATA_PATH . $relative)) {
+        return null;
+    }
+
+    return G5_DATA_URL . $relative . '?' . filemtime(G5_DATA_PATH . $relative);
+}
+
 function get_member_icon_url($mb_id)
 {
     if (!$mb_id) {
@@ -272,7 +292,62 @@ function api_board_file_path($bo_table, $bf_file)
     return $path;
 }
 
-function api_board_file_url($bo_table, $wr_id, $bf_no, $bf_file)
+/**
+ * 목록이 쓸 수 있는 축소 폭. 아무 숫자나 받으면 사본이 끝없이 쌓이므로 몇 가지로 묶는다.
+ * 화면이 쓰는 칸 크기(갤러리 200px, 상품 300px 안팎)에 2배수 화면까지 감안한 값이다.
+ */
+function api_board_file_thumb_widths()
+{
+    return [240, 400, 800];
+}
+
+/**
+ * 원본 옆에 폭을 줄인 사본을 만들어 두고 그 경로를 돌려준다. 만들지 못하면 빈 문자열.
+ *
+ * 그누보드 코어의 thumbnail() 을 그대로 쓴다 — 만드는 규칙도 파일 이름도 두는 자리도
+ * 게시판 목록이 이미 쓰는 것과 같아야 설치본에 사본이 두 벌로 쌓이지 않는다.
+ * GD 가 없거나(공유호스팅에 더러 있다) 원본이 이미 작으면 빈 문자열을 주고 원본을 쓰게 한다.
+ */
+function api_board_file_thumbnail($bo_table, $bf_file, $source_path, $mime, $width)
+{
+    $width = (int) $width;
+    if ($width < 1 || !function_exists('imagecreatetruecolor')) {
+        return '';
+    }
+
+    // 움직이는 그림은 줄이면 첫 장면만 남는다. 건드리지 않는다.
+    if ($mime === 'image/gif' || $mime === 'image/webp') {
+        return '';
+    }
+
+    $size = @getimagesize($source_path);
+    if (!$size || (int) $size[0] <= $width) {
+        return ''; // 원본이 이미 그 폭 이하면 줄일 것이 없다.
+    }
+
+    if (!function_exists('thumbnail')) {
+        $lib = G5_LIB_PATH . '/thumbnail.lib.php';
+        if (!is_file($lib)) {
+            return '';
+        }
+        require_once $lib;
+    }
+
+    $dir = dirname($source_path);
+    $name = basename($source_path);
+
+    // 높이 0 = 비율 유지. is_create=false 면 이미 만들어 둔 사본을 그대로 쓴다.
+    $thumb = @thumbnail($name, $dir, $dir, $width, 0, false);
+    if (!$thumb) {
+        return '';
+    }
+
+    $path = $dir . '/' . $thumb;
+
+    return is_file($path) ? $path : '';
+}
+
+function api_board_file_url($bo_table, $wr_id, $bf_no, $bf_file, $width = 0)
 {
     $path = api_board_file_path($bo_table, $bf_file);
     if ($path === '') {
@@ -290,6 +365,16 @@ function api_board_file_url($bo_table, $wr_id, $bf_no, $bf_file)
     $stamp = filemtime($path) ?: 0;
     $base = api_public_app_base_url();
 
+    $query = [];
+    if ($stamp) {
+        $query['v'] = $stamp;
+    }
+    // 목록이 쓰는 폭만 싣는다. 주소에 폭이 들어가야 브라우저·CDN 이 크기별로 따로 캐시한다.
+    $width = (int) $width;
+    if ($width > 0 && in_array($width, api_board_file_thumb_widths(), true)) {
+        $query['w'] = $width;
+    }
+
     return ($base !== '' ? $base : '')
         . '/api/v1/board-files/'
         . rawurlencode($bo_table)
@@ -299,7 +384,7 @@ function api_board_file_url($bo_table, $wr_id, $bf_no, $bf_file)
         . $bf_no
         . '/'
         . implode('/', $segments)
-        . ($stamp ? '?v=' . $stamp : '');
+        . ($query ? '?' . http_build_query($query) : '');
 }
 
 /**

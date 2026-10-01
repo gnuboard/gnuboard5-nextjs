@@ -20,6 +20,7 @@ export interface Member {
   mb_intercept_date: string;
   mb_email_certify: string;
   mb_icon_path?: string;
+  mb_image_path?: string;
   mb_homepage?: string;
   mb_signature?: string;
   mb_profile?: string;
@@ -44,6 +45,7 @@ export interface MemberProfile {
   mb_open: number;
   mb_datetime: string;
   mb_icon_path?: string;
+  mb_image_path?: string;
   mb_homepage?: string;
   mb_profile?: string;
   reg_days: number;

@@ -304,7 +304,7 @@ if ($apiMethod === 'POST' && in_array($action, ['notify', 'toss-notify', 'toss-w
     }
 
     if ($provider === 'inicis') {
-        if (!pg_notify_ip_allowed('inicis', pg_detect_test_mode($cfg, 'inicis'))) {
+        if (!pg_notify_ip_allowed('inicis')) {
             pg_text_response('DB Error', 403);
         }
         $orderId = trim((string) ($input['no_oid'] ?? $input['MOID'] ?? $input['Moid'] ?? $input['oid'] ?? ''));
@@ -325,7 +325,7 @@ if ($apiMethod === 'POST' && in_array($action, ['notify', 'toss-notify', 'toss-w
     }
 
     if ($provider === 'kcp') {
-        if (!pg_notify_ip_allowed('kcp', pg_detect_test_mode($cfg, 'kcp'))) {
+        if (!pg_notify_ip_allowed('kcp')) {
             pg_text_response('<html><body><form><input type="hidden" name="result" value="9999"></form></body></html>', 403, 'text/html; charset=euc-kr');
         }
         $txCd = (string) ($input['tx_cd'] ?? '');

@@ -26,7 +26,6 @@ type BuildOrdererInfoPropsInput = {
   setGuestPassword: (value: string) => void;
   email: string;
   setEmail: (value: string) => void;
-  openPostcode: (target: PostcodeTarget) => void;
 };
 
 type AddressSaveState = {
@@ -56,7 +55,6 @@ type BuildRecipientInfoPropsInput = {
   openAddressModal: () => void;
   recipient: AddressForm;
   updateRecipient: AddressFieldUpdater;
-  openPostcode: (target: PostcodeTarget) => void;
   isMemberOrder: boolean;
   addressSave: AddressSaveState;
   deliveryRequest: DeliveryRequestState;

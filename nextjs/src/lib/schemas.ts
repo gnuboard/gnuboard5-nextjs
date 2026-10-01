@@ -25,6 +25,7 @@ export const memberProfileSchema = z
     mb_open: numberValue,
     mb_datetime: stringValue,
     mb_icon_path: optionalString,
+    mb_image_path: optionalString,
     mb_homepage: optionalString,
     mb_profile: optionalString,
     reg_days: numberValue,
@@ -239,6 +240,16 @@ export const visitStatsSchema = z.object({
 
 export type VisitStats = z.infer<typeof visitStatsSchema>;
 
+const memberMediaRuleSchema = z
+  .object({
+    enabled: booleanValue,
+    level: numberValue,
+    size: numberValue,
+    width: numberValue,
+    height: numberValue,
+  })
+  .partial();
+
 export const publicSettingsSchema = z
   .object({
     cf_bbs_rewrite: numberValue.optional(),
@@ -248,6 +259,11 @@ export const publicSettingsSchema = z
     comment_editor: booleanValue.optional(),
     pwa_enabled: booleanValue.optional(),
     visit: visitStatsSchema.optional(),
+    /** 회원아이콘 · 회원이미지 설정(관리자 > 기본환경설정 > 회원가입). size 는 바이트, width · height 는 px. */
+    member_media: z
+      .object({ icon: memberMediaRuleSchema, image: memberMediaRuleSchema })
+      .partial()
+      .optional(),
   })
   .passthrough();
 

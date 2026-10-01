@@ -199,7 +199,7 @@ function pg_nicepay_notify_payload(array $input): array {
 
 function pg_nicepay_notify_response(array $cfg, array $input, ?callable $depositMarker = null): array {
     $isTestMode = pg_detect_test_mode($cfg, 'nicepay');
-    if (!pg_notify_ip_allowed('nicepay', $isTestMode)) {
+    if (!pg_notify_ip_allowed('nicepay')) {
         return [
             'text' => 'FAIL',
             'status' => 403,
@@ -227,6 +227,19 @@ function pg_nicepay_notify_response(array $cfg, array $input, ?callable $deposit
     }
 
     if ($payload['result_code'] !== '4110') {
+        /*
+         * 입금(4110) 이 아닌 통보는 처리하지 않는다 — 계좌 발급(4100) 같은 것이 섞여 온다.
+         * 그래도 OK 를 돌려주는 것은 나이스페이가 실패로 보고 같은 통보를 계속 다시 보내지
+         * 않게 하려는 것이다. 다만 그러면 "입금이 안 들어왔다" 고 할 때 기록에 OK 만 남아
+         * 어느 코드가 왔는지 알 수 없으므로, 넘긴 코드를 남겨 둔다.
+         */
+        error_log(sprintf(
+            '[shop-pg] nicepay 입금통보가 아니어서 넘겼다: ResultCode=%s order=%s tid=%s',
+            $payload['result_code'] !== '' ? $payload['result_code'] : '(없음)',
+            $payload['order_id'] !== '' ? $payload['order_id'] : '(없음)',
+            $payload['tid'] !== '' ? $payload['tid'] : '(없음)'
+        ));
+
         return [
             'text' => 'OK',
             'status' => 200,

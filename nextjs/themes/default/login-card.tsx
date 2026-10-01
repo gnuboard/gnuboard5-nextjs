@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { LogOut, Settings, UserRound } from "lucide-react";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { G5Link as Link } from "@/components/ui/g5-link";
 import { g5BaseUrlForRuntime, g5PathForRuntime } from "@/lib/config";
+import { shouldBypassImageOptimization } from "@/lib/image";
 import { formatNumber } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth";
 import { useRuntimeLocation } from "./use-runtime-pathname";
@@ -50,13 +52,26 @@ export function SoluneLoginCard() {
   }
 
   const displayName = user.mb_nick || user.mb_name || user.mb_id;
+  // 회원이미지(프로필 사진)가 먼저, 없으면 회원아이콘, 둘 다 없으면 기본 그림.
+  const avatarUrl = user.mb_image_path || user.mb_icon_path || "";
 
   return (
     <section className="solune-sidebar-widget solune-login-card" aria-label="회원 정보">
       <div className="solune-login-card-body">
         <div className="solune-member-head">
           <span className="solune-member-avatar" aria-hidden>
-            <UserRound size={20} />
+            {avatarUrl ? (
+              <Image
+                src={avatarUrl}
+                alt=""
+                width={44}
+                height={44}
+                className="solune-member-avatar-img"
+                unoptimized={shouldBypassImageOptimization(avatarUrl)}
+              />
+            ) : (
+              <UserRound size={20} />
+            )}
           </span>
           <div className="min-w-0">
             <strong>{displayName}</strong>

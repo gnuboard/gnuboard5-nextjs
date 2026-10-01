@@ -315,6 +315,22 @@ function nextjs_default_content_security_policy()
     $toss_sources = 'https://*.tosspayments.com';
     $pg_sources = $toss_sources . ' ' . $kcp_sources . ' ' . $inicis_sources . ' ' . $nicepay_sources;
     $postcode_script_sources = 'https://t1.daumcdn.net';
+    /*
+     * 우편번호 찾기는 새 창을 열고 그 안에 postcode.map.kakao.com 을 <iframe> 으로 넣는다.
+     * 그 창은 우리가 window.open 으로 만든 것이라 이 CSP 를 그대로 물려받는다 — frame-src 에
+     * 없으면 iframe 이 막혀 빈 창에 깨진 문서 아이콘만 남는다(주문서 "우편번호" 단추).
+     * nextjs/next.config.ts 와 nextjs/scripts/static-security-headers.mjs 에는 이미 같은 값이
+     * 있었고 PHP 브리지에만 빠져 있었다. 셋을 같이 고칠 것.
+     */
+    $postcode_frame_sources = 'https://postcode.map.daum.net https://postcode.map.kakao.com';
+    /*
+     * http 로 서비스하는 설치본(로컬 개발, 사내망)에서는 위젯이 제 주소의 규약을 따라 http 로
+     * iframe 을 건다. https 만 허용하면 그런 설치본에서 막히므로 같이 열어 준다. https 로
+     * 서비스하는 사이트에서는 이 줄이 아무것도 더하지 않는다.
+     */
+    if (strpos(strtolower((string) nextjs_default_g5_url()), 'http://') === 0) {
+        $postcode_frame_sources .= ' http://postcode.map.daum.net http://postcode.map.kakao.com';
+    }
     $script_sources = "'self' 'nonce-" . nextjs_default_csp_nonce() . "' https://js.tosspayments.com " . $pg_sources . ' ' . $postcode_script_sources;
     $image_sources = array_values(array_unique(array_merge(array("'self'", 'data:', 'blob:', 'https:'), nextjs_default_dynamic_csp_image_sources())));
     $connect_sources = array_values(array_unique(array_merge(
@@ -330,7 +346,7 @@ function nextjs_default_content_security_policy()
         'img-src ' . implode(' ', $image_sources),
         "font-src 'self' data: https:",
         'connect-src ' . implode(' ', $connect_sources),
-        'frame-src ' . $pg_sources,
+        'frame-src ' . $pg_sources . ' ' . $postcode_frame_sources,
         "manifest-src 'self'",
         "worker-src 'self' blob:",
         "base-uri 'self'",

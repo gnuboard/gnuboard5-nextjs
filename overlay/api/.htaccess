@@ -10,3 +10,20 @@ RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^(.*)$ index.php?_route=$1 [QSA,L]
 
 # CORS는 index.php에서 처리 (중복 방지)
+
+# JSON 응답 압축.
+#
+# 한 화면이 API 를 스물다섯 번 넘게 부르는데 그 응답이 전부 압축 없이 나가고 있었다
+# (운영 호스트에서도 같았다). JSON 은 보통 7~8할이 줄어든다. 정적 파일 쪽은 빌드가
+# out/.htaccess 로 같은 규칙을 내보내지만 /api 는 PHP 가 내는 응답이라 빠져 있었다.
+#
+# 모듈이 없는 호스트에서는 IfModule 이 통째로 무시된다 — 압축만 안 될 뿐 동작은 같다.
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE application/json application/problem+json text/plain
+  # 이미 압축된 그림을 다시 압축하면 CPU 만 쓰고 더 커지기도 한다(board-files 응답).
+  SetEnvIfNoCase Request_URI \.(?:png|jpe?g|gif|webp|avif|ico)$ no-gzip dont-vary
+  # 오래된 프록시가 압축한 응답을 압축 못 받는 쪽에 내주지 않도록.
+  <IfModule mod_headers.c>
+    Header append Vary Accept-Encoding
+  </IfModule>
+</IfModule>

@@ -49,7 +49,6 @@ export function buildOrderPageControllerResult({
       setGuestPassword: formState.setGuestPassword,
       email: orderData.email,
       setEmail: orderData.setEmail,
-      openPostcode: addressBook.openPostcode,
     }),
     recipientInfo: buildRecipientInfoProps({
       addressSelection: formState.addressSelection,
@@ -58,7 +57,6 @@ export function buildOrderPageControllerResult({
       openAddressModal: () => addressBook.setShowAddressModal(true),
       recipient: orderData.recipient,
       updateRecipient: addressBook.updateRecipient,
-      openPostcode: addressBook.openPostcode,
       isMemberOrder: orderData.isMemberOrder,
       addressSave: formState.addressSave,
       deliveryRequest: formState.deliveryRequest,

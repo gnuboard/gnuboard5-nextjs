@@ -107,6 +107,7 @@ function api_member_profile_payload(array $member): array
         'mb_homepage'  => isset($member['mb_homepage']) ? (string) $member['mb_homepage'] : '',
         'mb_profile'   => isset($member['mb_profile']) ? (string) $member['mb_profile'] : '',
         'mb_icon_path' => get_member_icon_url(isset($member['mb_id']) ? $member['mb_id'] : ''),
+        'mb_image_path' => get_member_image_url(isset($member['mb_id']) ? $member['mb_id'] : ''),
         'reg_days'     => api_member_registration_days($member['mb_datetime'] ?? ''),
     ];
 }

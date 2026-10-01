@@ -79,13 +79,24 @@ body[data-g5-theme-source="default"] .solune-shop-page {
     font-size: 13.5px;
     text-align: left;
   }
+  /* 아이콘은 설치본 img/ 의 PNG 라 색을 바꿀 수 없다. 칩을 씌우고 고른 칸에서 색을 뒤집던
+     예전 규칙은 아이콘이 lucide SVG(currentColor) 이던 때의 것으로, 지금 그대로 두면 그림
+     둘레로 검은 사각형만 비친다. 칩을 걷고 그림만 둔다 — 레퍼런스 주문서도 라벨 배경으로 깔 뿐이다. */
   .shop-pay-method-icon {
     width: 36px;
-    height: 36px;
-    border-radius: 9px;
-    background: var(--solune-surface-soft);
-    color: var(--solune-text-soft);
-    transition: background-color 0.16s ease, color 0.16s ease;
+    height: 28px;
+    background: none;
+    object-fit: contain;
+    /* 그림이 흰 바탕을 포함한 불투명 PNG 라, 밝은 칸에서는 곱하기로 그 바탕을 녹인다. */
+    mix-blend-mode: multiply;
+  }
+  /* 어두운 화면에서는 곱하기로 그림이 묻히므로, 로고 칸과 같이 흰 칩을 씌워 읽히게 한다. */
+  :root[data-solune-theme="dark"] & .shop-pay-method-icon {
+    box-sizing: content-box;
+    padding: 3px 4px;
+    border-radius: 7px;
+    background: #fff;
+    mix-blend-mode: normal;
   }
   .shop-pay-method:hover { border-color: var(--solune-text); background: var(--solune-surface); }
   .shop-pay-method[aria-pressed="true"] {
@@ -95,11 +106,13 @@ body[data-g5-theme-source="default"] .solune-shop-page {
     font-weight: 700;
     box-shadow: inset 0 0 0 1px var(--solune-text);
   }
-  .shop-pay-method[aria-pressed="true"] .shop-pay-method-icon { background: var(--solune-text); color: var(--solune-surface); }
   /* 간편결제 서비스 칸(KCP · NICEPAY) — 로고만 가운데. 로고 그림은 흰 바탕을 전제로 그려져 있어
      다크에서도 이 칸만은 밝은 칩으로 둔다(고른 칸은 옅은 회색). */
   .shop-pay-method--brand { justify-content: center; }
-  .shop-pay-method--brand .shop-pay-method-logo { height: 16px; }
+  /* 로고마다 가로세로 비율이 달라 높이만 묶으면 가로가 제멋대로 늘어난다. 같은 상자에 맞춘다
+     (그 상자 크기는 컴포넌트가 정한다). 로고도 흰 바탕을 품은 PNG 라 밝은 칸에서는 녹인다. */
+  .shop-pay-method--brand .shop-pay-method-logo { mix-blend-mode: multiply; }
+  :root[data-solune-theme="dark"] & .shop-pay-method--brand .shop-pay-method-logo { mix-blend-mode: normal; }
   :root[data-solune-theme="dark"] & .shop-pay-method--brand { background: #fff; }
   :root[data-solune-theme="dark"] & .shop-pay-method--brand[aria-pressed="true"] { background: #f1f0ec; }
   @media (prefers-reduced-motion: reduce) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   KOREAN_PHONE_PATTERN,
@@ -7,6 +8,7 @@ import {
   normalizeKoreanZipInput,
 } from "@/lib/address-validation";
 import { type AddressForm } from "./orderAddressHelpers";
+import { PostcodeSearchPanel } from "./PostcodeSearchPanel";
 
 export type AddressFieldUpdater = (
   field: keyof AddressForm,
@@ -19,7 +21,11 @@ type AddressFieldsProps = {
   address: AddressForm;
   updateAddress: AddressFieldUpdater;
   postcodeTarget: PostcodeTarget;
-  openPostcode: (target: PostcodeTarget) => void;
+};
+
+const POSTCODE_PANEL_LABEL: Record<PostcodeTarget, string> = {
+  orderer: "주문하시는 분",
+  recipient: "받는 분",
 };
 
 export function AddressFields({
@@ -27,9 +33,9 @@ export function AddressFields({
   address,
   updateAddress,
   postcodeTarget,
-  openPostcode,
 }: AddressFieldsProps) {
   const fieldId = (field: string) => `order-${postcodeTarget}-${field}`;
+  const [postcodeOpen, setPostcodeOpen] = useState(false);
 
   return (
     <>
@@ -102,10 +108,25 @@ export function AddressFields({
           <Button
             type="button"
             variant="outline"
-            onClick={() => openPostcode(postcodeTarget)}
+            onClick={() => setPostcodeOpen((prev) => !prev)}
+            aria-expanded={postcodeOpen}
+            aria-controls={fieldId("postcode-panel")}
           >
-            우편번호 검색
+            {postcodeOpen ? "검색 닫기" : "우편번호 검색"}
           </Button>
+        </div>
+        <div id={fieldId("postcode-panel")}>
+          <PostcodeSearchPanel
+            open={postcodeOpen}
+            label={POSTCODE_PANEL_LABEL[postcodeTarget]}
+            onClose={() => setPostcodeOpen(false)}
+            onComplete={(data) => {
+              updateAddress("zip", data.zonecode);
+              updateAddress("addr1", data.address);
+              updateAddress("addr3", data.buildingName ? `(${data.buildingName})` : "");
+              updateAddress("addr_jibeon", data.jibunAddress ?? "");
+            }}
+          />
         </div>
       </div>
       <div className="sm:col-span-2">

@@ -16,7 +16,6 @@ type OrdererInfoSectionProps = {
   setGuestPassword: (value: string) => void;
   email: string;
   setEmail: (value: string) => void;
-  openPostcode: (target: PostcodeTarget) => void;
 };
 
 export function OrdererInfoSection({
@@ -28,7 +27,6 @@ export function OrdererInfoSection({
   setGuestPassword,
   email,
   setEmail,
-  openPostcode,
 }: OrdererInfoSectionProps) {
   return (
     <section className="shop-order-section shop-order-section--orderer rounded-lg border p-6">
@@ -39,7 +37,6 @@ export function OrdererInfoSection({
           address={orderer}
           updateAddress={updateOrderer}
           postcodeTarget="orderer"
-          openPostcode={openPostcode}
         />
         {!isMemberOrder && (
           <div className="sm:col-span-2">

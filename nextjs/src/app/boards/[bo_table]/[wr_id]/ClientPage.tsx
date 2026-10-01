@@ -2,7 +2,9 @@
 
 import { createElement, Suspense, useEffect, useState } from "react";
 import Image from "next/image";
-import type { PostFile } from "@/lib/types";
+import type { Board, PostFile } from "@/lib/types";
+import { canWriteToBoard } from "@/lib/board-permissions";
+import { useAuthStore } from "@/store/auth";
 import type { PostDetail } from "@/services/boards";
 import { getBoard, getPostDetailBySeoResult, getPostDetailResult } from "@/services/boards";
 import { getClientPublicSettings } from "@/services/settings";
@@ -94,6 +96,9 @@ export default function PostViewClient({
   const routeReady = useRuntimeRouteReady();
   const [post, setPost] = useState<PostDetail | null>(initialPost);
   const [boardName, setBoardName] = useState(initialBoardName);
+  // 글쓰기 · 답글 단추를 게시판 권한대로 보이려고 게시판 정보를 함께 둔다.
+  const [board, setBoard] = useState<Board | null>(null);
+  const authUser = useAuthStore((state) => state.user);
   const [bbsRewriteMode, setBbsRewriteMode] = useState(initialBbsRewriteMode);
   const [commentEditorEnabled, setCommentEditorEnabled] = useState(initialCommentEditorEnabled);
   const [loading, setLoading] = useState(!initialPost);
@@ -151,6 +156,8 @@ export default function PostViewClient({
         const nextRewriteMode = Number(settings?.cf_bbs_rewrite ?? 0);
         setBbsRewriteMode(nextRewriteMode);
         setBoardName(nextBoard?.bo_subject ?? bo_table);
+      setBoard(nextBoard);
+        setBoard(nextBoard);
         setCommentEditorEnabled(!!settings?.comment_editor);
 
         const seoPost = seoPostResult.ok ? seoPostResult.data : null;
@@ -190,6 +197,7 @@ export default function PostViewClient({
       setPost(nextPost);
       setBbsRewriteMode(Number(settings?.cf_bbs_rewrite ?? 0));
       setBoardName(nextBoard?.bo_subject ?? bo_table);
+      setBoard(nextBoard);
       setCommentEditorEnabled(!!settings?.comment_editor);
       setMissing(!nextPost && !nextAccessDenied);
       setAccessDenied(nextAccessDenied);
@@ -521,12 +529,16 @@ export default function PostViewClient({
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <Button asChild variant="outline" size="sm" className="board-view-toolbar-reply">
-              <a href={g5ShortHref(`/boards/${bo_table}/write?reply_to=${post.wr_id}`)}>답글</a>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="board-view-toolbar-write">
-              <a href={g5ShortHref(`/boards/${bo_table}/write`)}>글쓰기</a>
-            </Button>
+            {canWriteToBoard(board, authUser, "reply") && (
+              <Button asChild variant="outline" size="sm" className="board-view-toolbar-reply">
+                <a href={g5ShortHref(`/boards/${bo_table}/write?reply_to=${post.wr_id}`)}>답글</a>
+              </Button>
+            )}
+            {canWriteToBoard(board, authUser) && (
+              <Button asChild variant="outline" size="sm" className="board-view-toolbar-write">
+                <a href={g5ShortHref(`/boards/${bo_table}/write`)}>글쓰기</a>
+              </Button>
+            )}
             <Button asChild size="sm" className="board-view-toolbar-list">
               <a href={g5ShortHref(`/boards/${bo_table}`)}>목록으로</a>
             </Button>
@@ -572,9 +584,11 @@ export default function PostViewClient({
         <Button asChild variant="outline">
           <a href={g5ShortHref(`/boards/${bo_table}`)}>목록</a>
         </Button>
-        <Button asChild>
-          <a href={g5ShortHref(`/boards/${bo_table}/write`)}>글쓰기</a>
-        </Button>
+        {canWriteToBoard(board, authUser) && (
+          <Button asChild>
+            <a href={g5ShortHref(`/boards/${bo_table}/write`)}>글쓰기</a>
+          </Button>
+        )}
       </div>
 
       {/* 그누보드 기본 화면처럼 글 아래에 그 게시판의 목록. 테마가 features.listUnderPostView 로 켠다. */}

@@ -9,7 +9,6 @@ import {
   type SavedAddress,
 } from "./orderAddressHelpers";
 import { useOrderAddressBookMutations } from "./useOrderAddressBookMutations";
-import { useOrderPostcode } from "./useOrderPostcode";
 
 type UseOrderAddressBookOptions = {
   addressSelection: AddressSelection;
@@ -80,7 +79,6 @@ export function useOrderAddressBook({
     setSavedAddresses,
     handleAddressSelection,
   });
-  const openPostcode = useOrderPostcode({ setOrderer, setRecipient });
 
   return {
     showAddressModal,
@@ -93,6 +91,5 @@ export function useOrderAddressBook({
     handleDeleteAddress,
     handleUpdateAddressSubject,
     handleSetDefaultAddress,
-    openPostcode,
   };
 }

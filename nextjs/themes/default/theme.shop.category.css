@@ -1,8 +1,9 @@
 /* 헤더 "카테고리" 펼침 메뉴 — shop-category-panel.tsx 의 solune-shop-category-* .
    레퍼런스 shop/category.php · default_shop.css "헤더 카테고리 펼침 메뉴"(2026-09 실측):
-   헤더 아래로 흰 띠가 좌우 끝까지 흐르고, 안쪽은 본문과 같은 폭(.solune-shop-shell).
+   헤더 아래로 본문과 같은 폭(.solune-shop-shell)의 흰 판 하나가 내려오고, 양옆과 아래는
+   투명해 아래 화면이 그대로 보인다(2026-10 레퍼런스 localhost 기준).
    왼쪽 260px 이름표 줄(고른 것은 회색 바탕 + 오른쪽 2px 짙은 선), 오른쪽은 고른 분류의
-   이름 · 전체 보기 · 하위 분류(자동 칸, 180px 이상) · 추천 상품 넷. 띠 아래는 옅은 뒷막. */
+   이름 · 전체 보기 · 하위 분류(자동 칸, 180px 이상) · 추천 상품 넷. */
 .solune-shop-page .solune-shop-category {
   position: absolute;
   z-index: 100;
@@ -19,30 +20,28 @@
   opacity: 1;
   pointer-events: auto;
 }
-/* 흰 바탕은 가짜 요소로 깐다. 상자 자체에 깔면 띠 아래의 뒷막이 가려진다. */
-.solune-shop-page .solune-shop-category::before {
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  border-top: 1px solid var(--solune-border);
-  background: var(--solune-surface);
-  box-shadow: 0 24px 48px color-mix(in srgb, var(--solune-text) 12%, transparent);
-  content: "";
-}
+/* 뒷막은 투명하다 — 레퍼런스(localhost)처럼 펼친 판 양옆으로 아래 화면이 그대로 보인다.
+   판 뒤(z-index 0)에 판 윗선부터 깔아, 판 양옆 빈 곳과 아래 어디에 마우스를 올려도 닫히고
+   누르면 닫힌다(레퍼런스와 같은 동작). 판 자신은 z-index 1 이라 판 위에서는 닫히지 않는다. */
 .solune-shop-page .solune-shop-category-backdrop {
   position: absolute;
-  top: 100%;
+  z-index: 0;
+  top: 0;
   right: 0;
   left: 0;
   height: 100vh;
-  background: color-mix(in srgb, var(--solune-text) 32%, transparent);
+  background: transparent;
 }
+/* 흰 바탕은 본문 폭의 판에만 깐다(좌우 끝까지 흐르는 띠 없음). */
 .solune-shop-page .solune-shop-category-panel {
   position: relative;
   z-index: 1;
   overflow-y: auto;
   max-height: calc(100vh - 7rem);
   padding-block: 28px 40px;
+  border-top: 1px solid var(--solune-border);
+  background: var(--solune-surface);
+  box-shadow: 0 18px 42px color-mix(in srgb, var(--solune-text) 10%, transparent);
 }
 .solune-shop-page .solune-shop-category.is-open .solune-shop-category-panel {
   animation: soluneCatPanelIn 260ms cubic-bezier(0.2, 0.7, 0.2, 1) both;

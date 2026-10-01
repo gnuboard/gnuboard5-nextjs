@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
+import { useState, useEffect } from "react";
 import { useAuthStore } from "@/store/auth";
 import {
   Card,
@@ -13,10 +12,24 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Camera, Loader2 } from "lucide-react";
-import { toastSuccess, toastError } from "@/lib/toast";
-import { shouldBypassImageOptimization } from "@/lib/image";
-import { updateMyProfile, uploadMyIcon } from "@/services/member";
+import type { PublicSettings } from "@/lib/schemas";
+import {
+  deleteMyIcon,
+  deleteMyImage,
+  updateMyProfile,
+  uploadMyIcon,
+  uploadMyImage,
+} from "@/services/member";
+import { getClientPublicSettings } from "@/services/settings";
+import { MemberMediaField } from "./MemberMediaField";
+
+type MemberMedia = NonNullable<PublicSettings["member_media"]>;
+
+/** 관리자 설정에서 켜져 있고 레벨이 되면 보인다. 설정을 아직 못 읽었으면 아이콘은 예전처럼 보인다. */
+function canUse(rule: MemberMedia["icon"] | undefined, level: number, whenUnknown: boolean): boolean {
+  if (!rule) return whenUnknown;
+  return rule.enabled !== false && level >= (rule.level ?? 0);
+}
 
 export default function ProfilePage() {
   const { user, fetchUser } = useAuthStore();
@@ -28,9 +41,7 @@ export default function ProfilePage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [msg, setMsg] = useState({ type: "", text: "" });
   const [loading, setLoading] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [media, setMedia] = useState<MemberMedia | undefined>(undefined);
 
   useEffect(() => {
     if (user) {
@@ -40,34 +51,29 @@ export default function ProfilePage() {
         mb_email: user.mb_email || "",
       });
       setCurrentPassword("");
-      setAvatarUrl(user.mb_icon_path || null);
     }
   }, [user]);
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toastError("이미지 파일만 업로드 가능합니다.");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toastError("파일 크기는 5MB 이하여야 합니다.");
-      return;
-    }
-    setUploadingAvatar(true);
-    try {
-      await uploadMyIcon(file);
-      await fetchUser();
-      // Force refresh avatar with cache buster
-      setAvatarUrl((user?.mb_icon_path || "") + "?t=" + Date.now());
-      toastSuccess("프로필 이미지가 변경되었습니다.");
-    } catch {
-      toastError("프로필 이미지 업로드에 실패했습니다.");
-    } finally {
-      setUploadingAvatar(false);
-      e.target.value = "";
-    }
+  useEffect(() => {
+    let alive = true;
+    getClientPublicSettings()
+      .then((settings) => {
+        if (alive) setMedia(settings.member_media);
+      })
+      .catch(() => {
+        // 설정을 못 읽으면 아이콘만 예전처럼 보인다.
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const level = Number(user?.mb_level ?? 0);
+  const showImage = canUse(media?.image, level, false);
+  const showIcon = canUse(media?.icon, level, true);
+  const initial = (user?.mb_nick || "?")[0].toUpperCase();
+  const refreshUser = async () => {
+    await fetchUser();
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -121,51 +127,40 @@ export default function ProfilePage() {
             </Alert>
           )}
 
-          {/* Avatar */}
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className="h-20 w-20 rounded-full bg-muted overflow-hidden border-2 border-border">
-                {avatarUrl ? (
-                  <Image
-                    src={avatarUrl}
-                    alt="프로필"
-                    width={80}
-                    height={80}
-                    className="h-full w-full object-cover"
-                    unoptimized={shouldBypassImageOptimization(avatarUrl)}
-                  />
-                ) : (
-                  <div className="h-full w-full flex items-center justify-center text-2xl font-bold text-muted-foreground">
-                    {(user?.mb_nick || "?")[0].toUpperCase()}
-                  </div>
-                )}
-              </div>
-              <button
-                type="button"
-                aria-label="프로필 사진 변경"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingAvatar}
-                className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow hover:bg-[#08783a] transition-colors"
-              >
-                {uploadingAvatar ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Camera className="h-3.5 w-3.5" />
-                )}
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleAvatarUpload}
-              />
-            </div>
-            <div className="text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">{user?.mb_id}</p>
-              <p>프로필 이미지를 변경하려면 카메라 아이콘을 클릭하세요.</p>
-            </div>
-          </div>
+          <p className="text-sm font-medium text-foreground">{user?.mb_id}</p>
+
+          {/* 그누보드 회원정보 수정과 같은 두 칸 — 회원이미지(프로필 사진)와 회원아이콘(이름 옆 작은 그림). */}
+          {showImage && (
+            <MemberMediaField
+              label="회원이미지"
+              description="프로필 사진입니다. 회원 카드 · 프로필에 보입니다."
+              url={user?.mb_image_path}
+              fallback={initial}
+              rule={media?.image}
+              shape="circle"
+              previewSize={80}
+              accept="image/gif,image/jpeg,image/png"
+              onUpload={uploadMyImage}
+              onDelete={deleteMyImage}
+              onChanged={refreshUser}
+            />
+          )}
+          {showIcon && (
+            <MemberMediaField
+              label="회원아이콘"
+              description="글 · 댓글에서 이름 옆에 보이는 작은 그림입니다."
+              url={user?.mb_icon_path}
+              fallback={initial}
+              // 아이콘 올리기 API 는 크기(바이트)만 설정을 따르고 폭 · 높이는 자르지 않으므로 용량만 안내한다.
+              rule={{ size: media?.icon?.size }}
+              shape="square"
+              previewSize={48}
+              accept="image/gif,image/jpeg,image/png,image/webp"
+              onUpload={uploadMyIcon}
+              onDelete={deleteMyIcon}
+              onChanged={refreshUser}
+            />
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="mb_nick">닉네임</Label>

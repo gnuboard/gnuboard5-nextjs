@@ -26,6 +26,7 @@ export interface ServerUser {
   mb_level: number;
   mb_point: number;
   mb_icon_path?: string;
+  mb_image_path?: string;
   is_super_admin?: boolean;
 }
 
@@ -62,6 +63,7 @@ export async function getCurrentUser(): Promise<ServerUser | null> {
       mb_level: Number(m.mb_level ?? 0),
       mb_point: Number(m.mb_point ?? 0),
       mb_icon_path: m.mb_icon_path ? String(m.mb_icon_path) : undefined,
+      mb_image_path: m.mb_image_path ? String(m.mb_image_path) : undefined,
       is_super_admin: !!env.data.is_super_admin,
     };
   } catch {

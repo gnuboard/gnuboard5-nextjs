@@ -3,6 +3,11 @@
  * Safe image bridge for board attachments stored below data/file/{bo_table}.
  *
  * GET /v1/board-files/{bo_table}/{wr_id}/{bf_no}/{filename...}
+ *
+ * ?w=400 을 붙이면 그 폭으로 줄인 사본을 준다. 목록 화면은 200~400px 칸에 그림을 놓는데
+ * 원본을 그대로 보내면 한 장이 300KB 를 넘기도 한다(갤러리 여덟 장이 2.4MB 였다).
+ * 줄인 사본은 그누보드 코어의 thumbnail() 이 원본 옆에 만들어 두고 다음부터는 그 파일을 쓴다.
+ * GD 가 없거나 만들지 못하면 원본을 그대로 보낸다 — 설치본 사정이 달라도 그림은 나와야 한다.
  */
 
 if (!defined('_GNUBOARD_')) {
@@ -99,6 +104,21 @@ if ($mime === '' && function_exists('mime_content_type')) {
 
 if ($mime === '' || strpos($mime, 'image/') !== 0) {
     Response::error('Unsupported file type.', 415);
+}
+
+/*
+ * 폭을 지정했으면 그 폭의 사본으로 바꿔 보낸다.
+ *
+ * 폭은 목록이 실제로 쓰는 몇 가지로만 받는다. 아무 숫자나 받으면 사본이 끝없이 쌓이고,
+ * 남이 1~9999 를 훑어 디스크를 채우는 길이 된다. 원본보다 큰 폭은 키울 이유가 없으니 그대로 둔다.
+ * 애니메이션(GIF·WebP)은 줄이면 첫 장면만 남으므로 손대지 않는다.
+ */
+$thumb_width = isset($_GET['w']) ? (int) $_GET['w'] : 0;
+if ($thumb_width > 0 && in_array($thumb_width, api_board_file_thumb_widths(), true)) {
+    $resized = api_board_file_thumbnail($bo_table, $stored_file, $path, $mime, $thumb_width);
+    if ($resized !== '') {
+        $path = $resized;
+    }
 }
 
 $size = filesize($path);

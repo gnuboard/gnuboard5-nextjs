@@ -11,6 +11,8 @@ interface User {
   mb_level: number;
   mb_point: number;
   mb_icon_path?: string;
+  /** 회원이미지(프로필 사진) — 회원아이콘과 다른 그림. 없으면 비어 있다. */
+  mb_image_path?: string;
   // 그누보드 cf_admin 일치 여부. 게시판/그룹 관리자 권한은 board context가 필요해
   // 단건 글 응답의 admin_role / can_manage 필드로 별도 전달.
   is_super_admin?: boolean;
@@ -46,6 +48,7 @@ function normalizeUser(
     mb_level: Number(member.mb_level ?? 0),
     mb_point: Number(member.mb_point ?? 0),
     mb_icon_path: member.mb_icon_path ? String(member.mb_icon_path) : undefined,
+    mb_image_path: member.mb_image_path ? String(member.mb_image_path) : undefined,
     is_super_admin: options.isSuperAdmin,
   };
 }

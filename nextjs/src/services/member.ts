@@ -92,6 +92,21 @@ export function uploadMyIcon(file: File) {
   return apiClient.upload("/members/me/icon", formData);
 }
 
+export function deleteMyIcon() {
+  return apiClient.delete("/members/me/icon");
+}
+
+/** 회원이미지(프로필 사진) — 회원아이콘과 다른 그림. 한도는 설정의 member_media.image. */
+export function uploadMyImage(file: File) {
+  const formData = new FormData();
+  formData.append("mb_img", file);
+  return apiClient.upload("/members/me/image", formData);
+}
+
+export function deleteMyImage() {
+  return apiClient.delete("/members/me/image");
+}
+
 export async function getMemberProfile(mbId: string): Promise<MemberProfile> {
   const response = await apiClient.get<{ member?: unknown }>(
     `/members/${encodeURIComponent(mbId)}/profile`

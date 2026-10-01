@@ -194,15 +194,41 @@ function pg_notify_allowed_ips(string $provider): array {
     return $allowed[$provider] ?? [];
 }
 
-function pg_notify_ip_allowed(string $provider, bool $isTestMode): bool {
-    if ($isTestMode || (getenv('SHOP_PG_NOTIFY_SKIP_IP_CHECK') ?: '') !== '') {
+/**
+ * 입금통보를 보낸 쪽이 그 PG 의 통보 서버인지 본다.
+ *
+ * 이니시스·KCP 통보 처리(payment_status_routes.php)는 POST 로 받은 주문번호와 금액을 그대로
+ * 믿고 주문을 '입금' 으로 바꾼다 — 재조회도 서명 검증도 없다. 보낸 쪽이 진짜 PG 인지 가리는
+ * 것은 이 검사뿐이다.
+ *
+ * 예전에는 테스트모드면 무조건 통과시켰다. 그런데 PG 의 통보 서버 주소는 테스트와 실결제가
+ * 같으므로 느슨하게 둘 이유가 없었고, 오히려 설치 직후(de_card_test=1) 상태의 상점은 아무나
+ * 보낸 통보로 주문이 입금 처리될 수 있었다. 이제 두 모드 모두 목록으로 거른다.
+ *
+ * 목록이 없는 PG 도 거른다(fail closed). 통보를 흉내 내 보는 로컬 시험에서만
+ * SHOP_PG_NOTIFY_SKIP_IP_CHECK 로 명시해서 끈다 — 운영에서는 켜지 말 것.
+ *
+ * 막혔는데 이유를 모르면 손쓸 수 없으니 거른 주소를 남긴다. PG 가 통보 서버를 늘려 목록이
+ * 낡으면 이 기록이 단서가 된다(그때는 pg_notify_allowed_ips 를 고쳐야 한다).
+ */
+function pg_notify_ip_allowed(string $provider): bool {
+    if ((getenv('SHOP_PG_NOTIFY_SKIP_IP_CHECK') ?: '') !== '') {
         return true;
     }
 
-    $remote = $_SERVER['REMOTE_ADDR'] ?? '';
+    $remote = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
     $allowed = pg_notify_allowed_ips($provider);
 
-    return empty($allowed) || in_array($remote, $allowed, true);
+    if ($allowed === [] || !in_array($remote, $allowed, true)) {
+        error_log(sprintf(
+            '[shop-pg] %s 입금통보를 허용 목록에 없는 주소에서 받아 거절했다: %s',
+            $provider,
+            $remote !== '' ? $remote : '(주소 없음)'
+        ));
+        return false;
+    }
+
+    return true;
 }
 
 function pg_text_response(string $text, int $status = 200, string $contentType = 'text/plain; charset=utf-8'): void {

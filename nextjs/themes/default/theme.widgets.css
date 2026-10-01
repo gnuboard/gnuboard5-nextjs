@@ -218,6 +218,7 @@ button.solune-comment-name:hover { color: var(--solune-primary); text-decoration
 .solune-login-links a:hover { color: var(--solune-primary); }
 .solune-member-head { display: flex; align-items: center; gap: 0.75rem; }
 .solune-member-avatar {
+  overflow: hidden;
   display: inline-grid;
   width: 2.75rem;
   height: 2.75rem;
@@ -226,6 +227,12 @@ button.solune-comment-name:hover { color: var(--solune-primary); text-decoration
   border-radius: 50%;
   background: var(--solune-primary);
   color: var(--solune-primary-ink);
+}
+
+.solune-member-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .solune-member-head strong {
   display: block;

@@ -86,10 +86,6 @@ export default function OrderPage() {
               inputClassName={inputClassName}
               {...recipientInfo}
             />
-            <OrderPaymentMethodSection
-              inputClassName={inputClassName}
-              {...paymentMethodSection}
-            />
             {isMemberOrder && (
               <OrderCouponPointSection
                 inputClassName={inputClassName}
@@ -99,7 +95,15 @@ export default function OrderPage() {
             <OrderAgreementsSection {...agreements} />
           </div>
 
-          <OrderSummarySidebar {...summary} />
+          {/* 결제수단은 결제 금액 바로 위 — 레퍼런스 주문서(shop/orderform.sub.php)도
+              #od_pay_sl 을 총 주문금액과 같은 오른쪽 덩어리에 둔다. */}
+          <div className="shop-order-aside min-w-0 space-y-8 lg:col-span-1">
+            <OrderPaymentMethodSection
+              inputClassName={inputClassName}
+              {...paymentMethodSection}
+            />
+            <OrderSummarySidebar {...summary} />
+          </div>
         </div>
       </form>
 

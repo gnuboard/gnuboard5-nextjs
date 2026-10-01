@@ -66,6 +66,7 @@ if (!function_exists('api_auth_member_payload')) {
 
         if (!empty($member['mb_id']) && function_exists('get_member_icon_url')) {
             $payload['mb_icon_path'] = get_member_icon_url((string) $member['mb_id']);
+            $payload['mb_image_path'] = function_exists('get_member_image_url') ? get_member_image_url((string) $member['mb_id']) : null;
         }
 
         $payload['is_super_admin'] = Auth::adminRole($member) === 'super';

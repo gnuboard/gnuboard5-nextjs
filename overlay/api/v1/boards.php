@@ -260,11 +260,14 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'GET') {
                     $fileName = ltrim(str_replace('\\', '/', $r['bf_file']), '/');
                     $filePath = G5_DATA_PATH . '/file/' . $bo_table . '/' . $fileName;
                     if (is_file($filePath)) {
+                        // 목록 썸네일은 작은 칸에 들어간다. 원본을 그대로 내보내면 갤러리
+                        // 한 화면이 수 MB 가 된다(실측 여덟 장 2.4MB). 줄인 사본을 가리킨다.
                         $thumbByWr[(int) $r['wr_id']] = api_board_file_url(
                             $bo_table,
                             (int) $r['wr_id'],
                             (int) $r['bf_no'],
-                            $fileName
+                            $fileName,
+                            400
                         );
                     }
                 }

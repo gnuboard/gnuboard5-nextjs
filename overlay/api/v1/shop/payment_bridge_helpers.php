@@ -585,13 +585,37 @@ function pg_kcp_return_field(array $input, array $keys, string $default = ''): s
 // youngcart / gnuboard 는 그대로 허용(하위 호환) — 바뀌는 것은 app_scheme 누락·미허용 시의 폴백 대상뿐.
 const PG_ALLOWED_APP_SCHEMES = ['youngcart', 'gnuboard', 'sirsoft-g5'];
 const PG_DEFAULT_APP_SCHEME = 'sirsoft-g5://';
+// 앱 스킴으로 쓰면 결제 결과가 웹 주소·스크립트로 새는 이름 — 설정에 적혀 있어도 받지 않는다.
+const PG_REJECTED_APP_SCHEMES = ['http', 'https', 'javascript', 'data', 'file', 'intent', 'about'];
+
+function pg_scheme_name(string $raw): string {
+    $trimmed = trim($raw);
+    return strtolower(rtrim(strstr($trimmed, ':', true) ?: $trimmed, ':'));
+}
+
+/**
+ * 허용 앱 스킴 = 기본 목록 + `G5_SOCIAL_MOBILE_SCHEMES`(쉼표 목록, api/.env·상수·서버 환경변수).
+ * 내 사이트 앱(gnuboard5-app brand.json 의 scheme 을 바꾼 앱)은 소셜 로그인과 같은 이 설정 하나로 결제 복귀도 허용된다.
+ */
+function pg_allowed_app_schemes(): array {
+    $configured = function_exists('g5_api_config_value')
+        ? g5_api_config_value('G5_SOCIAL_MOBILE_SCHEMES')
+        : (string) getenv('G5_SOCIAL_MOBILE_SCHEMES');
+    $schemes = PG_ALLOWED_APP_SCHEMES;
+    foreach (explode(',', $configured) as $item) {
+        $scheme = pg_scheme_name($item);
+        if (preg_match('/^[a-z][a-z0-9.+-]*$/', $scheme) && !in_array($scheme, PG_REJECTED_APP_SCHEMES, true)) {
+            $schemes[] = $scheme;
+        }
+    }
+    return array_values(array_unique($schemes));
+}
 
 function pg_normalize_app_scheme(string $raw): string {
-    $trimmed = trim($raw);
-    if ($trimmed === '') return PG_DEFAULT_APP_SCHEME;
+    if (trim($raw) === '') return PG_DEFAULT_APP_SCHEME;
 
-    $schemeOnly = strtolower(rtrim(strstr($trimmed, ':', true) ?: $trimmed, ':'));
-    if (!in_array($schemeOnly, PG_ALLOWED_APP_SCHEMES, true)) {
+    $schemeOnly = pg_scheme_name($raw);
+    if (!in_array($schemeOnly, pg_allowed_app_schemes(), true)) {
         return PG_DEFAULT_APP_SCHEME;
     }
     return $schemeOnly . '://';

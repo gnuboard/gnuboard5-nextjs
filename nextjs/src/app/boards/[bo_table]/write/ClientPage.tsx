@@ -12,6 +12,7 @@ import { runtimeRouterReplace } from "@/lib/runtime-router";
 import { useAuthStore } from "@/store/auth";
 import { getClientPublicSettings } from "@/services/settings";
 import type { Board, WritePost } from "@/lib/types";
+import { canWriteToBoard } from "@/lib/board-permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -352,6 +353,26 @@ export default function WritePage({ boTable: fallbackBoTable }: WritePageProps) 
         <div aria-hidden="true" className="skeleton h-11 w-full rounded-md" />
         <div aria-hidden="true" className="skeleton h-72 w-full rounded-lg" />
         <div aria-hidden="true" className="skeleton h-10 w-24 rounded-md" />
+      </div>
+    );
+  }
+
+  // 새 글 · 답글은 들어올 때 권한을 본다 — 다 쓰고 저장을 누른 뒤에야 거절당하지 않게(그누보드 write.php 와 같다).
+  // 글 수정은 게시판 레벨이 아니라 글쓴이 · 관리자 여부로 정해지므로 여기서 막지 않는다(서버가 판단).
+  const writeKind = replyTo || Number(searchParams.get("reply_to") || "0") > 0 ? "reply" : "write";
+  if (board && !isEdit && !canWriteToBoard(board, user, writeKind)) {
+    return (
+      <div className="board-write-page container mx-auto px-4 py-8">
+        <Alert variant="destructive">
+          <AlertDescription>
+            {writeKind === "reply" ? "이 게시판에 답글을 쓸 권한이 없습니다." : "이 게시판에 글을 쓸 권한이 없습니다."}
+          </AlertDescription>
+        </Alert>
+        <div className="mt-4">
+          <Button asChild variant="outline">
+            <a href={g5ShortHref(`/boards/${boTable || routeBoTable}`)}>목록으로</a>
+          </Button>
+        </div>
       </div>
     );
   }

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { G5Link as Link } from "@/components/ui/g5-link";
 import { useSearchParams } from "next/navigation";
 import type { Board, WritePost } from "@/lib/types";
+import { canWriteToBoard } from "@/lib/board-permissions";
+import { useAuthStore } from "@/store/auth";
 import { GALLERY_BOARDS } from "@/lib/config";
 import { cn, formatDate } from "@/lib/utils";
 import { applyClientPageMetadata } from "@/lib/client-metadata";
@@ -78,6 +80,7 @@ export default function BoardPostListClient({ boTable, embedded = false, current
   );
 
   const [board, setBoard] = useState<Board | null>(null);
+  const authUser = useAuthStore((state) => state.user);
   const [postsData, setPostsData] = useState<PostsState>(EMPTY_POSTS);
   const [bbsRewriteMode, setBbsRewriteMode] = useState(0);
   const [infiniteScroll, setInfiniteScroll] = useState(false);
@@ -230,9 +233,11 @@ export default function BoardPostListClient({ boTable, embedded = false, current
             </p>
           </div>
           <div className="board-list-actions flex items-center gap-2">
-            <Button className="board-list-write" asChild>
-              <a href={g5ShortHref(`/boards/${bo_table}/write`)}>글쓰기</a>
-            </Button>
+            {canWriteToBoard(board, authUser) && (
+              <Button className="board-list-write" asChild>
+                <a href={g5ShortHref(`/boards/${bo_table}/write`)}>글쓰기</a>
+              </Button>
+            )}
           </div>
         </div>
       </section>

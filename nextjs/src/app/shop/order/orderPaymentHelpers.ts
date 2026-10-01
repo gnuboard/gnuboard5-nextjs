@@ -92,7 +92,19 @@ export function isPaymentMethodEnabled(
   return false;
 }
 
-export type EasyPayOption = { service: string; label: string; src: string };
+export type EasyPayOption = {
+  service: string;
+  label: string;
+  src: string;
+  /** 칸에는 로고만 보이므로, 어느 PG 의 무엇인지는 포인터를 올렸을 때 뜨는 이 글로 알린다. */
+  title?: string;
+};
+
+/* 영카트 주문서(shop/orderform.sub.php)가 label 의 title 에 적는 표기와 같은 말로 맞춘다. */
+const EASY_PAY_GATEWAY_LABEL: Record<string, string> = {
+  kcp: "NHN_KCP",
+  nicepay: "NICEPAY",
+};
 
 /* 간편결제 서비스를 따로 고를 수 있는 PG 와 그 서비스들. 순서는 서버의 대표 서비스(pg_primary_easy_pay_service)
    고르는 순서와 같아 첫 칸이 곧 기본값이다. 영카트 주문서(orderform.sub.php)도 KCP · NICEPAY 일 때만 서비스마다
@@ -119,7 +131,10 @@ const EASY_PAY_SERVICES: Record<string, EasyPayOption[]> = {
 export function easyPayOptions(config: Pick<PaymentConfig, "pg_service" | "easy_pay_services"> | null): EasyPayOption[] {
   if (!config) return [];
   const enabled = new Set(config.easy_pay_services || []);
-  return (EASY_PAY_SERVICES[config.pg_service] || []).filter((option) => enabled.has(option.service));
+  const gateway = EASY_PAY_GATEWAY_LABEL[config.pg_service] ?? config.pg_service.toUpperCase();
+  return (EASY_PAY_SERVICES[config.pg_service] || [])
+    .filter((option) => enabled.has(option.service))
+    .map((option) => ({ ...option, title: `${gateway} - ${option.label}` }));
 }
 
 /**

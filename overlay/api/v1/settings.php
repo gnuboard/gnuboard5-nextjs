@@ -260,4 +260,25 @@ if ($company !== null) {
     $publicSettings['company'] = $company;
 }
 
+// 회원아이콘 · 회원이미지 — 관리자 > 기본환경설정 > 회원가입. 마이페이지가 쓸 수 있는지 · 한도를 보여 줄 때 쓴다.
+// 크기 한도(size)는 바이트, 폭 · 높이는 px. 레벨(level) 이상 회원만 올릴 수 있다.
+$publicSettings['member_media'] = [
+    'icon' => [
+        'enabled' => !empty($config['cf_use_member_icon']),
+        'level'   => (int) ($config['cf_icon_level'] ?? 0),
+        'size'    => (int) ($config['cf_member_icon_size'] ?? 0),
+        'width'   => (int) ($config['cf_member_icon_width'] ?? 0),
+        'height'  => (int) ($config['cf_member_icon_height'] ?? 0),
+    ],
+    'image' => [
+        'enabled' => (int) ($config['cf_member_img_size'] ?? 0) > 0
+            && (int) ($config['cf_member_img_width'] ?? 0) > 0
+            && (int) ($config['cf_member_img_height'] ?? 0) > 0,
+        'level'   => (int) ($config['cf_icon_level'] ?? 0),
+        'size'    => (int) ($config['cf_member_img_size'] ?? 0),
+        'width'   => (int) ($config['cf_member_img_width'] ?? 0),
+        'height'  => (int) ($config['cf_member_img_height'] ?? 0),
+    ],
+];
+
 Response::success($publicSettings);

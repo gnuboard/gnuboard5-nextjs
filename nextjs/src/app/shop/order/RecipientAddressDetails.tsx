@@ -15,7 +15,6 @@ type RecipientAddressDetailsProps = {
   addressSelection: AddressSelection;
   recipient: AddressForm;
   updateRecipient: AddressFieldUpdater;
-  openPostcode: (target: PostcodeTarget) => void;
   isMemberOrder: boolean;
   saveAsNewAddress: boolean;
   setSaveAsNewAddress: (checked: boolean) => void;
@@ -30,7 +29,6 @@ export function RecipientAddressDetails({
   addressSelection,
   recipient,
   updateRecipient,
-  openPostcode,
   isMemberOrder,
   saveAsNewAddress,
   setSaveAsNewAddress,
@@ -49,7 +47,6 @@ export function RecipientAddressDetails({
           address={recipient}
           updateAddress={updateRecipient}
           postcodeTarget="recipient"
-          openPostcode={openPostcode}
         />
       </div>
 

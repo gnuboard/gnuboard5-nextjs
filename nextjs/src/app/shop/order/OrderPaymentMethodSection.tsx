@@ -1,6 +1,5 @@
 "use client";
 
-import { ArrowLeftRight, Banknote, CreditCard, Landmark, Smartphone, Wallet, type LucideIcon } from "lucide-react";
 import { g5PathForRuntime } from "@/lib/config";
 import {
   PAYMENT_METHODS,
@@ -11,34 +10,55 @@ import {
   type PaymentConfig,
 } from "./orderPaymentHelpers";
 
-/* 결제수단 칸의 아이콘. 영카트 주문서처럼 칸마다 무엇인지 그림으로도 알린다. */
-const PAY_METHOD_ICONS: Record<string, LucideIcon> = {
-  bank: Landmark,
-  card: CreditCard,
-  vbank: Banknote,
-  iche: ArrowLeftRight,
-  hp: Smartphone,
-  easy_pay: Wallet,
-  kakaopay: Wallet,
+/*
+ * 결제수단 칸의 아이콘.
+ *
+ * 영카트 주문서(shop/orderform.sub.php)는 라벨에 .bank_icon 같은 클래스를 붙이고 테마 CSS 가
+ * 설치본 img/ 의 그림을 배경으로 깐다. 같은 화면으로 보이려면 같은 그림을 써야 하므로, 여기서도
+ * 그 파일을 그대로 가리킨다 — 그누보드 설치본이면 어디에나 있는 것들이다.
+ * 간편결제 브랜드 로고도 이미 같은 방식이다(orderPaymentHelpers 의 EASY_PAY_SERVICES).
+ */
+const PAY_METHOD_ICONS: Record<string, string> = {
+  bank: "/img/pay_icon1.png",
+  vbank: "/img/pay_icon2.png",
+  iche: "/img/pay_icon2.png",
+  hp: "/img/pay_icon3.png",
+  card: "/img/pay_icon4.png",
+  kakaopay: "/img/kakao.png",
 };
 
 const TILE_CLASS =
-  "shop-pay-method flex min-w-0 items-center gap-2.5 whitespace-normal break-words rounded-md border px-2 py-3 text-left text-sm font-medium leading-snug transition-colors sm:px-3";
+  "shop-pay-method flex min-h-[58px] min-w-0 items-center gap-2.5 whitespace-normal break-keep rounded-[9px] border px-3 py-2 text-left text-[0.8125rem] font-medium leading-snug transition-colors";
 
 function tileStateClass(pressed: boolean) {
-  return pressed ? "border-primary bg-primary/5 text-primary" : "hover:bg-accent";
+  return pressed
+    ? "border-primary bg-primary/5 font-bold text-primary shadow-[inset_0_0_0_1px_var(--color-primary)]"
+    : "border-border hover:border-foreground/40 hover:bg-accent";
 }
 
-/** 간편결제 서비스 한 칸 — 브랜드 로고만 보이고 이름은 로고의 alt 로 읽힌다(영카트 주문서와 같다). */
+/**
+ * 간편결제 서비스 한 칸 — 브랜드 로고만 보이고 이름은 로고의 alt 로 읽힌다(영카트 주문서와 같다).
+ *
+ * 로고 파일은 브랜드마다 가로세로 비율도, 그림 둘레의 여백도 제각각이다. 높이만 맞춰 두면
+ * (h-4 w-auto) 가로가 제멋대로 늘어나 어떤 칸은 글자가 깨알같고 어떤 칸은 칸을 꽉 채운다.
+ * 그래서 로고마다 같은 크기의 상자를 주고 그 안에서 비율을 지켜 맞춘다(object-contain).
+ * 로고만 봐서는 어느 PG 의 무엇인지 모르니 title 로 알린다 — 영카트 주문서도 같다.
+ */
 function EasyPayServiceTile({ option, pressed, onSelect }: { option: EasyPayOption; pressed: boolean; onSelect: () => void }) {
   return (
     <button
       type="button"
       onClick={onSelect}
       aria-pressed={pressed}
+      title={option.title ?? option.label}
       className={`${TILE_CLASS} shop-pay-method--brand justify-center ${tileStateClass(pressed)}`}
     >
-      <img src={g5PathForRuntime(option.src)} alt={option.label} className="shop-pay-method-logo h-4 w-auto" loading="lazy" />
+      <img
+        src={g5PathForRuntime(option.src)}
+        alt={option.label}
+        className="shop-pay-method-logo max-h-6 w-full max-w-[88px] object-contain"
+        loading="lazy"
+      />
     </button>
   );
 }
@@ -76,7 +96,8 @@ export function OrderPaymentMethodSection({
       <div className="mb-4">
         <h2 className="text-lg font-bold">결제 수단</h2>
       </div>
-      <div className="shop-pay-methods grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+      {/* 오른쪽 좁은 칸에 들어가므로 두 칸 격자로 둔다 — 레퍼런스 주문서의 #sod_frm_paysel 과 같다. */}
+      <div className="shop-pay-methods grid min-w-0 grid-cols-2 gap-2.5">
         {PAYMENT_METHODS.filter((method) =>
           isPaymentMethodEnabled(method, paymentConfig)
         ).map((method) => {
@@ -96,24 +117,35 @@ export function OrderPaymentMethodSection({
               />
             ));
           }
-          const Icon = PAY_METHOD_ICONS[method.value] ?? Wallet;
+          const iconSrc = PAY_METHOD_ICONS[method.value];
           const pressed = paymentMethod === method.value;
+          const label =
+            method.value === "easy_pay"
+              ? easyPayButtonLabel(paymentConfig?.easy_pay_services)
+              : method.label;
           return (
             <button
               key={method.value}
               type="button"
               onClick={() => setPaymentMethod(method.value)}
               aria-pressed={pressed}
-              className={`${TILE_CLASS} ${tileStateClass(pressed)}`}
+              title={label}
+              className={`${TILE_CLASS} ${tileStateClass(pressed)} ${
+                /* 그림이 없는 수단(서비스를 못 고르는 PG 의 "간편결제" 한 칸)은 이름을
+                   가운데 둔다 — 왼쪽에 두면 그림이 빠진 자리처럼 보인다. */
+                iconSrc ? "" : "justify-center text-center"
+              }`}
             >
-              <span className="shop-pay-method-icon grid h-9 w-9 shrink-0 place-items-center rounded-md bg-muted" aria-hidden>
-                <Icon size={18} strokeWidth={1.7} />
-              </span>
-              <span className="shop-pay-method-label min-w-0">
-                {method.value === "easy_pay"
-                  ? easyPayButtonLabel(paymentConfig?.easy_pay_services)
-                  : method.label}
-              </span>
+              {iconSrc ? (
+                <img
+                  src={g5PathForRuntime(iconSrc)}
+                  alt=""
+                  aria-hidden
+                  className="shop-pay-method-icon h-7 w-9 shrink-0 object-contain"
+                  loading="lazy"
+                />
+              ) : null}
+              <span className="shop-pay-method-label min-w-0">{label}</span>
             </button>
           );
         })}

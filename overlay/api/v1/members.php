@@ -99,11 +99,16 @@ if ($seg0 === 'me' && $apiMethod === 'GET') {
     // Return full member info minus sensitive fields
     $safeData = api_member_safe($member);
     $safeData['mb_icon_path'] = get_member_icon_url($member['mb_id']);
+    $safeData['mb_image_path'] = get_member_image_url($member['mb_id']);
 
     Response::success([
         'member' => $safeData,
     ]);
 }
+
+// 회원이미지 올리기 · 지우기, 회원아이콘 지우기 (그누보드 회원정보 수정과 같은 규칙).
+// PATCH /me · DELETE /me(탈퇴) 는 두 번째 경로를 보지 않으므로 반드시 그보다 먼저 둔다.
+require_once __DIR__ . '/members_media_routes.php';
 
 // -------------------------------------------------------------------------
 // POST /v1/members/me/legal-consent — 약관·개인정보처리방침 동의 기록
@@ -347,6 +352,7 @@ if ($seg0 === 'me' && $apiMethod === 'PATCH') {
 
     $safeData = api_member_safe($updated);
     $safeData['mb_icon_path'] = get_member_icon_url($member['mb_id']);
+    $safeData['mb_image_path'] = get_member_image_url($member['mb_id']);
 
     Response::success([
         'member' => $safeData,
