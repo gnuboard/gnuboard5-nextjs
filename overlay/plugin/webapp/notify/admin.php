@@ -36,7 +36,7 @@ if (!function_exists('dday_nt_admin_menu')) {
     {
         $admin_menu['menu100'][] = array(
             '100950',
-            '디데이 알림 현황',
+            '알림 현황',
             G5_ADMIN_URL . '/view.php?call=dday_notifications',
             'dday_notifications'
         );

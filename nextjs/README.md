@@ -155,9 +155,9 @@ runtime will fall back to `NEXT_PUBLIC_API_URL`. Set a different
 `G5_API_INTERNAL_URL` only when the server can reach a private origin, internal
 DNS name, or closer proxy that browsers should not see.
 
-`npm run check:api-vercel-env` verifies that every Vercel theme project listed
-in `nextjs/vercel-theme-map.json` is also present in the public API example
-allowlists in `overlay/api/env.example`.
+When the front end runs on Vercel, add the Vercel address to
+`G5_CORS_ALLOWED_ORIGINS` and `G5_SOCIAL_WEB_HOSTS` in the Gnuboard site's
+`api/.env` (see the commented examples in `overlay/api/env.example`).
 
 GitHub Actions uses repository variables for the same live endpoints. Configure
 these under `Settings > Secrets and variables > Actions > Variables`:

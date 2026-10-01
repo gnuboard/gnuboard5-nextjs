@@ -101,7 +101,9 @@ function CartLink() {
 
   // greenhub 의 CartButton 과 같은 방식: 첫 마운트와 cart:changed 이벤트에서 다시 센다.
   useEffect(() => {
-    void fetchCart();
+    // 붙는 순간에는 "지금 담긴 수"만 필요하다. 머리글 카트가 둘(앱 머리글·쇼핑 머리글)이라
+    // 같은 요청이 두 번 나갔다. 변경 알림에는 그대로 강제로 다시 받는다.
+    void fetchCart({ dedupe: true });
     const onChanged = () => void fetchCart();
     window.addEventListener("cart:changed", onChanged);
     return () => window.removeEventListener("cart:changed", onChanged);

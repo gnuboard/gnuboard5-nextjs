@@ -415,10 +415,12 @@ function sanitizeNextjsPackageJson(path) {
     //   check:runtime-config — 원본에서도 고장(모듈 로딩 require 오류), 원본에서 고친 뒤 되돌린다
     //   check:file-size — 원본의 리팩터링 과제 추적
     //   check:public-branches — 공개 저장소 로컬 경로 · 브랜치 동기화 확인용 개발 도구
+    //   check:api-vercel-env — 관리자가 운영하는 Vercel 프로젝트 주소가 env.example 에 켜져 있는지 본다.
+    //     공개판 env.example 은 모든 값을 주석으로 둔 사용자용 예시라(publisher.mjs) 맞지 않는다.
     json.scripts['check:code'] = [
       'typecheck:themes', 'lint', 'test:sanitize', 'test:order', 'test:payment',
       'check:theme-pair', 'check:theme-manifest', 'check:theme-routes', 'check:deploy-config',
-      'check:vercel-configs', 'check:api-vercel-env', 'check:route-runtime-policy', 'check:safe-html',
+      'check:vercel-configs', 'check:route-runtime-policy', 'check:safe-html',
       'check:bridge-diagnostics', 'check:scripts', 'check:static-export-guards', 'check:dependency-ranges',
       'check:secret-scan', 'check:php-vendors', 'check:php-syntax', 'check:audit',
     ].map((name) => `npm run ${name}`).join(' && ');
@@ -797,9 +799,9 @@ runtime will fall back to \`NEXT_PUBLIC_API_URL\`. Set a different
 \`G5_API_INTERNAL_URL\` only when the server can reach a private origin, internal
 DNS name, or closer proxy that browsers should not see.
 
-\`npm run check:api-vercel-env\` verifies that every Vercel theme project listed
-in \`nextjs/vercel-theme-map.json\` is also present in the public API example
-allowlists in \`overlay/api/env.example\`.
+When the front end runs on Vercel, add the Vercel address to
+\`G5_CORS_ALLOWED_ORIGINS\` and \`G5_SOCIAL_WEB_HOSTS\` in the Gnuboard site's
+\`api/.env\` (see the commented examples in \`overlay/api/env.example\`).
 
 GitHub Actions uses repository variables for the same live endpoints. Configure
 these under \`Settings > Secrets and variables > Actions > Variables\`:

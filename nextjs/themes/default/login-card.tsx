@@ -3,13 +3,14 @@
 import { LogOut, Settings, UserRound } from "lucide-react";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { G5Link as Link } from "@/components/ui/g5-link";
-import { g5PathForRuntime } from "@/lib/config";
+import { g5BaseUrlForRuntime, g5PathForRuntime } from "@/lib/config";
 import { formatNumber } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth";
 import { useRuntimeLocation } from "./use-runtime-pathname";
 
 /* 소셜 단추 로고 — 그누보드가 skin/social/img 에 두는 30px 그림을 레퍼런스(#sns_login)처럼 쓴다.
-   CSS 의 url() 은 설치 폴더를 모르므로 여기서 설치 경로를 붙여 변수로 넘긴다. */
+   CSS 의 url() 은 그림이 어디 있는지 모르므로 그누보드 주소를 붙여 변수로 넘긴다. 화면이
+   그누보드와 다른 주소(Vercel)에서 떠도 그림은 그누보드에서 받아야 한다. */
 const SNS_LOGO_FILES = {
   naver: "sns_naver_s.png",
   kakao: "sns_kakao_s.png",
@@ -22,7 +23,7 @@ const SNS_LOGO_FILES = {
 function snsLogoVars(): React.CSSProperties {
   const vars: Record<string, string> = {};
   for (const [name, file] of Object.entries(SNS_LOGO_FILES)) {
-    vars[`--solune-sns-${name}`] = `url("${g5PathForRuntime(`/skin/social/img/${file}`)}")`;
+    vars[`--solune-sns-${name}`] = `url("${g5BaseUrlForRuntime()}/skin/social/img/${file}")`;
   }
   return vars as React.CSSProperties;
 }

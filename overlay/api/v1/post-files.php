@@ -313,9 +313,11 @@ function post_files_allowed_extension($extension)
         array('svg', 'svgz')
     );
     $documentExtensions = array(
-        'pdf', 'txt', 'csv', 'zip',
+        'pdf', 'txt', 'csv',
         'hwp', 'hwpx',
         'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+        // 압축 — 앱 첨부 "파일(문서·압축)"과 같은 목록(앱 entities/postFile/attachmentRules.ts, 2026-09-30).
+        'zip', '7z', 'rar', 'alz', 'egg', 'tar', 'gz', 'tgz',
     );
 
     return in_array($extension, array_merge($imageExtensions, $documentExtensions), true);
@@ -418,6 +420,14 @@ function post_files_allowed_mime(string $extension, string $mime, $imgInfo): boo
             'application/vnd.openxmlformats-officedocument.presentationml.presentation',
             'application/zip',
         ),
+        // 압축(2026-09-30) — finfo 가 알아보는 형식과, 알아보지 못할 때의 octet-stream.
+        '7z'   => array('application/octet-stream', 'application/x-7z-compressed'),
+        'rar'  => array('application/octet-stream', 'application/vnd.rar', 'application/x-rar', 'application/x-rar-compressed'),
+        'alz'  => array('application/octet-stream'),
+        'egg'  => array('application/octet-stream'),
+        'tar'  => array('application/octet-stream', 'application/x-tar'),
+        'gz'   => array('application/octet-stream', 'application/gzip', 'application/x-gzip'),
+        'tgz'  => array('application/octet-stream', 'application/gzip', 'application/x-gzip'),
     );
 
     return isset($documentMimes[$extension])

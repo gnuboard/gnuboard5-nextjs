@@ -9,13 +9,30 @@ interface CartState {
   totalPrice: number;
   totalPoint: number;
   totalQty: number;
-  fetchCart: () => Promise<void>;
+  /**
+   * 장바구니를 다시 받는다. 기본은 늘 새로 받는다 — 담기·수량 변경 직후에는 방금 보낸
+   * 변경이 반영된 값이어야 하므로 진행 중인 요청을 물려받아서는 안 된다.
+   * `dedupe` 는 화면이 뜰 때처럼 "지금 상태가 필요할 뿐"인 경우에만 쓴다.
+   */
+  fetchCart: (options?: { dedupe?: boolean }) => Promise<void>;
   addItem: (it_id: string, qty: number, options?: ShopItemOption[]) => Promise<void>;
   updateQty: (ct_id: number, qty: number) => Promise<void>;
   removeItem: (ct_id: number) => Promise<void>;
   clearCart: () => Promise<void>;
   resetLocalCart: () => void;
 }
+
+/** 진행 중인 /shop/cart 요청. dedupe 를 부탁한 호출만 이것을 물려받는다. */
+let cartFetchInFlight: Promise<void> | null = null;
+/** 마지막으로 받아온 시각. */
+let cartFetchedAt = 0;
+/*
+ * 화면 이동으로 쇼핑 화면에 들어오면 머리글 카트가 두 번 붙는데 그 간격이 150ms 쯤이고
+ * 요청은 50ms 면 끝난다 — 겹치지 않으므로 "진행 중인 것 물려주기"만으로는 두 번 나간다.
+ * 그래서 dedupe 호출은 방금 받은 값이 있으면 아예 다시 받지 않는다. 담기·수량 변경은
+ * dedupe 를 쓰지 않으니 이 창에 걸리지 않는다.
+ */
+const CART_DEDUPE_WINDOW_MS = 1_000;
 
 function calculateTotals(items: CartItem[]) {
   return {
@@ -36,19 +53,34 @@ export const useCartStore = create<CartState>((set, get) => ({
   totalPoint: 0,
   totalQty: 0,
 
-  fetchCart: async () => {
-    set({ isLoading: true, fetchError: null });
-    try {
-      const res = await api.get<{ items: CartItem[]; total_price: number; total_qty: number }>('/shop/cart');
-      const data = res.data;
-      const items = data?.items || [];
-      set({ items, isLoading: false, fetchError: null, ...calculateTotals(items) });
-    } catch {
-      set({
-        isLoading: false,
-        fetchError: '장바구니를 불러오지 못했습니다. 네트워크 상태를 확인해 주세요.',
-      });
+  fetchCart: (options) => {
+    if (options?.dedupe) {
+      if (cartFetchInFlight) return cartFetchInFlight;
+      if (Date.now() - cartFetchedAt < CART_DEDUPE_WINDOW_MS) return Promise.resolve();
     }
+
+    const run = (async () => {
+      set({ isLoading: true, fetchError: null });
+      try {
+        const res = await api.get<{ items: CartItem[]; total_price: number; total_qty: number }>('/shop/cart');
+        const data = res.data;
+        const items = data?.items || [];
+        cartFetchedAt = Date.now();
+        set({ items, isLoading: false, fetchError: null, ...calculateTotals(items) });
+      } catch {
+        set({
+          isLoading: false,
+          fetchError: '장바구니를 불러오지 못했습니다. 네트워크 상태를 확인해 주세요.',
+        });
+      }
+    })();
+
+    cartFetchInFlight = run;
+    void run.finally(() => {
+      if (cartFetchInFlight === run) cartFetchInFlight = null;
+    });
+
+    return run;
   },
 
   addItem: async (it_id: string, qty: number, options?: ShopItemOption[]) => {

@@ -87,12 +87,14 @@ export function getShopBanners(
 }
 
 export function getShopPopups(
-  params: { device?: "pc" | "mobile" | "all"; limit?: number } = {},
+  params: { device?: "pc" | "mobile" | "all"; limit?: number; division?: "shop" | "comm" } = {},
   revalidate = 60
 ): Promise<ShopPopup[]> {
   const query = new URLSearchParams();
   query.set("device", params.device || "all");
   query.set("limit", String(params.limit || 5));
+  // 팝업레이어관리의 구분. comm = 커뮤니티 화면, 기본은 쇼핑몰. 둘 다(both)인 팝업은 어느 쪽에도 나온다.
+  if (params.division === "comm") query.set("division", "comm");
   const suffix = `?${query.toString()}`;
 
   return fetchApiData(apiUrl(`/shop/popups${suffix}`), shopPopupListSchema, [], {

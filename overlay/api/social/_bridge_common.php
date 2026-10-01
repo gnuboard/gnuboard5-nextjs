@@ -243,7 +243,8 @@ if (!function_exists('nextjs25_social_add_allowed_schemes')) {
 if (!function_exists('nextjs25_social_allowed_mobile_schemes')) {
     function nextjs25_social_allowed_mobile_schemes()
     {
-        $schemes = array('dday-app');
+        // sirsoft-g5 = 공식 그누보드5 앱(gnuboard5-app). 다른 앱은 G5_SOCIAL_MOBILE_SCHEMES 로 더한다.
+        $schemes = array('sirsoft-g5');
 
         if (defined('G5_SOCIAL_MOBILE_SCHEMES') && G5_SOCIAL_MOBILE_SCHEMES) {
             nextjs25_social_add_allowed_schemes($schemes, G5_SOCIAL_MOBILE_SCHEMES);
@@ -496,7 +497,7 @@ if (!function_exists('nextjs25_social_oauth_use_popup')) {
 if (!function_exists('nextjs25_social_redirect_to_register_url')) {
     function nextjs25_social_redirect_to_register_url($redirect)
     {
-        // 모바일 앱 콜백(dday-app://social-callback?state=…)은 그대로 돌려준다.
+        // 모바일 앱 콜백(sirsoft-g5://social-callback?state=… 같은 앱 스킴 주소)은 그대로 돌려준다.
         // 앱은 같은 콜백에서 ticket / social_signup_ticket 파라미터로 로그인·가입을
         // 구분하고, 콜백 base URL 과 state 가 바뀌면 검증에서 거부한다.
         if (nextjs25_social_validate_mobile_redirect($redirect) !== '') {

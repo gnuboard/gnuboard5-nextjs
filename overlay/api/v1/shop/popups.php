@@ -46,6 +46,8 @@ if ($apiMethod === 'GET') {
     }
 
     $devicePlaceholders = implode(',', array_fill(0, count($devices), '?'));
+    // 팝업레이어관리의 "구분" — comm(커뮤니티) · shop(쇼핑몰) · both. 값을 안 주면 예전처럼 쇼핑몰.
+    $division = strtolower(trim((string) ($_GET['division'] ?? 'shop'))) === 'comm' ? 'comm' : 'shop';
     $popupTable = DB::table('new_win_table');
     $rows = DB::fetchAll(
         "SELECT nw_id, nw_division, nw_device, nw_begin_time, nw_end_time, nw_disable_hours,
@@ -53,10 +55,10 @@ if ($apiMethod === 'GET') {
            FROM {$popupTable}
           WHERE NOW() BETWEEN nw_begin_time AND nw_end_time
             AND nw_device IN ({$devicePlaceholders})
-            AND nw_division IN ('both', 'shop')
+            AND nw_division IN ('both', ?)
           ORDER BY nw_id ASC
           LIMIT ?",
-        array_merge($devices, [$limit])
+        array_merge($devices, [$division, $limit])
     );
 
     Response::success(array_map('api_shop_popup_summary', $rows));

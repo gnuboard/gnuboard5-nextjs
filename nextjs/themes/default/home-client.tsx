@@ -14,6 +14,7 @@ import {
 } from "./home-widgets";
 import { SoluneLoginCard } from "./login-card";
 import { SolunePollWidget } from "./poll-widget";
+import { SoluneSitePopups } from "./site-popups";
 import {
   SoluneGalleryPanelSkeleton,
   SolunePanelSkeleton,
@@ -129,6 +130,7 @@ export function SoluneHomeClient({ config, initialHome, initialExtras }: SoluneH
           <SoluneVisitWidgetSkeleton />
         ) : null}
       </aside>
+      <SoluneSitePopups division="comm" />
     </div>
   );
 }

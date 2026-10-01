@@ -22,6 +22,21 @@ NProgress.configure({
   speed: 320,
 } as Partial<NProgress.NProgressOptions> & { trickleRate: number });
 
+/*
+ * 누른 자리에서 이만큼 넘게 움직인 뒤 놓았으면 끌기로 본다. 손가락·마우스가 링크를 누를 때
+ * 몇 픽셀 흔들리는 것은 클릭이므로 문턱을 아주 낮게 두면 진짜 클릭을 놓친다.
+ */
+const DRAG_THRESHOLD_PX = 10;
+
+/** 눌린 자리를 끌기 판정에 쓰는 유효 시간. 이보다 오래된 것은 지금 클릭과 무관하다. */
+const POINTER_DOWN_STALE_MS = 2_000;
+
+/*
+ * 클릭이 실제 이동으로 이어지기를 기다리는 시간. 클라이언트 이동은 재보면 90~105ms 에
+ * pushState 를 부르고, 문서 이동은 beforeunload 가 온다. 둘 다 없으면 이동하지 않는 클릭이다.
+ */
+const NAVIGATION_WATCHDOG_MS = 700;
+
 function getUrl(value: string | URL | null | undefined) {
   if (!value) {
     return null;
@@ -81,6 +96,11 @@ export function PageLoadingProvider() {
   const finishTimer = useRef<number | null>(null);
   const historyTimer = useRef<number | null>(null);
   const submitTimer = useRef<number | null>(null);
+  // 클릭으로 시작한 막대가 정말 이동으로 이어졌는지 지켜보는 타이머와 그 신호.
+  const watchdogTimer = useRef<number | null>(null);
+  const navigatedRef = useRef(false);
+  // 누른 자리. 여기서 멀리 끌고 간 뒤 놓은 클릭은 이동 의도가 아니다(캐러셀 끌기).
+  const pointerDownAt = useRef<{ x: number; y: number; at: number } | null>(null);
 
   const clearTimers = useCallback(() => {
     if (fallbackTimer.current) {
@@ -95,6 +115,10 @@ export function PageLoadingProvider() {
       window.clearTimeout(historyTimer.current);
       historyTimer.current = null;
     }
+    if (watchdogTimer.current) {
+      window.clearTimeout(watchdogTimer.current);
+      watchdogTimer.current = null;
+    }
     if (submitTimer.current) {
       window.clearTimeout(submitTimer.current);
       submitTimer.current = null;
@@ -107,19 +131,35 @@ export function PageLoadingProvider() {
     NProgress.done();
   }, [clearTimers]);
 
-  const start = useCallback(() => {
-    clearTimers();
-    // 이미 차오르는 중이면 다시 0 으로 돌리지 않는다 — 클릭·pushState·beforeunload 가
-    // 한 번의 이동에 연달아 오면 막대가 "나왔다 안 나왔다" 하는 원인이 된다.
-    if (!loadingRef.current) {
-      loadingRef.current = true;
-      NProgress.start();
-    }
-    fallbackTimer.current = window.setTimeout(() => {
-      fallbackTimer.current = null;
-      stop();
-    }, 8000);
-  }, [clearTimers, stop]);
+  const start = useCallback(
+    (options?: { watchdogMs?: number }) => {
+      clearTimers();
+      // 이미 차오르는 중이면 다시 0 으로 돌리지 않는다 — 클릭·pushState·beforeunload 가
+      // 한 번의 이동에 연달아 오면 막대가 "나왔다 안 나왔다" 하는 원인이 된다.
+      if (!loadingRef.current) {
+        loadingRef.current = true;
+        NProgress.start();
+      }
+      fallbackTimer.current = window.setTimeout(() => {
+        fallbackTimer.current = null;
+        stop();
+      }, 8000);
+
+      // 클릭으로 시작했을 때만: 이동이 시작되지 않으면 곧 접는다.
+      // 링크를 눌러도 이동하지 않는 경우가 있다 — 팝오버를 여는 링크, 그리고 캐러셀을
+      // 끌고 놓았을 때 나는 클릭. 우리는 document 의 capture 단계에서 듣기 때문에 그런
+      // 처리기가 preventDefault/stopPropagation 하기 *전에* 먼저 본다. 그대로 두면 더
+      // 바뀔 주소가 없어 8 초 폴백까지 막대가 남는다.
+      if (options?.watchdogMs) {
+        navigatedRef.current = false;
+        watchdogTimer.current = window.setTimeout(() => {
+          watchdogTimer.current = null;
+          if (!navigatedRef.current) stop();
+        }, options.watchdogMs);
+      }
+    },
+    [clearTimers, stop],
+  );
 
   const scheduleStart = useCallback(
     (url: URL) => {
@@ -165,6 +205,22 @@ export function PageLoadingProvider() {
   }, [finish, pathname, searchParams]);
 
   useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      pointerDownAt.current = { x: event.clientX, y: event.clientY, at: Date.now() };
+    };
+
+    const wasDragged = (event: MouseEvent) => {
+      const from = pointerDownAt.current;
+      pointerDownAt.current = null;
+      // 키보드(Enter·Space)로 활성화한 클릭과 스크립트가 만든 클릭은 detail 이 0 이고 좌표도
+      // 0,0 이다. 눌린 자리와 비교하면 멀리 떨어져 보여 끌기로 오판하니 여기서 걸러 낸다.
+      if (event.detail === 0) return false;
+      // 링크 밖에서 끝난 끌기는 클릭을 만들지 않아 눌린 자리가 남는다. 오래된 것은 버린다.
+      if (!from || Date.now() - from.at > POINTER_DOWN_STALE_MS) return false;
+      return Math.abs(event.clientX - from.x) > DRAG_THRESHOLD_PX
+        || Math.abs(event.clientY - from.y) > DRAG_THRESHOLD_PX;
+    };
+
     const onClick = (event: MouseEvent) => {
       if (
         event.defaultPrevented ||
@@ -188,8 +244,14 @@ export function PageLoadingProvider() {
         return;
       }
 
+      // 끌고 간 끝에 나는 클릭은 이동 의도가 아니다. 쇼핑 홈의 분류 줄·진열·후기는 모두
+      // Swiper 이고 슬라이드가 링크라, 끌어서 넘기면 놓는 순간 링크 클릭이 발생한다.
+      if (wasDragged(event)) {
+        return;
+      }
+
       if (shouldShowForUrl(url)) {
-        start();
+        start({ watchdogMs: NAVIGATION_WATCHDOG_MS });
       }
     };
 
@@ -217,12 +279,14 @@ export function PageLoadingProvider() {
 
         const url = formSubmitUrl(form, submitter);
         if (url && shouldShowForUrl(url)) {
-          start();
+          // 검색 폼도 이동으로 이어지지 않을 수 있다(스크립트가 막는 경우).
+          start({ watchdogMs: NAVIGATION_WATCHDOG_MS });
         }
       }, 0);
     };
 
     const onPopState = () => {
+      navigatedRef.current = true;
       // popstate 는 브라우저가 주소를 이미 바꾼 뒤에 온다. 게다가 React 라우터의 리스너가
       // 우리보다 먼저 등록돼 있어 그 안에서 새 라우트를 동기 커밋해 버린다. 그러면 finish()
       // 가 "진행 중 아님"으로 먼저 빠져나가고, 뒤늦게 start() 한 막대는 더 바뀔 주소가 없어
@@ -232,7 +296,10 @@ export function PageLoadingProvider() {
       }
       start();
     };
-    const onBeforeUnload = () => start();
+    const onBeforeUnload = () => {
+      navigatedRef.current = true;
+      start();
+    };
     const onPageShow = () => stop();
     const originalPushState = window.history.pushState;
     const originalReplaceState = window.history.replaceState;
@@ -240,6 +307,7 @@ export function PageLoadingProvider() {
     window.history.pushState = function pushState(data, unused, url) {
       const nextUrl = getUrl(url);
       if (nextUrl && shouldShowForUrl(nextUrl)) {
+        navigatedRef.current = true;
         scheduleStart(nextUrl);
       }
       return originalPushState.call(this, data, unused, url);
@@ -248,11 +316,13 @@ export function PageLoadingProvider() {
     window.history.replaceState = function replaceState(data, unused, url) {
       const nextUrl = getUrl(url);
       if (nextUrl && shouldShowForUrl(nextUrl)) {
+        navigatedRef.current = true;
         scheduleStart(nextUrl);
       }
       return originalReplaceState.call(this, data, unused, url);
     };
 
+    document.addEventListener("pointerdown", onPointerDown, true);
     document.addEventListener("click", onClick, true);
     document.addEventListener("submit", onSubmit, true);
     window.addEventListener("popstate", onPopState);
@@ -261,6 +331,7 @@ export function PageLoadingProvider() {
 
     return () => {
       clearTimers();
+      document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("click", onClick, true);
       document.removeEventListener("submit", onSubmit, true);
       window.removeEventListener("popstate", onPopState);

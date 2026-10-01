@@ -367,6 +367,29 @@ const nextConfig: NextConfig = {
     G5_NEXT_RUNTIME: SERVER_RUNTIME ? 'server' : 'static',
     G5_THEME_SOURCE: THEME_SOURCE,
   },
+  /*
+   * 청크를 덜 쪼갠다.
+   *
+   * 이 빌드는 그누보드 설치본 안의 정적 파일로 서빙되고, 그 호스트(Cafe24 공유호스팅 등)는
+   * 대개 HTTP/1.1 이다. 재보면 청크가 사실상 한 번에 하나씩 내려온다 — 홈에서 JS 28 개가
+   * 첫 요청 33ms 부터 마지막 완료 2293ms 까지 2.26 초에 걸쳐 도착했다. Turbopack 의 기본
+   * requestCost(200KB)는 HTTP/2 를 가정한 값이라 우리 환경에서는 요청 하나를 너무 싸게
+   * 매긴다. 요청을 비싸게 매기고 한 화면의 청크 수에 상한을 둬서 첫 화면을 먼저 살린다.
+   *
+   * 대가: 화면을 옮길 때 이미 받은 것과 겹치는 큰 청크를 다시 받을 수 있다. 정적 자원은
+   * immutable 로 1 년 캐시되므로 재방문에는 영향이 없고, 지금은 첫 방문 비용이 더 크다.
+   * priorityRoutes 는 처음 들어오는 화면 — 커뮤니티 홈과 쇼핑 홈.
+   *
+   * experimental 이므로 Next 를 올릴 때 이 블록이 아직 유효한지 확인할 것.
+   */
+  experimental: {
+    turbopackChunking: {
+      requestCost: 600_000,
+      minChunkSize: 150_000,
+      maxChunkCountPerGroup: 12,
+      priorityRoutes: [/^\/$/, /^\/shop$/],
+    },
+  },
   turbopack: {
     resolveAlias: THEME_TURBOPACK_ALIASES,
   },

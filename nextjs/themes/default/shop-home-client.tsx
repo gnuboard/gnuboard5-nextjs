@@ -29,6 +29,7 @@ import { SOLUNE_SHOP_HOME_SECTIONS } from "./shop-home-sections";
 import { SoluneShopProductRowsSkeleton } from "./shop-home-skeletons";
 import { soluneListDate } from "./home-meta";
 import { toSoluneCompany, type SoluneCompany } from "./site-company";
+import { SoluneSitePopups } from "./site-popups";
 
 const ROW_COUNT = SHOP_HOME_ROW_LIMIT;
 /* 레퍼런스 쇼핑몰 공지는 latest(notice, 3) — 세 줄. 공지 글이 목록에 섞여 오면 더 오므로 잘라 쓴다. */
@@ -243,7 +244,16 @@ export async function loadSoluneShopHomeExtras(): Promise<SoluneShopHomeExtras> 
   const [banners, categories, noticeResult, settings, bankAccounts] = await Promise.all([
     getShopBanners({ position: "메인", device: "all" }, 0).catch(() => [] as ShopBanner[]),
     getShopCategories(0).catch(() => [] as ShopCategory[]),
-    getBoardPosts({ boTable: NOTICE_BOARD, perPage: NOTICE_COUNT, revalidate: 0 }).catch(() => ({ list: [] as WritePost[] })),
+    // getBoardPosts 자체는 나눠 쓰지 않는다 — 게시판 화면은 방금 쓴 글이 바로 보여야 한다.
+    // 이 화면의 공지 세 줄만, 두 번 도는 갱신을 합치려고 여기서 잠깐 나눠 쓴다.
+    requestShare
+      .get(
+        `shop-home:notices:${NOTICE_BOARD}:${NOTICE_COUNT}`,
+        SHOP_EXTRAS_SHARE_TTL_MS,
+        () => getBoardPosts({ boTable: NOTICE_BOARD, perPage: NOTICE_COUNT, revalidate: 0 }),
+        (result) => result.list.length === 0
+      )
+      .catch(() => ({ list: [] as WritePost[] })),
     getClientPublicSettings().catch(() => null),
     loadBankAccounts().catch(() => [] as string[]),
   ]);
@@ -349,6 +359,7 @@ export function SoluneShopHomeClient({ config, initialHome, initialExtras }: Sol
         company={extras.company}
         bankAccounts={extras.bankAccounts}
       />
+      <SoluneSitePopups division="shop" />
     </>
   );
 }

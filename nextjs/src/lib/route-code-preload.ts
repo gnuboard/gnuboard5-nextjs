@@ -25,6 +25,12 @@ import { g5PathForRuntime, isG5AppRouteRoot } from "@/lib/config";
  * (routeCodeShape). 그래서 PHP 브리지에 가는 요청도 종류 수만큼으로 그친다.
  */
 
+/**
+ * <경로>.txt 는 정적 내보내기에만 있다. 서버 실행(Vercel)은 RSC 를 ?_rsc= 로 주므로 .txt 를 받으면
+ * 404 만 쌓인다 — 거기서는 Next 자신의 미리 받기에 맡긴다. (next.config 의 env 가 빌드 때 박아 넣는다.)
+ */
+const ROUTE_PAYLOAD_FILES = process.env.G5_NEXT_RUNTIME !== "server";
+
 const preloadedShapes = new Set<string>();
 const CHUNK_PATTERN = /"([^"\s]*\/_next\/static\/chunks\/[^"\s]+\.js)"/g;
 
@@ -99,7 +105,7 @@ function prefersLightLoading(): boolean {
 }
 
 export function preloadRouteCode(clientPath: string): void {
-  if (typeof window === "undefined" || prefersLightLoading()) return;
+  if (typeof window === "undefined" || !ROUTE_PAYLOAD_FILES || prefersLightLoading()) return;
 
   const shape = routeCodeShape(clientPath);
   if (preloadedShapes.has(shape)) return;
@@ -135,7 +141,7 @@ const IDLE_TIMEOUT_MS = 2000;
  * 취소 함수를 돌려준다.
  */
 export function scheduleIdleRouteCodePreload(resolveClientPath: (href: string) => string | null): () => void {
-  if (typeof window === "undefined" || prefersLightLoading()) return () => undefined;
+  if (typeof window === "undefined" || !ROUTE_PAYLOAD_FILES || prefersLightLoading()) return () => undefined;
 
   // 지금 화면의 코드는 이미 실행돼 있다 — 같은 종류(예: 이 목록의 2쪽)는 받을 것이 없다.
   try {

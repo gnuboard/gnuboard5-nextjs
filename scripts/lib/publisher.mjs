@@ -27,6 +27,36 @@ export const USER_FACING_ROOTS = [
   'nextjs/release-policy.json',
 ];
 
+const PUBLIC_ENV_EXAMPLE_HEAD = `# Example settings for api/.env. Do NOT copy this file as-is: every value below is an
+# example. Copy only the lines you need and put your own values in. A normal install
+# (the Next.js theme on the same address as Gnuboard) needs none of them.
+
+# Front ends on another address (for example a Vercel project) that call this API.
+# Comma-separated origins, no trailing slash.
+# G5_CORS_ALLOWED_ORIGINS=https://your-project.vercel.app
+
+# A PHP-hosted install (root or sub-folder) needs none of the constants below:
+# the bridge and the API derive every URL from Gnuboard's own G5_URL.
+# Define them in a PHP extend file only when the app lives on another origin
+# (for example a Vercel preview) or to restrict which hosts the bridge trusts:
+# define('G5_WEBAPP_APP_URL', 'https://your-project.vercel.app');
+# define('G5_NEXTJS_DEFAULT_ALLOWED_HOSTS', 'your-gnuboard.example.com,your-project.vercel.app');
+
+# Optional. Extra web hosts allowed for social OAuth redirects.
+# If omitted, G5_CORS_ALLOWED_ORIGINS is also used for social redirect host checks.
+# G5_SOCIAL_WEB_HOSTS=your-project.vercel.app
+
+# Optional. Comma-separated reverse proxy REMOTE_ADDR values whose
+# X-Forwarded-Proto / X-Forwarded-Host headers may be trusted by PHP.
+# Same-host nginx/PHP-FPM normally needs no value because loopback is trusted.
+# G5_TRUSTED_PROXY_REMOTE_ADDRS=10.0.0.10,172.16.0.5
+
+# Optional. Extra mobile app schemes allowed for social OAuth deep links.
+# The official Gnuboard5 app (gnuboard5-app, scheme sirsoft-g5) is always allowed.
+# G5_SOCIAL_MOBILE_SCHEMES=myapp
+
+`;
+
 function rewrite(path, replacements) {
   if (!existsSync(path)) return;
   const before = readFileSync(path, 'utf8');
@@ -53,6 +83,17 @@ export function applyPublisherBranding(repoRoot, publicTheme) {
 
   rewrite(join(repoRoot, 'overlay', 'plugin', 'webapp', 'notify', 'admin.php'), [
     [/placeholder="예: thisgun"/g, 'placeholder="예: member01"'],
+  ]);
+
+  // 소셜 로그인 앱 스킴 기본값 — 공개판은 공식 앱(sirsoft-g5)만. 관리자 개인 앱(dday-app)은 뺀다.
+  rewrite(join(repoRoot, 'overlay', 'api', 'social', '_bridge_common.php'), [
+    [/\$schemes = array\('sirsoft-g5', 'dday-app'\);/, "$schemes = array('sirsoft-g5');"],
+  ]);
+
+  // API 설정 예시 — 원본은 관리자가 운영하는 Vercel 프로젝트 · 개발 주소를 켜 둔 값이다.
+  // 공개판은 모든 값을 주석으로 둔 사용자용 예시로 바꾼다(Nicepay 줄부터는 원본 그대로).
+  rewrite(join(repoRoot, 'overlay', 'api', 'env.example'), [
+    [/^[\s\S]*?(?=# Optional\. Nicepay)/, PUBLIC_ENV_EXAMPLE_HEAD],
   ]);
 
   // 원본 저장소의 브랜치 · 폴더 정책은 공개 저장소와 상관없다. 공개 저장소는 main 하나다.

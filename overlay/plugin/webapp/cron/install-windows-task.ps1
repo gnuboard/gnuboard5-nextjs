@@ -44,7 +44,9 @@ $purgeLog        = Join-Path $logDir 'members.purge.log'
 $purgeErr        = Join-Path $logDir 'members.purge.err.log'
 
 if (-not (Test-Path $phpExe))        { throw "PHP not found: $phpExe" }
-if (-not (Test-Path $enqueueScript)) { throw "Script not found: $enqueueScript" }
+# 디데이 인큐는 디데이 앱(plugin/dday)이 있는 사이트만 쓴다. 없으면 그 작업만 건너뛴다.
+$hasEnqueue = Test-Path $enqueueScript
+if (-not $hasEnqueue) { Write-Host "D-day enqueue script not found, skipping that task: $enqueueScript" }
 if (-not (Test-Path $workerScript))  { throw "Script not found: $workerScript" }
 if (-not (Test-Path $cleanupScript)) { Write-Warning "Optional script missing: $cleanupScript" }
 if (-not (Test-Path $purgeScript))   { Write-Warning "Optional script missing: $purgeScript" }
@@ -53,19 +55,21 @@ if (-not (Test-Path $logDir))        { New-Item -ItemType Directory -Path $logDi
 # ---------------------------------------------------------------------------
 # 1) Enqueue 작업 — 매일 1회
 # ---------------------------------------------------------------------------
-$enqueueArgs = "/c `"$phpExe`" `"$enqueueScript`" >> `"$enqueueLog`" 2> `"$enqueueErr`""
-$enqueueAction  = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument $enqueueArgs -WorkingDirectory $ProjectDir
-$enqueueTrigger = New-ScheduledTaskTrigger -Daily -At $Time
-$enqueueSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable -RunOnlyIfNetworkAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
+if ($hasEnqueue) {
+    $enqueueArgs = "/c `"$phpExe`" `"$enqueueScript`" >> `"$enqueueLog`" 2> `"$enqueueErr`""
+    $enqueueAction  = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument $enqueueArgs -WorkingDirectory $ProjectDir
+    $enqueueTrigger = New-ScheduledTaskTrigger -Daily -At $Time
+    $enqueueSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable -RunOnlyIfNetworkAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
 
-if (Get-ScheduledTask -TaskName $EnqueueTaskName -ErrorAction SilentlyContinue) {
-    Unregister-ScheduledTask -TaskName $EnqueueTaskName -Confirm:$false
-    Write-Host "Existing task '$EnqueueTaskName' removed."
+    if (Get-ScheduledTask -TaskName $EnqueueTaskName -ErrorAction SilentlyContinue) {
+        Unregister-ScheduledTask -TaskName $EnqueueTaskName -Confirm:$false
+        Write-Host "Existing task '$EnqueueTaskName' removed."
+    }
+
+    Register-ScheduledTask -TaskName $EnqueueTaskName -Action $enqueueAction -Trigger $enqueueTrigger -Settings $enqueueSettings -Description '디데이 매칭 → push_queue 인큐 (매일)' | Out-Null
+
+    Write-Host "Registered '$EnqueueTaskName' (daily at $Time)."
 }
-
-Register-ScheduledTask -TaskName $EnqueueTaskName -Action $enqueueAction -Trigger $enqueueTrigger -Settings $enqueueSettings -Description '디데이 매칭 → push_queue 인큐 (매일)' | Out-Null
-
-Write-Host "Registered '$EnqueueTaskName' (daily at $Time)."
 
 # ---------------------------------------------------------------------------
 # 2) Worker 작업 — 매분 1회 (push_queue drain)

@@ -19,8 +19,9 @@ export function CartMiniPopover() {
   const [open, setOpen] = useState(false);
 
   // 비회원 카트도 쿠키 기반으로 동작하므로 초기 진입과 cart 변경 때 동기화한다.
+  // 붙는 순간에는 "지금 상태"만 필요하다 — 화면 이동으로 두 번 붙어도 요청은 한 번만 나간다.
   useEffect(() => {
-    fetchCart();
+    void fetchCart({ dedupe: true });
   }, [fetchCart]);
 
   useEffect(() => {
