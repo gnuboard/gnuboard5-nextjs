@@ -1,5 +1,4 @@
-import { SoluneReviewSection } from "./shop-home-swipers";
-import { SoluneShopRow } from "./shop-row";
+import { SoluneReviewHead, SoluneShopRowHead, SoluneStaticTrack } from "./shop-section-heads";
 import { shopTypeHref } from "./shop-links";
 import { SOLUNE_SHOP_HOME_SECTIONS } from "./shop-home-sections";
 
@@ -43,30 +42,43 @@ function SoluneShopReviewCardSkeleton() {
   );
 }
 
+/*
+ * 줄은 Swiper 없이 같은 마크업으로 그린다(shop-section-heads.tsx). 이 스켈레톤은 로딩 슬롯을 거쳐
+ * 모든 화면의 번들에 들어가므로, 여기서 Swiper 줄을 쓰면 커뮤니티 화면도 Swiper 를 받는다.
+ * 넘길 것도 없는 자리 잡기라 Swiper 가 할 일도 없다.
+ */
 export function SoluneShopProductRowsSkeleton() {
   return (
     <>
       {SOLUNE_SHOP_HOME_SECTIONS.map((section) => (
-        <SoluneShopRow
+        <section
           key={section.key}
-          eyebrow={section.eyebrow}
-          title={section.title}
-          sub={section.sub}
-          href={shopTypeHref(section.type)}
-          peek={section.peek}
-          headingId={`solune-shop-loading-${section.key}`}
+          className="solune-shop-product-section solune-shop-row"
+          aria-labelledby={`solune-shop-loading-${section.key}`}
         >
-          {Array.from({ length: 6 }, (_, index) => (
-            <SoluneShopProductCardSkeleton key={index} index={index} />
-          ))}
-        </SoluneShopRow>
+          <SoluneShopRowHead
+            eyebrow={section.eyebrow}
+            title={section.title}
+            sub={section.sub}
+            href={shopTypeHref(section.type)}
+            headingId={`solune-shop-loading-${section.key}`}
+          />
+          <SoluneStaticTrack className="solune-shop-swiper" wrapperClass="swiper-wrapper sct">
+            {Array.from({ length: 6 }, (_, index) => (
+              <SoluneShopProductCardSkeleton key={index} index={index} />
+            ))}
+          </SoluneStaticTrack>
+        </section>
       ))}
 
-      <SoluneReviewSection headingId="solune-shop-loading-reviews">
-        {Array.from({ length: 4 }, (_, index) => (
-          <SoluneShopReviewCardSkeleton key={index} />
-        ))}
-      </SoluneReviewSection>
+      <section className="solune-shop-product-section solune-shop-review-section" aria-labelledby="solune-shop-loading-reviews">
+        <SoluneReviewHead headingId="solune-shop-loading-reviews" />
+        <SoluneStaticTrack className="solune-review-swiper" wrapperClass="swiper-wrapper ondam-review-grid">
+          {Array.from({ length: 4 }, (_, index) => (
+            <SoluneShopReviewCardSkeleton key={index} />
+          ))}
+        </SoluneStaticTrack>
+      </section>
     </>
   );
 }

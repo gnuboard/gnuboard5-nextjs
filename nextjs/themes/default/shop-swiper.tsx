@@ -22,15 +22,35 @@ export function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
+/** 키보드로 옮긴 초점인가. 마우스로 단추를 누를 때 생기는 초점은 :focus-visible 이 아니다. */
+function isKeyboardFocus(target: Element): boolean {
+  try {
+    return target.matches(":focus-visible");
+  } catch {
+    return true; // :focus-visible 을 모르는 브라우저 — 예전처럼 끌어온다.
+  }
+}
+
+/** 칸이 캐러셀 창 안에 다 들어와 있는가(가장자리 1px 은 반올림 오차로 본다). */
+function isSlideFullyVisible(swiper: SwiperInstance, slide: Element): boolean {
+  const view = swiper.el.getBoundingClientRect();
+  const rect = slide.getBoundingClientRect();
+  return rect.left >= view.left - 1 && rect.right <= view.right + 1;
+}
+
 /**
  * 탭으로 화면 밖 칸에 초점이 가면 그 칸을 보이는 자리로 끌어온다. Swiper 는 이걸 해 주지 않아
  * 초점은 갔는데 화면에는 아무 변화가 없는 상태가 된다(레퍼런스 shop/index.php 와 같은 처리).
  * 쪽 단위로 넘기는 줄은 그 칸이 든 쪽의 첫 장으로 맞춘다.
+ *
+ * 키보드 초점이고 그 칸이 덜 보일 때만 움직인다. 전에는 마우스로 카드의 "담기"를 눌러도(단추가 초점을
+ * 받는다) 그 카드가 줄 맨 앞으로 끌려가 줄이 왼쪽으로 미끄러졌다 — 이미 보이는 칸은 옮길 까닭이 없다.
  */
 export function slideToFocusedSlide(swiper: SwiperInstance, target: EventTarget | null): void {
   if (!(target instanceof Element)) return;
   const slide = target.closest(".swiper-slide");
   if (!slide || !slide.parentElement) return;
+  if (!isKeyboardFocus(target) || isSlideFullyVisible(swiper, slide)) return;
   const index = Array.prototype.indexOf.call(slide.parentElement.children, slide) as number;
   if (index < 0) return;
   const group = Number(swiper.params.slidesPerGroup) || 1;

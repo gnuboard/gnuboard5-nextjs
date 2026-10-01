@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod";
 import { normalizeG5ImageSrc } from "@/lib/image";
 
 export const stringValue = z.preprocess(

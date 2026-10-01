@@ -324,6 +324,11 @@ class PushQueue
             $channelId = 'order';
             $priority = ($data['status'] ?? '') === 'placed' ? 'default' : 'high';
         }
+        // 관리자 새 주문 알림(order_push_helpers.php) — 같은 주문 채널, 바로 확인해야 하니 high.
+        if (is_array($data) && ($data['type'] ?? null) === 'admin.order.placed') {
+            $channelId = 'order';
+            $priority = 'high';
+        }
         return [
             'to'         => (string) $job['expo_token'],
             'title'      => $content['title'],

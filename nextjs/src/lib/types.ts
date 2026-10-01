@@ -461,6 +461,8 @@ export interface LoginResponse {
   auto_login?: 0 | 1 | boolean;
   user?: Pick<Member, 'mb_id' | 'mb_nick' | 'mb_name' | 'mb_email' | 'mb_level' | 'mb_point' | 'mb_icon_path'>;
   member?: Record<string, string | number | undefined>;
+  /** /auth/me 와 같은 최고관리자 여부. 이 필드가 없는 예전 API 면 undefined. */
+  is_super_admin?: boolean;
 }
 
 // 쪽지 (g5_memo)

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod";
 import { apiClient } from "@/lib/api";
 import { validateApiData } from "@/lib/api-response";
 

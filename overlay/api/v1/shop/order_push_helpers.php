@@ -121,10 +121,119 @@ if (!function_exists('shop_api_push_order_event')) {
     }
 }
 
+if (!function_exists('shop_api_order_admin_ids')) {
+    /**
+     * 새 주문 알림을 받을 관리자 — 최고관리자(기본환경설정 cf_admin)와, 관리자 권한 설정에서
+     * 주문내역(메뉴 400400) 읽기 권한을 받은 부관리자.
+     *
+     * @return list<string>
+     */
+    function shop_api_order_admin_ids(): array
+    {
+        $ids = [];
+        try {
+            $config = DB::fetch("SELECT cf_admin FROM " . DB::table('config_table') . " LIMIT 1");
+            $ids[] = trim((string) ($config['cf_admin'] ?? ''));
+            $rows = DB::fetchAll(
+                "SELECT mb_id FROM " . DB::table('auth_table') . " WHERE au_menu = '400400' AND au_auth LIKE '%r%'"
+            );
+            foreach ($rows as $row) {
+                $ids[] = trim((string) $row['mb_id']);
+            }
+        } catch (\Throwable $e) {
+            error_log('[order-push] admin list failed: ' . $e->getMessage());
+        }
+        return array_values(array_unique(array_filter($ids, 'strlen')));
+    }
+}
+
+if (!function_exists('shop_api_order_admin_text')) {
+    /**
+     * 관리자용 새 주문 알림 문구. 운영에 필요한 주문 금액·상품·결제수단은 넣고,
+     * 구매자 이름·연락처·주소는 넣지 않는다(잠금화면 노출).
+     *
+     * @param array<string,mixed> $order g5_shop_order 행(od_id, od_settle_case, 금액 칸)
+     * @param list<string> $itemNames 주문 줄 상품명
+     * @return array{title:string, body:string}
+     */
+    function shop_api_order_admin_text(array $order, array $itemNames): array
+    {
+        $names = array_values(array_unique(array_filter(array_map('strval', $itemNames), 'strlen')));
+        $summary = $names ? $names[0] . (count($names) > 1 ? ' 외 ' . (count($names) - 1) . '건' : '') . ' · ' : '';
+        $num = static function (string $key) use ($order): int {
+            return (int) ($order[$key] ?? 0);
+        };
+        $total = $num('od_cart_price') + $num('od_send_cost') + $num('od_send_cost2')
+            - $num('od_cart_coupon') - $num('od_coupon') - $num('od_send_coupon');
+        $settle = trim((string) ($order['od_settle_case'] ?? ''));
+        return [
+            'title' => '[새 주문] ' . number_format(max(0, $total)) . '원',
+            'body' => $summary . ($settle !== '' ? $settle . ' · ' : '') . '주문번호 ' . (string) $order['od_id'],
+        ];
+    }
+}
+
+if (!function_exists('shop_api_notify_admins_new_order')) {
+    /**
+     * 새 주문을 관리자에게 알린다(회원·비회원 주문 모두). 주문 하나에 한 번만 — 같은 주문이 접수(placed)와 결제
+     * 확인(paid, 웹훅 포함)으로 여러 번 불려도 이름 잠금 + 알림함 기록으로 걸러 낸다.
+     * 알림 data 는 {type:'admin.order.placed', od_id} — 앱은 누르면 그 주문의 관리자 주문서를 브라우저로 연다.
+     */
+    function shop_api_notify_admins_new_order(string $od_id): void
+    {
+        try {
+            if (!preg_match('/^[0-9]{10,20}$/', $od_id) || !shop_api_order_push_boot()) {
+                return;
+            }
+            $admins = shop_api_order_admin_ids();
+            if (!$admins) {
+                return;
+            }
+            $lock = 'g5_admin_new_order_' . $od_id;
+            $got = DB::fetch('SELECT GET_LOCK(?, 0) AS got', [$lock]);
+            if (empty($got['got'])) {
+                return;
+            }
+            try {
+                $seen = DB::fetch(
+                    "SELECT nt_id FROM " . DB::table('notification_log_table')
+                    . " WHERE mb_id = ? AND nt_event = 'admin.order.placed' AND nt_data LIKE ? LIMIT 1",
+                    [$admins[0], '%"od_id":"' . $od_id . '"%']
+                );
+                if ($seen) {
+                    return;
+                }
+                $order = DB::fetch(
+                    "SELECT od_id, od_settle_case, od_cart_price, od_send_cost, od_send_cost2, od_cart_coupon, od_coupon, od_send_coupon FROM "
+                    . DB::table('g5_shop_order_table') . " WHERE od_id = ? LIMIT 1",
+                    [$od_id]
+                );
+                if (!$order) {
+                    return;
+                }
+                $rows = DB::fetchAll(
+                    "SELECT it_name FROM " . DB::table('g5_shop_cart_table') . " WHERE od_id = ? ORDER BY ct_id ASC",
+                    [$od_id]
+                );
+                $text = shop_api_order_admin_text($order, array_column($rows, 'it_name'));
+                Notify::emitMany('admin.order.placed', $admins, $text['title'], $text['body'], [
+                    'type' => 'admin.order.placed',
+                    'od_id' => (string) $order['od_id'],
+                ]);
+            } finally {
+                DB::fetch('SELECT RELEASE_LOCK(?) AS released', [$lock]);
+            }
+        } catch (\Throwable $e) {
+            error_log('[order-push] admin new order ' . $od_id . ' failed: ' . $e->getMessage());
+        }
+    }
+}
+
 if (!function_exists('shop_api_defer_order_push')) {
     /**
      * API 경로(주문 생성·결제 확인·웹훅·취소)용 — 응답을 먼저 내보낸 뒤(shutdown + fastcgi_finish_request)
      * 보낸다. Notify::emit 의 즉시 발송(Expo 호출, 최대 몇 초)이 결제 응답을 늦추지 않게 한다.
+     * 접수·결제 확인이면 관리자에게도 새 주문을 알린다(주문 하나에 한 번).
      */
     function shop_api_defer_order_push(string $od_id, string $event): void
     {
@@ -133,6 +242,9 @@ if (!function_exists('shop_api_defer_order_push')) {
                 fastcgi_finish_request();
             }
             shop_api_push_order_event($od_id, $event);
+            if ($event === 'placed' || $event === 'paid') {
+                shop_api_notify_admins_new_order($od_id);
+            }
         });
     }
 }

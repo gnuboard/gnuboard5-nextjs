@@ -1,7 +1,7 @@
 import { ArrowRight, ChevronDown, ChevronRight, Search } from "lucide-react";
 import { G5Link as Link } from "@/components/ui/g5-link";
 import { MemberSideview } from "@/components/MemberSideview";
-import { SafeHtml } from "@/components/SafeHtml";
+import dynamic from "next/dynamic";
 import { GalleryThumbnail } from "@/app/boards/[bo_table]/GalleryThumbnail";
 import { boardPostHref } from "@/lib/board-url";
 import { formatDate, formatNumber, truncate } from "@/lib/utils";
@@ -10,6 +10,10 @@ import type { PopularKeyword, VisitStats } from "@/lib/schemas";
 import type { SoluneGallery } from "./home-data";
 import { SoluneCommentRowsSkeleton, SolunePopularRowsSkeleton } from "./home-skeletons";
 import { SoluneAuthor, soluneListDate } from "./home-meta";
+
+/* FAQ 답은 HTML 정화기(sanitize-html, 약 180KB)를 거친다. 이 파일은 사이드 레일을 거쳐 모든 화면에
+   들어가므로 FAQ 를 그릴 때 받는다 — 답은 접혀 있어 처음부터 보이지 않는다. */
+const SafeHtml = dynamic(() => import("@/components/SafeHtml").then((m) => m.SafeHtml));
 
 const GALLERY_PANEL_LIMIT = 8;
 /*

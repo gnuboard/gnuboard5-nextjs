@@ -6,7 +6,7 @@ import { G5Link as Link } from "@/components/ui/g5-link";
 import { g5PathForRuntime } from "@/lib/config";
 import { G5_COMMUNITY_LOGO, SoluneBrandLogo } from "./brand-logo";
 import { SoluneCompanyInfo, useSoluneCompany } from "./site-company";
-import { isUnsafeMenuLink, menuAnchorTarget, type MenuItem } from "@/components/layout/menu";
+import { isUnsafeMenuLink, menuAnchorTarget, menuHref, type MenuItem } from "@/components/layout/menu";
 import { useRuntimeMenus } from "@/hooks/useRuntimeMenus";
 import { useAuthStore } from "@/store/auth";
 import type { G5ThemeConfig, G5ThemeLayoutShellProps } from "@/lib/theme-types";
@@ -28,14 +28,16 @@ const FOOTER_LINKS = [
   { label: "이용약관", href: "/content/provision" },
 ];
 
-/** Menus arrive from Gnuboard, so links are validated before they are rendered. */
+/** Menus arrive from Gnuboard, so links are validated before they are rendered.
+ *  관리자 > 메뉴설정은 링크를 그누보드 전체 주소(G5_URL/bbs/new.php 등)로 저장한다 — menuHref 가 앱 화면이
+ *  있는 주소는 앱 주소(/recent 등)로, 그누보드 첫 주소는 앱 홈으로 바꿔, 프런트를 다른 주소에 둬도 앱 안에 머문다. */
 function menuToNavItem(menu: MenuItem): NavItem | null {
-  const href = (menu.me_link || "").trim();
+  const raw = (menu.me_link || "").trim();
   const label = (menu.me_name || "").trim();
-  if (!href || !label || isUnsafeMenuLink(href)) return null;
+  if (!raw || !label || isUnsafeMenuLink(raw)) return null;
   return {
     label,
-    href,
+    href: menuHref(raw),
     target: menuAnchorTarget(menu.me_target),
     children: (menu.children ?? [])
       .map(menuToNavItem)

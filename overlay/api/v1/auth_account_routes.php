@@ -232,6 +232,8 @@ if ($action === 'login' && $apiMethod === 'POST') {
         'expires_in'    => JWT_EXPIRE_SECONDS,
         'auto_login'    => $autoLogin ? 1 : 0,
         'member'        => $memberData,
+        // /auth/me 와 같은 값 — 로그인 직후 화면 이동만 하는 경우에도 관리자 단추를 바로 그린다.
+        'is_super_admin' => Auth::adminRole($member) === 'super',
     ], $member));
 }
 
@@ -638,6 +640,7 @@ if ($action === 'register' && $apiMethod === 'POST') {
         'refresh_token' => $refresh,
         'expires_in'    => JWT_EXPIRE_SECONDS,
         'member'        => api_auth_member_payload($member),
+        'is_super_admin' => Auth::adminRole($member) === 'super',
         'registration_result_url' => '/register/result',
     ], $member), 201);
 }

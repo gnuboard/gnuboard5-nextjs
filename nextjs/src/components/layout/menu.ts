@@ -59,8 +59,14 @@ function knownG5LegacyPathFromAbsoluteUrl(link: string): string | null {
 
   for (const base of knownBases) {
     const path = pathWithinBase(url, base);
-    if (path && /^\/(?:bbs|mobile|shop)\/[^/?#]+\.php(?:[?#].*)?$/i.test(path)) {
+    if (!path) continue;
+    if (/^\/(?:bbs|mobile|shop)\/[^/?#]+\.php(?:[?#].*)?$/i.test(path)) {
       return path;
+    }
+    // 그누보드 첫 주소(G5_URL, G5_URL/index.php) — 관리자 > 메뉴설정의 상위 메뉴 기본값. 앱 홈으로 보낸다.
+    const root = path.match(/^\/(?:index\.php)?((?:[?#].*)?)$/i);
+    if (root) {
+      return `/${root[1]}`;
     }
   }
 

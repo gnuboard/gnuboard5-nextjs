@@ -37,6 +37,26 @@ test.describe("menu links", () => {
     expect(menuHref(`${g5BaseUrl}/bbs/content.php?co_id=intro`)).toBe("/content/intro");
     expect(menuHref(`${g5BaseUrl}/bbs/board.php?bo_table=free&wr_id=6`)).toBe("/free/6");
     expect(menuHref(`${g5BaseUrl}/shop/item.php?it_id=1446772772`)).toBe("/shop/1446772772");
+    // 관리자 > 메뉴설정의 기본 링크들(G5_URL 로 저장된다) — 프런트 화면이 있으면 그 주소로 간다.
+    expect(menuHref(`${g5BaseUrl}/bbs/new.php`)).toBe("/recent");
+    expect(menuHref(`${g5BaseUrl}/bbs/search.php`)).toBe("/search");
+    expect(menuHref(`${g5BaseUrl}/bbs/register.php`)).toBe("/register");
+    expect(menuHref(`${g5BaseUrl}/bbs/login.php`)).toBe("/login");
+    expect(menuHref(`${g5BaseUrl}/bbs/point.php`)).toBe("/mypage/points");
+  });
+
+  test("sends the Gnuboard site root to the app home", () => {
+    const g5BaseUrl = g5BaseUrlForRuntime();
+    expect(menuHref(`${g5BaseUrl}/`)).toBe("/");
+    expect(menuHref(g5BaseUrl)).toBe("/");
+    expect(menuHref(`${g5BaseUrl}/index.php`)).toBe("/");
+  });
+
+  test("keeps Gnuboard pages that have no app screen as /bbs paths", () => {
+    // 앱 화면이 없는 페이지는 /bbs/*.php 그대로 — PHP 설치본은 그누보드가, 서버 런타임은
+    // app/bbs/[...path] 가 원래 그누보드 주소로 넘긴다.
+    const g5BaseUrl = g5BaseUrlForRuntime();
+    expect(menuHref(`${g5BaseUrl}/bbs/current_connect.php`)).toBe("/bbs/current_connect.php");
   });
 
   test("keeps legacy shop login redirects in the shop context", () => {

@@ -1,9 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ShopHomePopups } from "@/app/shop/ShopHomeMarketing";
+import dynamic from "next/dynamic";
 import type { ShopPopup } from "@/lib/api";
 import { getShopPopups } from "@/services/shop";
+
+/* 팝업 본문은 HTML 정화기(sanitize-html, 약 180KB)를 거친다. 이 파일은 모든 화면에 들어가므로
+   띄울 팝업이 있을 때만 받는다. */
+const ShopHomePopups = dynamic(() => import("@/app/shop/ShopHomeMarketing").then((m) => m.ShopHomePopups), {
+  ssr: false,
+});
 
 const MOBILE_QUERY = "(max-width: 767px)";
 

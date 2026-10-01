@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { ArrowRight } from "lucide-react";
 import { GalleryThumbnail } from "@/app/boards/[bo_table]/GalleryThumbnail";
 import { ProductImageFallback } from "@/components/shop/ProductImageFallback";
@@ -8,7 +9,7 @@ import { G5Link as Link } from "@/components/ui/g5-link";
 import { boardPostHref, type BbsRewriteMode } from "@/lib/board-url";
 import { normalizeG5ImageSrc } from "@/lib/image";
 import { shopProductHref } from "@/lib/product-url";
-import { htmlToPlainText } from "@/lib/sanitize";
+import { htmlToText } from "@/lib/html-text";
 import { buildShopHomeData, EMPTY_SHOP_HOME, SHOP_HOME_ROW_LIMIT } from "@/lib/shop-home";
 import type { ShopBanner, ShopCategory, ShopReview } from "@/lib/shop-types";
 import type { G5ThemeComponentProps, G5ThemeShopHomeData } from "@/lib/theme-types";
@@ -21,15 +22,26 @@ import { getClientPublicSettings } from "@/services/settings";
 import { getShopBanners, getShopCategories } from "@/services/shop";
 import { shopCategoryHref, shopTypeHref } from "./shop-links";
 import { SoluneProductCard } from "./product-card";
-import { SoluneShopBanner } from "./shop-banner";
 import { assignCategoryIcons } from "./shop-category-icons";
-import { SoluneShopRow } from "./shop-row";
-import { SoluneCategorySwiper, SoluneReviewSection } from "./shop-home-swipers";
 import { SOLUNE_SHOP_HOME_SECTIONS } from "./shop-home-sections";
 import { SoluneShopProductRowsSkeleton } from "./shop-home-skeletons";
 import { soluneListDate } from "./home-meta";
 import { toSoluneCompany, type SoluneCompany } from "./site-company";
 import { SoluneSitePopups } from "./site-popups";
+
+/*
+ * Swiper 를 쓰는 조각(배너 · 진열 줄 · 분류 줄 · 후기 줄)은 따로 받는다.
+ *
+ * 이 파일은 테마 슬롯을 거쳐 루트 layout 에서 닿으므로, 정적으로 가져오면 모든 화면이 Swiper
+ * (약 200KB)를 첫 번들로 받는다 — 커뮤니티 홈도 받고 있었다. 쇼핑 홈이 붙자마자 미리 불러
+ * API 응답과 나란히 받으므로, 배너가 그려질 때쯤에는 대개 이미 와 있다.
+ * 네 조각을 한 문(shop-home-carousels.tsx)으로 받는다 — 따로 받으면 Swiper 가 세 벌 들어간다.
+ */
+const loadCarousels = () => import("./shop-home-carousels");
+const SoluneShopBanner = dynamic(() => loadCarousels().then((m) => m.SoluneShopBanner));
+const SoluneShopRow = dynamic(() => loadCarousels().then((m) => m.SoluneShopRow));
+const SoluneCategorySwiper = dynamic(() => loadCarousels().then((m) => m.SoluneCategorySwiper));
+const SoluneReviewSection = dynamic(() => loadCarousels().then((m) => m.SoluneReviewSection));
 
 const ROW_COUNT = SHOP_HOME_ROW_LIMIT;
 /* 레퍼런스 쇼핑몰 공지는 latest(notice, 3) — 세 줄. 공지 글이 목록에 섞여 오면 더 오므로 잘라 쓴다. */
@@ -96,7 +108,7 @@ function ReviewSection({ reviews, rewriteMode }: { reviews: ShopReview[]; rewrit
                   <Link href={reviewHref}>{review.is_subject}</Link>
                 </p>
               ) : null}
-              <p className="ondam-review-text">{truncate(htmlToPlainText(review.is_content), 200)}</p>
+              <p className="ondam-review-text">{truncate(htmlToText(review.is_content), 200)}</p>
               <div className="ondam-review-meta">
                 <span>{review.mb_nick || review.is_name}</span>
                 {/* 레퍼런스 후기 날짜는 연도 두 자리(26-09-22). */}
@@ -298,6 +310,8 @@ export function SoluneShopHomeClient({ config, initialHome, initialExtras }: Sol
 
   useEffect(() => {
     let alive = true;
+    // Swiper 조각을 API 와 나란히 받아 둔다(위 loadCarousels 설명).
+    void loadCarousels();
     // 상품 줄과 부가 조각은 서로 기다리지 않는다 — 배너는 상품 목록이 오기 전에 뜰 수 있다.
     buildShopHomeData({ runtime: true, include: SHOP_HOME_INCLUDE })
       .then((nextHome) => {

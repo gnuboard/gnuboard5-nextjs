@@ -1,11 +1,10 @@
 "use client";
 
 import { Children, isValidElement, useRef, type ReactNode } from "react";
-import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Swiper as SwiperInstance } from "swiper";
 import { A11y, Keyboard, Navigation, Pagination } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { G5Link as Link } from "@/components/ui/g5-link";
+import { SoluneShopRowHead } from "./shop-section-heads";
 import { attachSwiperControls, slideToFocusedSlide } from "./shop-swiper";
 
 interface SoluneShopRowProps {
@@ -43,26 +42,16 @@ export function SoluneShopRow({ eyebrow, title, sub, href, peek = false, heading
 
   return (
     <section className="solune-shop-product-section solune-shop-row" aria-labelledby={headingId}>
-      <header className="solune-shop-section-head solune-shop-section-head--row">
-        <span className="solune-shop-eyebrow">{eyebrow}</span>
-        <h2 id={headingId}>{href ? <Link href={href}>{title}</Link> : title}</h2>
-        {href ? (
-          <Link className="solune-shop-section-more" href={href}>
-            전체 보기
-            <ArrowRight size={13} strokeWidth={2.6} aria-hidden />
-          </Link>
-        ) : null}
-        <div className="solune-shop-swiper-nav">
-          <button ref={prevRef} type="button" className="solune-shop-swiper-prev" aria-label={`${title} 이전`}>
-            <ChevronLeft size={18} aria-hidden />
-          </button>
-          <button ref={nextRef} type="button" className="solune-shop-swiper-next" aria-label={`${title} 다음`}>
-            <ChevronRight size={18} aria-hidden />
-          </button>
-        </div>
-        {sub ? <p className="solune-shop-section-sub">{sub}</p> : null}
-        <div ref={progressRef} className="solune-shop-swiper-progress" aria-hidden />
-      </header>
+      <SoluneShopRowHead
+        eyebrow={eyebrow}
+        title={title}
+        sub={sub}
+        href={href}
+        headingId={headingId}
+        prevRef={prevRef}
+        nextRef={nextRef}
+        progressRef={progressRef}
+      />
       <div onFocus={(event) => swiperRef.current && slideToFocusedSlide(swiperRef.current, event.target)}>
         <Swiper
           className="solune-shop-swiper"

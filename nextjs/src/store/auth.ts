@@ -53,7 +53,7 @@ function normalizeUser(
   };
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isLoading: false,
   isInitialized: false,
@@ -97,8 +97,15 @@ export const useAuthStore = create<AuthState>((set) => ({
           api.setRefreshToken(res.data.refresh_token, { autoLogin });
         }
         // API returns 'member' field, map to user
-        const user = normalizeUser(res.data.member ?? res.data.user);
+        const user = normalizeUser(res.data.member ?? res.data.user, {
+          isSuperAdmin: res.data.is_super_admin === true,
+        });
         set({ user, isLoading: false });
+        // 로그인 뒤 화면만 바뀌면(전체 새로고침 없음) /auth/me 를 다시 부르지 않는다. 최고관리자 여부를 주지 않는
+        // 예전 API 면 여기서 한 번 채운다 — 없으면 관리자 단추가 새로고침 전까지 안 보인다.
+        if (user && typeof res.data.is_super_admin !== 'boolean') {
+          void get().fetchUser();
+        }
         void useCartStore.getState().fetchCart();
       } else {
         set({ isLoading: false });
@@ -117,7 +124,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       if (res.data?.token) {
         api.setToken(res.data.token);
         if (res.data.refresh_token) api.setRefreshToken(res.data.refresh_token, { autoLogin: false });
-        const user = normalizeUser(res.data.member ?? res.data.user);
+        const user = normalizeUser(res.data.member ?? res.data.user, {
+          isSuperAdmin: res.data.is_super_admin === true,
+        });
         if (user) set({ user });
         void useCartStore.getState().fetchCart();
       }

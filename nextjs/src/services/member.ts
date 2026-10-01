@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api";
-import { z } from "zod";
+import * as z from "zod";
 import type { ApiMeta } from "@/lib/api-response";
 import { validateApiData } from "@/lib/api-response";
 import {

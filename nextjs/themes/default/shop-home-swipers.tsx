@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Swiper as SwiperInstance } from "swiper";
 import { A11y, Keyboard, Navigation, Pagination, Scrollbar } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/react";
+import { SoluneReviewHead } from "./shop-section-heads";
 import { bindSwiperControlsAfterMount, slideToFocusedSlide } from "./shop-swiper";
 
 function slidesOf(children: ReactNode) {
@@ -131,11 +132,7 @@ export function SoluneReviewSwiper({ children }: { children: ReactNode }) {
 export function SoluneReviewSection({ headingId, children }: { headingId: string; children: ReactNode }) {
   return (
     <section className="solune-shop-product-section solune-shop-review-section" aria-labelledby={headingId}>
-      <header className="solune-shop-section-head solune-shop-section-head--center">
-        <span className="solune-shop-eyebrow">REVIEW</span>
-        <h2 id={headingId}>고객님이 남긴 후기</h2>
-        <p className="solune-shop-section-sub">상품을 받아본 분들이 직접 적은 이야기입니다.</p>
-      </header>
+      <SoluneReviewHead headingId={headingId} />
       <SoluneReviewSwiper>{children}</SoluneReviewSwiper>
     </section>
   );

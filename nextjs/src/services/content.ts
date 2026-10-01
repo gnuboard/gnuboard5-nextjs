@@ -2,7 +2,7 @@ import { apiClient } from "@/lib/api";
 import { apiUrl } from "@/lib/config";
 import { fetchApiData, fetchApiResult, validateApiData } from "@/lib/api-response";
 import { contentDataSchema, type ContentData } from "@/lib/schemas";
-import { z } from "zod";
+import * as z from "zod";
 
 const contentListItemSchema = z
   .object({

@@ -1,6 +1,6 @@
 import { apiClient } from "@/lib/api";
 import { validateApiData } from "@/lib/api-response";
-import { z } from "zod";
+import * as z from "zod";
 import {
   authAvailabilitySchema,
   passwordResetRequestSchema,
