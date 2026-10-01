@@ -105,18 +105,6 @@ if ($apiMethod === 'POST' && $ct_id === '') {
             shop_api_cart_validate_buy_qty($item, $baseBatchQty, $existingBaseQty);
         }
 
-        if ((int) $item['it_stock_qty'] > 0 && $baseBatchQty > 0) {
-            $activeQty = DB::fetch(
-                "SELECT IFNULL(SUM(ct_qty), 0) AS qty FROM " . DB::table('g5_shop_cart_table') . "
-                 WHERE od_id = ? AND it_id = ? AND io_type = 0
-                   AND " . shop_api_cart_active_status_sql(),
-                array_merge([$cart_id, $it_id], shop_api_cart_active_statuses())
-            );
-            if ((int) ($activeQty['qty'] ?? 0) + $baseBatchQty > (int) $item['it_stock_qty']) {
-                Response::error('Requested quantity exceeds available stock (' . $item['it_stock_qty'] . ').', 400);
-            }
-        }
-
         $hasBaseOptions = DB::count(
             "SELECT COUNT(*) FROM " . DB::table('g5_shop_item_option_table') . "
              WHERE it_id = ? AND io_use = 1 AND io_type = 0",
@@ -134,19 +122,15 @@ if ($apiMethod === 'POST' && $ct_id === '') {
             }
         }
 
+        // 재고는 담기 전에 옵션마다 한꺼번에 본다 — 몇 줄만 담기고 중간에 멈추지 않게.
+        // 옵션 행은 상품 재고가 아니라 그 옵션 재고로 센다(영카트 원본과 같다).
         foreach ($optionBatch as $batch) {
-            if ((int) $batch['io_stock_qty'] <= 0) {
-                continue;
-            }
-            $activeOptionQty = DB::fetch(
-                "SELECT IFNULL(SUM(ct_qty), 0) AS qty FROM " . DB::table('g5_shop_cart_table') . "
-                 WHERE od_id = ? AND it_id = ? AND io_id = ? AND io_type = ?
-                   AND " . shop_api_cart_active_status_sql(),
-                array_merge([$cart_id, $it_id, $batch['io_id'], $batch['io_type']], shop_api_cart_active_statuses())
+            shop_api_cart_assert_stock(
+                $it_id,
+                $batch['io_id'],
+                (int) $batch['io_type'],
+                shop_api_cart_line_qty($cart_id, $it_id, $batch['io_id'], (int) $batch['io_type'], $sw_direct) + (int) $batch['ct_qty']
             );
-            if ((int) ($activeOptionQty['qty'] ?? 0) + (int) $batch['ct_qty'] > (int) $batch['io_stock_qty']) {
-                Response::error('Requested quantity exceeds available option stock (' . $batch['io_stock_qty'] . ').', 400);
-            }
         }
 
         $cartItems = [];
@@ -187,12 +171,8 @@ if ($apiMethod === 'POST' && $ct_id === '') {
         Response::success(shop_api_with_cart_id($cartItem, (string) $cart_id), 201);
     }
 
-    if ((int) $item['it_stock_qty'] > 0 && $ct_qty > (int) $item['it_stock_qty']) {
-        Response::error('Requested quantity exceeds available stock (' . $item['it_stock_qty'] . ').', 400);
-    }
-
-    // 옵션별 재고 검사 — 옵션이 지정된 상품은 해당 io_stock_qty 가 0 보다 크면 그 한도까지만.
-    //   상품에 옵션 목록이 있는데 사용자가 옵션을 안 골랐다면 거부 (선택 강제).
+    // 상품에 선택옵션이 있는데 옵션을 안 골랐다면 거부(선택 강제). 재고보다 먼저 본다 —
+    //   옵션 상품은 상품 재고를 쓰지 않으므로, 먼저 재고를 보면 "옵션을 고르라" 대신 "품절"이 나간다.
     $hasOptions = DB::count(
         "SELECT COUNT(*) FROM " . DB::table('g5_shop_item_option_table') . "
          WHERE it_id = ? AND io_use = 1 AND io_type = 0",
@@ -201,21 +181,14 @@ if ($apiMethod === 'POST' && $ct_id === '') {
     if ($hasOptions > 0 && $ct_option === '') {
         Response::error('옵션을 선택해주세요.', 400);
     }
-    $optQty = 0;
-    if ($ct_option !== '') {
-        $optStock = DB::fetch(
-            "SELECT io_stock_qty FROM " . DB::table('g5_shop_item_option_table') . "
-             WHERE it_id = ? AND io_id = ? AND io_use = 1 LIMIT 1",
-            [$it_id, $ct_option]
-        );
-        if (!$optStock) {
-            Response::error('선택한 옵션을 사용할 수 없습니다.', 400);
-        }
-        $optQty = (int) $optStock['io_stock_qty'];
-        if ($optQty > 0 && $ct_qty > $optQty) {
-            Response::error('해당 옵션 재고 부족 (' . $optQty . ').', 400);
-        }
-    }
+
+    // 옵션 없는 본품: 이 줄에 이미 담긴 수량 + 이번 수량이 쓸 수 있는 재고를 넘으면 거부(재고 0 은 품절).
+    shop_api_cart_assert_stock(
+        $it_id,
+        '',
+        0,
+        shop_api_cart_line_qty($cart_id, $it_id, '', 0, $sw_direct) + $ct_qty
+    );
 
     $existingBaseQty = shop_api_cart_active_base_qty($cart_id, $it_id, $sw_direct);
     shop_api_cart_validate_buy_qty($item, $ct_qty, $existingBaseQty);
@@ -235,12 +208,6 @@ if ($apiMethod === 'POST' && $ct_id === '') {
     if ($existing) {
         // Update existing cart item qty
         $newQty = (int) $existing['ct_qty'] + $ct_qty;
-        if ((int) $item['it_stock_qty'] > 0 && $newQty > (int) $item['it_stock_qty']) {
-            Response::error('Requested quantity exceeds available stock (' . $item['it_stock_qty'] . ').', 400);
-        }
-        if ($optQty > 0 && $newQty > $optQty) {
-            Response::error('Requested quantity exceeds available option stock (' . $optQty . ').', 400);
-        }
         DB::execute(
             "UPDATE " . DB::table('g5_shop_cart_table') . "
              SET ct_qty = ?,

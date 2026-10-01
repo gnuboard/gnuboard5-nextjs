@@ -46,36 +46,53 @@ async function loadGallery(): Promise<SoluneGallery | null> {
   return { board, posts };
 }
 
+/** 위젯마다 따로 진행 중인 조회. 어느 것도 실패로 끝나지 않는다(빈 값으로 떨어진다). */
+export type SoluneHomeExtraParts = { [K in keyof SoluneHomeExtras]: Promise<SoluneHomeExtras[K]> };
+
 /**
- * 레퍼런스 홈의 부가 위젯 데이터. 테마 슬롯(G5ThemeCommunityHomeData)이 주지 않는
- * 것들만 여기서 직접 읽는다. 한 곳이 비어도 나머지는 그리도록 전부 개별로 감싼다.
+ * 레퍼런스 홈의 부가 위젯 데이터를 위젯마다 따로 부른다. 테마 슬롯(G5ThemeCommunityHomeData)이
+ * 주지 않는 것들만 여기서 직접 읽는다. 한 곳이 비어도 나머지는 그리도록 전부 개별로 감싼다.
+ *
+ * 브라우저는 이것을 받아 도착하는 대로 칸을 채운다 — 갤러리(첫 화면의 가장 큰 그림)가
+ * 설문·인기검색어처럼 상관없는 응답을 기다리지 않게 하려는 것이다.
  */
-export async function loadSoluneHomeExtras(
-  options: { runtime?: boolean } = {}
-): Promise<SoluneHomeExtras> {
+export function loadSoluneHomeExtraParts(options: { runtime?: boolean } = {}): SoluneHomeExtraParts {
   // 브라우저에서는 공유되는 쪽을 쓴다 — 본문 묶음(lib/community-home.ts)도 같은 /settings 를
   // 부르므로, 공유하지 않으면 홈에서 두 번 나간다. 빌드 프리렌더는 요청마다 사람이 다를 수
   // 있어 나눠 쓰지 않는 쪽을 그대로 둔다(buildCommunityHomeData 와 같은 관례).
   const loadSettings = options.runtime === true ? getClientPublicSettings : getPublicSettings;
-  const [comments, faqs, poll, gallery, popularKeywords, settings] = await Promise.all([
-    getRecentItems({ view: "c", limit: COMMENT_LIMIT }).then((result) => result.items).catch(() => []),
-    getFaqs({ perPage: FAQ_LIMIT })
-      .then((result) => (result.ok ? result.data.items.slice(0, FAQ_LIMIT) : []))
-      .catch(() => [] as FaqItem[]),
-    getCurrentPoll()
-      .then((result) => (result.ok ? result.data : null))
-      .catch(() => null),
-    loadGallery().catch(() => null),
-    getPopularKeywords(POPULAR_LIMIT).catch(() => [] as PopularKeyword[]),
-    loadSettings().catch(() => null),
-  ]);
 
   return {
-    comments,
-    faqs,
-    poll,
-    gallery,
-    popularKeywords,
-    visit: settings?.visit ?? null,
+    comments: getRecentItems({ view: "c", limit: COMMENT_LIMIT })
+      .then((result) => result.items)
+      .catch(() => [] as RecentItem[]),
+    faqs: getFaqs({ perPage: FAQ_LIMIT })
+      .then((result) => (result.ok ? result.data.items.slice(0, FAQ_LIMIT) : []))
+      .catch(() => [] as FaqItem[]),
+    poll: getCurrentPoll()
+      .then((result) => (result.ok ? result.data : null))
+      .catch(() => null),
+    gallery: loadGallery().catch(() => null),
+    popularKeywords: getPopularKeywords(POPULAR_LIMIT).catch(() => [] as PopularKeyword[]),
+    visit: loadSettings()
+      .then((settings) => settings?.visit ?? null)
+      .catch(() => null),
   };
+}
+
+/** 위젯 데이터를 한 번에. 빌드 프리렌더처럼 다 모인 뒤 한 번 그리면 되는 곳이 쓴다. */
+export async function loadSoluneHomeExtras(
+  options: { runtime?: boolean } = {}
+): Promise<SoluneHomeExtras> {
+  const parts = loadSoluneHomeExtraParts(options);
+  const [comments, faqs, poll, gallery, popularKeywords, visit] = await Promise.all([
+    parts.comments,
+    parts.faqs,
+    parts.poll,
+    parts.gallery,
+    parts.popularKeywords,
+    parts.visit,
+  ]);
+
+  return { comments, faqs, poll, gallery, popularKeywords, visit };
 }

@@ -9,6 +9,9 @@
  *    새 access token + 새 refresh token (rotation) 발급, 이전 refresh 는 revoke.
  *    rotation 으로 토큰 탈취 시 attacker / legitimate 둘 다 다음 사용에서 401 받음.
  *  - revoke(): 단건 또는 mb_id 전체 (로그아웃 / 비밀번호 변경 시).
+ *  - session_family: 로그인 한 번에 번호 하나(회전해도 그대로). 액세스 토큰의 sid 로 실어 보내고
+ *    Auth::getUser() 가 요청마다 isSessionActive() 로 확인한다 — 세션을 끊으면 액세스 토큰 만료(30분)를
+ *    기다리지 않고 바로 끊긴다. 그누보드 세션(/adm)도 같은 번호로 닫힌다(plugin/webapp/bridge/api_session.php).
  *  - gc(): 만료 후 30 일 지난 row 정리.
  */
 declare(strict_types=1);
@@ -42,6 +45,11 @@ class RefreshToken
              VALUES (?, ?, 'active', ?, ?, ?, NOW(), ?)",
             [$mb_id, $hash, $deviceLabel, $userAgent ? mb_substr($userAgent, 0, 255) : null, $ip, $expiresAt]
         );
+        if (self::hasFamilyColumn()) {
+            // 새 로그인 = 새 세션 번호. 첫 행의 token_id 를 그대로 번호로 쓴다.
+            // lastInsertId 는 사이에 낀 조회(컬럼 확인)로 0 이 될 수 있어 해시로 행을 찾는다.
+            DB::execute("UPDATE `{$table}` SET session_family = token_id WHERE token_hash = ?", [$hash]);
+        }
         return $raw;
     }
 
@@ -74,12 +82,15 @@ class RefreshToken
                 }
                 $reuseMbId = null;
                 $reuse = DB::fetch(
-                    "SELECT mb_id, status, expires_at FROM `{$table}`
+                    "SELECT * FROM `{$table}`
                       WHERE token_hash = ?
                       LIMIT 1",
                     [$hash]
                 );
-                if ($reuse && (string) ($reuse['status'] ?? '') !== 'active' && !empty($reuse['mb_id'])) {
+                // 서버가 끊은 토큰(세션 목록·전체 로그아웃·비밀번호 변경)을 그 기기가 다시 내민 것은 도난 재사용이
+                // 아니다 — 거절만 한다. 이걸 재사용으로 보면 끊은 쪽 기기까지 모두 로그아웃된다.
+                $revokedRemotely = $reuse && (int) ($reuse['revoked_remotely'] ?? 0) === 1;
+                if ($reuse && !$revokedRemotely && (string) ($reuse['status'] ?? '') !== 'active' && !empty($reuse['mb_id'])) {
                     $reuseMbId = (string) $reuse['mb_id'];
                 }
                 DB::rollBack();
@@ -134,7 +145,13 @@ class RefreshToken
                 $expiresAt,
             ]
         );
-        return [$newRaw, (int) DB::lastInsertId()];
+        $newId = (int) DB::lastInsertId();
+        if (self::hasFamilyColumn()) {
+            // 회전은 같은 로그인 — 세션 번호를 이어받는다(칸이 생기기 전 행이면 그 행 번호로 시작).
+            $family = (int) ($row['session_family'] ?? 0) ?: (int) $row['token_id'];
+            DB::execute("UPDATE `{$table}` SET session_family = ? WHERE token_hash = ?", [$family, hash('sha256', $newRaw)]);
+        }
+        return [$newRaw, $newId];
     }
 
     /**
@@ -183,22 +200,77 @@ class RefreshToken
         return ['mb_id' => (string) $old['mb_id'], 'new_refresh' => $newRaw];
     }
 
-    /** replaced_by_token_id 컬럼(설치기가 만든다)이 있을 때만 유예를 켠다 — 없으면 종전 동작 그대로. */
-    private static function hasGraceColumn(): bool
+    /** 설치기가 나중에 더한 컬럼이 있나(요청당 한 번 확인). 없으면 그 기능만 꺼지고 종전 동작 그대로. */
+    private static function hasColumn(string $column): bool
     {
-        static $ready = null;
-        if ($ready === null) {
+        static $ready = [];
+        if (!array_key_exists($column, $ready)) {
             try {
-                $ready = (bool) DB::fetch(
+                $ready[$column] = (bool) DB::fetch(
                     "SELECT 1 AS x FROM information_schema.columns
-                      WHERE table_schema = DATABASE() AND table_name = ? AND column_name = 'replaced_by_token_id' LIMIT 1",
-                    [DB::table('refresh_token_table')]
+                      WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ? LIMIT 1",
+                    [DB::table('refresh_token_table'), $column]
                 );
             } catch (\Throwable $e) {
-                $ready = false;
+                $ready[$column] = false;
             }
         }
-        return $ready;
+        return $ready[$column];
+    }
+
+    /** replaced_by_token_id — 회전 체인. 있을 때만 응답을 잃은 재시도 유예를 켠다. */
+    private static function hasGraceColumn(): bool
+    {
+        return self::hasColumn('replaced_by_token_id');
+    }
+
+    /** session_family — 로그인 세션 번호. 있을 때만 sid 를 싣고 확인한다. */
+    private static function hasFamilyColumn(): bool
+    {
+        return self::hasColumn('session_family');
+    }
+
+    /** revoked_remotely — 서버가 끊은 토큰 표시. 있을 때만 그 토큰의 재제시를 재사용으로 보지 않는다. */
+    private static function hasRemoteColumn(): bool
+    {
+        return self::hasColumn('revoked_remotely');
+    }
+
+    /** 로그인 세션 번호를 쓰는 설치본인가(session_family 컬럼). sid 없는 토큰을 더는 늘려 주지 않을 때 본다. */
+    public static function tracksSessions(): bool
+    {
+        return self::hasFamilyColumn();
+    }
+
+    /**
+     * raw refresh token 이 속한 로그인 세션 번호. 액세스 토큰의 sid 와 그누보드 세션(ss_api_sid)에 넣는다.
+     * 컬럼이 없거나 토큰을 못 찾으면 null — 그때는 sid 없이 발급해 종전처럼 동작한다.
+     */
+    public static function sessionOf(string $rawToken): ?int
+    {
+        if ($rawToken === '' || !self::hasFamilyColumn()) return null;
+        $row = DB::fetch(
+            "SELECT session_family FROM `" . DB::table('refresh_token_table') . "` WHERE token_hash = ? LIMIT 1",
+            [hash('sha256', $rawToken)]
+        );
+        $family = (int) ($row['session_family'] ?? 0);
+        return $family > 0 ? $family : null;
+    }
+
+    /**
+     * 그 로그인 세션이 아직 살아 있나 — 회전 중인 active 행이 하나라도 있으면 그렇다.
+     * 세션 목록의 로그아웃·전체 로그아웃·재사용 감지가 active 행을 없애면 그 자리에서 false 가 된다.
+     * 회전은 한 트랜잭션(이전 행 revoke + 새 행 insert)이라 그 사이에 false 를 보는 일은 없다.
+     */
+    public static function isSessionActive(int $sessionId, string $mb_id): bool
+    {
+        if ($sessionId <= 0 || $mb_id === '') return false;
+        return (bool) DB::fetch(
+            "SELECT 1 AS x FROM `" . DB::table('refresh_token_table') . "`
+              WHERE session_family = ? AND mb_id = ? AND status = 'active' AND expires_at > NOW()
+              LIMIT 1",
+            [$sessionId, $mb_id]
+        );
     }
 
     /**
@@ -229,9 +301,28 @@ class RefreshToken
     {
         if ($mb_id === '' || $tokenId <= 0) return false;
         $table = DB::table('refresh_token_table');
+        if (self::hasFamilyColumn()) {
+            // 목록을 본 뒤 그 기기가 회전했으면 목록의 token_id 는 이미 revoked 다 — 행이 아니라 그 로그인 세션을 끊는다.
+            $row = DB::fetch(
+                "SELECT session_family FROM `{$table}` WHERE token_id = ? AND mb_id = ? LIMIT 1",
+                [$tokenId, $mb_id]
+            );
+            $family = (int) ($row['session_family'] ?? 0);
+            if ($family > 0) {
+                $n = DB::execute(
+                    "UPDATE `{$table}`
+                        SET status = 'revoked', revoked_at = NOW()" . self::remoteMark() . "
+                      WHERE session_family = ?
+                        AND mb_id = ?
+                        AND status = 'active'",
+                    [$family, $mb_id]
+                );
+                return $n > 0;
+            }
+        }
         $n = DB::execute(
             "UPDATE `{$table}`
-                SET status = 'revoked', revoked_at = NOW()
+                SET status = 'revoked', revoked_at = NOW()" . self::remoteMark() . "
               WHERE token_id = ?
                 AND mb_id = ?
                 AND status = 'active'",
@@ -257,16 +348,31 @@ class RefreshToken
     }
 
     /**
-     * 한 회원의 모든 active 토큰 revoke (비밀번호 변경 / 탈퇴 / 전체 로그아웃).
+     * 한 회원의 모든 active 토큰 revoke (비밀번호 변경 / 탈퇴 / 전체 로그아웃 / 재사용 감지).
+     * $exceptSession 을 주면 그 로그인 세션만 남긴다 — 비밀번호를 바꾼 그 기기는 로그인을 유지한다.
+     * 서버가 끊은 것이므로 그 기기들이 토큰을 다시 내밀어도 재사용으로 보지 않는다(remoteMark).
      */
-    public static function revokeAllFor(string $mb_id): int
+    public static function revokeAllFor(string $mb_id, ?int $exceptSession = null): int
     {
         $table = DB::table('refresh_token_table');
+        if ($exceptSession !== null && $exceptSession > 0 && self::hasFamilyColumn()) {
+            return DB::execute(
+                "UPDATE `{$table}` SET status = 'revoked', revoked_at = NOW()" . self::remoteMark() . "
+                  WHERE mb_id = ? AND status = 'active' AND (session_family IS NULL OR session_family <> ?)",
+                [$mb_id, $exceptSession]
+            );
+        }
         return DB::execute(
-            "UPDATE `{$table}` SET status = 'revoked', revoked_at = NOW()
+            "UPDATE `{$table}` SET status = 'revoked', revoked_at = NOW()" . self::remoteMark() . "
               WHERE mb_id = ? AND status = 'active'",
             [$mb_id]
         );
+    }
+
+    /** 서버가 끊는 UPDATE 에 붙이는 SET 조각 — 컬럼이 없는 설치본에서는 빈 문자열. */
+    private static function remoteMark(): string
+    {
+        return self::hasRemoteColumn() ? ', revoked_remotely = 1' : '';
     }
 
     /**

@@ -211,19 +211,20 @@ if ($action === 'login' && $apiMethod === 'POST') {
                      mb_login_ip    = ?
                  WHERE mb_id = ?", [$now, $ip, $mb_id]);
 
-    // Generate access + refresh token
-    $token = Auth::generateToken($member);
+    // Generate refresh + access token (액세스 토큰에 로그인 세션 번호를 싣는다)
     $refresh = RefreshToken::issue(
         $member['mb_id'],
         isset($input['device_label']) ? (string) $input['device_label'] : null,
         isset($_SERVER['HTTP_USER_AGENT']) ? (string) $_SERVER['HTTP_USER_AGENT'] : null,
         $ip
     );
+    $sessionId = RefreshToken::sessionOf($refresh);
+    $token = Auth::generateToken($member, $sessionId);
 
     // Build safe member data
     $memberData = api_auth_member_payload($member);
     api_auth_set_session_cookies($token, $refresh, $autoLogin);
-    api_auth_open_php_session($member);
+    api_auth_open_php_session($member, $sessionId);
 
     Response::success(api_auth_with_merged_cart([
         'token'         => $token,
@@ -620,16 +621,17 @@ if ($action === 'register' && $apiMethod === 'POST') {
         ], 201);
     }
 
-    // Generate access + refresh token
-    $token = Auth::generateToken($member);
+    // Generate refresh + access token (액세스 토큰에 로그인 세션 번호를 싣는다)
     $refresh = RefreshToken::issue(
         $member['mb_id'],
         'register',
         isset($_SERVER['HTTP_USER_AGENT']) ? (string) $_SERVER['HTTP_USER_AGENT'] : null,
         isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : null
     );
+    $sessionId = RefreshToken::sessionOf($refresh);
+    $token = Auth::generateToken($member, $sessionId);
     api_auth_set_session_cookies($token, $refresh, false);
-    api_auth_open_php_session($member);
+    api_auth_open_php_session($member, $sessionId);
 
     Response::success(api_auth_with_merged_cart([
         'token'         => $token,

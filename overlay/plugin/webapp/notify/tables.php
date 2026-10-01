@@ -520,6 +520,21 @@ if (!function_exists('webapp_admin_dbupgrade')) {
             sql_query("ALTER TABLE `{$refresh_token}` ADD COLUMN `replaced_by_token_id` INT NULL DEFAULT NULL AFTER `status`", false);
             $changed = true;
         }
+        // 로그인 세션 번호 — 로그인 한 번 = 번호 하나, 회전해도 그대로. 액세스 토큰의 sid 와 /adm 세션이 이 번호로
+        // "그 로그인이 아직 살아 있나"를 본다(세션 목록에서 로그아웃하면 그 자리에서 끊긴다).
+        if (webapp_table_exists($refresh_token) && !webapp_column_exists($refresh_token, 'session_family')) {
+            sql_query("ALTER TABLE `{$refresh_token}`
+                       ADD COLUMN `session_family` INT NULL DEFAULT NULL AFTER `replaced_by_token_id`,
+                       ADD KEY `idx_session_status` (`session_family`, `status`)", false);
+            $changed = true;
+        }
+        // 서버가 끊은 토큰 표시(세션 목록 로그아웃·전체 로그아웃·비밀번호 변경). 끊긴 기기가 그 토큰을 다시 내미는 것은
+        // 도난 재사용이 아니므로 거절만 한다 — 이 표시가 없으면 재사용 감지가 끊은 쪽 기기까지 모두 로그아웃시킨다.
+        if (webapp_table_exists($refresh_token) && !webapp_column_exists($refresh_token, 'revoked_remotely')) {
+            sql_query("ALTER TABLE `{$refresh_token}`
+                       ADD COLUMN `revoked_remotely` TINYINT(1) NOT NULL DEFAULT 0 AFTER `revoked_at`", false);
+            $changed = true;
+        }
         // refresh_token 핫경로: WHERE mb_id = ? AND status = 'active' ORDER BY token_id DESC
         if (webapp_table_exists($refresh_token) && !webapp_index_exists($refresh_token, 'idx_mb_status_id')) {
             sql_query("ALTER TABLE `{$refresh_token}`

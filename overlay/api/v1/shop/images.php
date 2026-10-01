@@ -38,6 +38,15 @@ if ($mime === '' || strpos($mime, 'image/') !== 0) {
     Response::error('Unsupported image type.', 415);
 }
 
+// ?w= 를 붙인 목록·배너 주소에는 줄이거나 WebP 로 옮긴 사본을 준다(lib/image-variants.php).
+// 상품 진열 사진은 원본 PNG 가 한 장 330KB 안팎이었다. 원본 주소(상세 화면)는 그대로 원본이다.
+$variant = api_image_variant($path, $mime, isset($_GET['w']) ? (int) $_GET['w'] : 0);
+$path = $variant['path'];
+$mime = $variant['mime'];
+if ($variant['vary']) {
+    header('Vary: Accept');
+}
+
 $size = filesize($path);
 $mtime = filemtime($path) ?: time();
 $etag = '"' . sha1($path . '|' . $size . '|' . $mtime) . '"';

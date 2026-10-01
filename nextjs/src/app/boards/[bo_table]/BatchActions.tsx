@@ -1,19 +1,15 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { apiClient } from "@/lib/api";
-import { useAuthStore } from "@/store/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Copy, FolderInput, Trash2 } from "lucide-react";
-import { toastSuccess, toastError } from "@/lib/toast";
 import { useVisitedPosts } from "@/hooks/useVisitedPosts";
 import { KeyboardNav } from "./KeyboardNav";
 import type { WritePost } from "@/lib/types";
 import { boardPostHref, type BbsRewriteMode } from "@/lib/board-url";
 import { PostListRow } from "./PostListRow";
-import { BatchTransferDialog, type TransferMode } from "./BatchTransferDialog";
+import { BatchTransferDialog } from "./BatchTransferDialog";
+import { useBatchSelection } from "./useBatchSelection";
 
 interface BatchPostListProps {
   boTable: string;
@@ -39,59 +35,22 @@ export function BatchPostList({
   boHot,
   currentWrId,
 }: BatchPostListProps) {
-  const router = useRouter();
-  const { user } = useAuthStore();
   const { isVisited } = useVisitedPosts();
-  const [transferMode, setTransferMode] = useState<TransferMode | null>(null);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [deleting, setDeleting] = useState(false);
-  const [deletedIds, setDeletedIds] = useState<Set<number>>(new Set());
-
-  const isAdmin = user && user.mb_level >= 10;
   // 공지도 고를 수 있다(선택 삭제 · 복사 · 이동). 공지는 목록 위에 따로 나오고 일반 글 목록에는 없다.
-  const allIds = [...notices, ...posts].map((p) => p.wr_id);
-  const visibleIds = allIds.filter((id) => !deletedIds.has(id));
-
-  const toggleOne = (id: number) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleAll = () => {
-    if (selected.size === visibleIds.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(visibleIds));
-    }
-  };
-
-  const handleBatchDelete = useCallback(async () => {
-    if (selected.size === 0) return;
-    if (!confirm(`선택한 ${selected.size}개의 게시글을 삭제하시겠습니까?`)) return;
-
-    setDeleting(true);
-    let count = 0;
-    for (const wrId of selected) {
-      try {
-        await apiClient.delete(`/posts/${boTable}/${wrId}`);
-        count++;
-        setDeletedIds((prev) => new Set(prev).add(wrId));
-      } catch {
-        // continue
-      }
-    }
-    setSelected(new Set());
-    if (count > 0) {
-      toastSuccess(`${count}개의 게시글이 삭제되었습니다.`);
-    } else {
-      toastError("삭제에 실패했습니다.");
-    }
-    setDeleting(false);
-  }, [selected, boTable]);
+  const {
+    isAdmin,
+    selected,
+    deletedIds,
+    deleting,
+    allSelected,
+    transferMode,
+    setTransferMode,
+    toggleOne,
+    toggleAll,
+    clearSelection,
+    handleBatchDelete,
+    handleTransferDone,
+  } = useBatchSelection(boTable, [...notices, ...posts].map((p) => p.wr_id));
 
   const postLinks = posts
     .filter((p) => !deletedIds.has(p.wr_id))
@@ -118,7 +77,7 @@ export function BatchPostList({
             <FolderInput className="h-4 w-4 mr-1" />
             선택 이동
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
+          <Button variant="ghost" size="sm" onClick={clearSelection}>
             선택 해제
           </Button>
         </div>
@@ -129,13 +88,7 @@ export function BatchPostList({
         boTable={boTable}
         wrIds={[...selected]}
         onClose={() => setTransferMode(null)}
-        onDone={(mode, movedIds) => {
-          if (mode === "move" && movedIds.length > 0) {
-            setDeletedIds((prev) => new Set([...prev, ...movedIds]));
-          }
-          setSelected(new Set());
-          router.refresh();
-        }}
+        onDone={handleTransferDone}
       />
 
       <Card className="board-list-card">
@@ -148,7 +101,7 @@ export function BatchPostList({
                     <th className="px-2 py-3 w-10 text-center">
                       <input
                         type="checkbox"
-                        checked={selected.size === visibleIds.length && visibleIds.length > 0}
+                        checked={allSelected}
                         onChange={toggleAll}
                         className="rounded"
                       />

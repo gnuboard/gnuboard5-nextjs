@@ -50,6 +50,48 @@ function shop_api_cart_active_base_qty($cart_id, $it_id, $direct = false, $exclu
     return (int) ($row['qty'] ?? 0);
 }
 
+/**
+ * 이 장바구니에 이미 담긴 같은 줄(같은 상품 · 같은 옵션 · 바로구매 여부)의 수량. $excludeCtId 행은 뺀다(수량 바꾸기).
+ */
+function shop_api_cart_line_qty($cart_id, $it_id, $ioId, $ioType, $direct = false, $excludeCtId = 0) {
+    $sql = "SELECT IFNULL(SUM(ct_qty), 0) AS qty FROM " . DB::table('g5_shop_cart_table') . "
+            WHERE od_id = ? AND it_id = ? AND io_id = ? AND io_type = ? AND ct_direct = ?
+              AND " . shop_api_cart_active_status_sql();
+    $params = array_merge([$cart_id, $it_id, (string) $ioId, (int) $ioType, $direct ? 1 : 0], shop_api_cart_active_statuses());
+
+    if ((int) $excludeCtId > 0) {
+        $sql .= " AND ct_id <> ?";
+        $params[] = (int) $excludeCtId;
+    }
+
+    $row = DB::fetch($sql, $params);
+    return (int) ($row['qty'] ?? 0);
+}
+
+/**
+ * 담기 · 수량 바꾸기의 재고 검사 — 주문 때의 shop_api_validate_order_stock() 과 같은 기준(영카트 cartupdate.php).
+ * 쓸 수 있는 재고(창고 재고 - 주문 대기 수량, shop_api_stock_available_qty)를 이 줄의 합계 수량이 넘으면 거부한다.
+ * 재고 0 은 품절이다 — 전에는 0 을 '재고 관리 안 함'으로 보아 담기는 되고 주문 단계에서야 막혔다.
+ * 옵션 없는 본품은 상품 재고, 옵션 행(선택 · 추가)은 그 옵션 재고만 본다(영카트 원본과 같다).
+ */
+function shop_api_cart_assert_stock($it_id, $ioId, $ioType, $totalQty) {
+    $ioId = (string) $ioId;
+    $available = shop_api_stock_available_qty((string) $it_id, $ioId, (int) $ioType);
+    if ((int) $totalQty <= $available) {
+        return;
+    }
+
+    $context = ['it_id' => (string) $it_id, 'io_id' => $ioId, 'available_qty' => max(0, $available)];
+    if ($available <= 0) {
+        Response::error($ioId !== '' ? '선택한 옵션은 품절입니다.' : 'Product is sold out.', 400, $context);
+    }
+    Response::error(
+        'Requested quantity exceeds available ' . ($ioId !== '' ? 'option ' : '') . 'stock (' . $available . ').',
+        400,
+        $context
+    );
+}
+
 function shop_api_cart_validate_buy_qty($item, $submittedBaseQty, $existingBaseQty = 0, $useTotalForMin = false) {
     $submittedBaseQty = max(0, (int) $submittedBaseQty);
     $existingBaseQty = max(0, (int) $existingBaseQty);
@@ -98,7 +140,6 @@ function shop_api_cart_add_row($cart_id, $mb_id, $item, $it_id, $ioId, $qty, $di
     $optRow = null;
     $ioType = 0;
     $ioPrice = 0;
-    $optQty = 0;
 
     if ($ioId !== '') {
         $optRow = DB::fetch(
@@ -111,7 +152,6 @@ function shop_api_cart_add_row($cart_id, $mb_id, $item, $it_id, $ioId, $qty, $di
         }
         $ioType = (int) $optRow['io_type'];
         $ioPrice = (int) $optRow['io_price'];
-        $optQty = (int) $optRow['io_stock_qty'];
 
         if ($ioType === 1 && $ioPrice < 0) {
             Response::error('Products with a negative purchase amount cannot be purchased.', 400);
@@ -144,19 +184,6 @@ function shop_api_cart_add_row($cart_id, $mb_id, $item, $it_id, $ioId, $qty, $di
         }
     }
 
-    if ($ioType === 0 && (int) $item['it_stock_qty'] > 0) {
-        $activeQty = DB::fetch(
-            "SELECT IFNULL(SUM(ct_qty), 0) AS qty FROM " . DB::table('g5_shop_cart_table') . "
-             WHERE od_id = ? AND it_id = ? AND io_type = 0
-               AND " . shop_api_cart_active_status_sql(),
-            array_merge([$cart_id, $it_id], shop_api_cart_active_statuses())
-        );
-        $totalQty = (int) ($activeQty['qty'] ?? 0) + $qty;
-        if ($totalQty > (int) $item['it_stock_qty']) {
-            Response::error('Requested quantity exceeds available stock (' . $item['it_stock_qty'] . ').', 400);
-        }
-    }
-
     $existing = DB::fetch(
         "SELECT ct_id, ct_qty FROM " . DB::table('g5_shop_cart_table') . "
          WHERE od_id = ? AND it_id = ? AND io_id = ? AND io_type = ?
@@ -166,12 +193,8 @@ function shop_api_cart_add_row($cart_id, $mb_id, $item, $it_id, $ioId, $qty, $di
         array_merge([$cart_id, $it_id, $ioId, $ioType, $direct ? 1 : 0], shop_api_cart_active_statuses())
     );
 
-    if ($optQty > 0) {
-        $newOptionQty = (int) ($existing['ct_qty'] ?? 0) + $qty;
-        if ($newOptionQty > $optQty) {
-            Response::error('Requested quantity exceeds available option stock (' . $optQty . ').', 400);
-        }
-    }
+    // 이 줄에 이미 담긴 수량 + 이번 수량이 쓸 수 있는 재고를 넘으면 거부(재고 0 은 품절).
+    shop_api_cart_assert_stock($it_id, $ioId, $ioType, (int) ($existing['ct_qty'] ?? 0) + $qty);
 
     $ctSendCost = shop_api_cart_normalize_send_cost_choice($item, $ctSendCost);
 

@@ -14,6 +14,7 @@ import { formatPrice } from "@/lib/utils";
 import { useCompareStore } from "@/store/compare";
 import { useThemeSlot } from "@/components/providers/ThemeSlotsProvider";
 import { ProductImageFallback } from "./ProductImageFallback";
+import { ProductQuickAdd } from "./ProductQuickAdd";
 
 interface ProductCardProps {
   product: ShopProduct;
@@ -100,6 +101,12 @@ function DefaultProductCard({ product, priority = false, productRewriteMode }: P
           </span>
         </div>
       </Link>
+      {/* 담기: 옵션 없는 상품은 바로 담고, 옵션 상품은 옵션 고르기 창을 연다(테마 카드와 같은 ProductQuickAdd). */}
+      <ProductQuickAdd
+        product={product}
+        href={href}
+        className="product-card-add mt-2.5 h-9 w-full rounded-md border border-[#e4e9e6] bg-white text-xs font-semibold text-[#27313c] transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:bg-[#f3f5f4] disabled:text-[#5f6872] disabled:hover:border-[#e4e9e6]"
+      />
       <CompareToggleButton product={product} />
     </div>
   );

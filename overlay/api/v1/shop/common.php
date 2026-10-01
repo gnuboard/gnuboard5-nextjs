@@ -125,17 +125,18 @@ if (!function_exists('shop_api_item_image_url')) {
 
 if (!function_exists('shop_api_product_list_extras')) {
     /**
-     * 목록 카드가 쓰는 부가 정보를 한 페이지 분량으로 한꺼번에 가져온다: 분류 이름, 후기 건수·평균.
-     * 상품마다 따로 묻지 않으려고(N+1) 페이지의 it_id·ca_id 묶음으로 두 번만 묻는다.
+     * 목록 카드가 쓰는 부가 정보를 한 페이지 분량으로 한꺼번에 가져온다: 분류 이름, 후기 건수·평균,
+     * 필수 옵션(선택옵션) 유무. 상품마다 따로 묻지 않으려고(N+1) 페이지의 it_id·ca_id 묶음으로 세 번만 묻는다.
+     * 필수 옵션 유무는 카드의 "담기" 단추가 바로 담을지(옵션 없음) 옵션 고르기 창을 열지 정하는 데 쓴다.
      * 상세(products/{it_id})가 내는 ca_name · review_count · review_avg 와 같은 뜻의 값이다 —
      * 테마 카드(브랜드 줄, "리뷰 N", 별점)가 목록과 상세에서 같은 필드를 읽게 하려는 것.
      *
      * @param array<int, array<string, mixed>> $rows it_id, ca_id 가 든 상품 행들
-     * @return array{categories: array<string, string>, reviews: array<string, array{cnt: int, avg: float}>}
+     * @return array{categories: array<string, string>, reviews: array<string, array{cnt: int, avg: float}>, options: array<string, bool>}
      */
     function shop_api_product_list_extras(array $rows)
     {
-        $extras = array('categories' => array(), 'reviews' => array());
+        $extras = array('categories' => array(), 'reviews' => array(), 'options' => array());
         if (!$rows) {
             return $extras;
         }
@@ -176,6 +177,16 @@ if (!function_exists('shop_api_product_list_extras')) {
                     'cnt' => (int) $stat['cnt'],
                     'avg' => round((float) $stat['avg_score'], 1),
                 );
+            }
+
+            // 쓰는 중인 선택옵션(io_type 0)이 하나라도 있으면 옵션 없이는 담을 수 없다(장바구니 API 가 거부한다).
+            // 추가옵션(io_type 1)만 있는 상품은 본품만 담을 수 있으므로 셈하지 않는다.
+            foreach (DB::fetchAll(
+                "SELECT DISTINCT it_id FROM " . DB::table('g5_shop_item_option_table') . "
+                  WHERE it_id IN ({$marks}) AND io_use = 1 AND io_type = 0",
+                $ids
+            ) as $opt) {
+                $extras['options'][(string) $opt['it_id']] = true;
             }
         }
 

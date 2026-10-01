@@ -212,7 +212,7 @@ if (!function_exists('api_shop_product_related_items')) {
                 'it_price'       => (int) $row['it_price'],
                 'it_cust_price'  => (int) $row['it_cust_price'],
                 'it_tel_inq'     => (string) (int) ($row['it_tel_inq'] ?? 0),
-                'image_url'      => api_shop_item_image_url((string) $row['it_id'], $row['it_img1'] ?? ''),
+                'image_url'      => api_image_url_with_width(api_shop_item_image_url((string) $row['it_id'], $row['it_img1'] ?? ''), 800),
             ];
         }
 
@@ -333,7 +333,8 @@ if ($apiMethod === 'GET' && $it_id === '') {
                 it_stock_qty, it_soldout, it_img1, it_img2, it_img3, it_img4, it_img5,
                 it_img6, it_img7, it_img8, it_img9, it_img10,
                 it_buy_min_qty, it_buy_max_qty, it_tel_inq, it_brand, it_maker,
-                it_type1, it_type2, it_type3, it_type4, it_type5, it_hit, it_seo_title
+                it_type1, it_type2, it_type3, it_type4, it_type5, it_hit, it_seo_title,
+                it_sc_type, it_sc_method
          FROM {$itemTable}
          WHERE {$where}
          ORDER BY {$orderBy}
@@ -372,7 +373,11 @@ if ($apiMethod === 'GET' && $it_id === '') {
             'it_type4'       => $row['it_type4'],
             'it_type5'       => $row['it_type5'],
             'it_hit'         => (int) $row['it_hit'],
-            'image_url'      => $images[0] ?? '',
+            'it_sc_type'     => (int) ($row['it_sc_type'] ?? 0),
+            'it_sc_method'   => (int) ($row['it_sc_method'] ?? 0),
+            'has_options'    => isset($extras['options'][(string) $row['it_id']]),
+            // 진열 카드용 — 폭을 붙여 줄이거나 WebP 로 옮긴 사본을 받게 한다. images 는 원본 그대로.
+            'image_url'      => api_image_url_with_width($images[0] ?? '', 800),
             'images'         => $images,
         ];
     }

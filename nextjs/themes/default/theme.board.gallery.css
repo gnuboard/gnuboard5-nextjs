@@ -1,0 +1,72 @@
+/* --- 갤러리 게시판 목록 (레퍼런스 gallery list.skin.php 의 .cb-gallery, 2026-10 실측) -----------
+   앱 마크업(GalleryPostGrid)의 gallery-* 손잡이에 테마 팔레트를 입힌다. 모양(16:10 사진 · 두 줄 제목 ·
+   발췌 · 발자취 줄)은 앱 마크업이 이미 그리고, 여기서는 색 · 그림자 · 카드 사이 간격만 레퍼런스에 맞춘다.
+   레퍼런스: 도구줄(분류 칩) · 선택바 · 카드 · 쪽 넘김이 각각 따로 선 카드(모서리 14px, 사이 18px).
+   theme.internal.pages.css 의 목록 틀은 칩 띠 · 표 · 쪽 넘김을 카드 한 장으로 잇는데, 갤러리는
+   그 이음을 풀어 낱장으로 세운다. 이 파일이 그 뒤에 실려 같은 무게에서 이긴다. */
+
+/* 선택바는 격자 바로 위(같은 order — 문서 순서대로 선다). */
+body[data-g5-theme-source="default"] .board-list-page .gallery-selbar { order: 5; }
+body[data-g5-theme-source="default"] .board-list-page:not(.board-list-embedded):not(:has(.board-list-categories)) > .gallery-selbar { margin-top: 1.5rem; }
+body[data-g5-theme-source="default"] .board-list-page .board-list-categories ~ :is(.gallery-selbar, .gallery-grid),
+body[data-g5-theme-source="default"] .board-list-page .gallery-selbar + .gallery-grid { margin-top: 1.125rem; }
+
+/* 칩 띠 · 쪽 넘김: 표의 머리 · 발이 아니라 스스로 선 카드. */
+body[data-g5-theme-source="default"] .board-list-page:has(.gallery-grid) .board-list-categories {
+  border-bottom: 1px solid var(--solune-border);
+  border-radius: 14px;
+  background: var(--solune-surface);
+  box-shadow: var(--solune-shadow-sm);
+}
+body[data-g5-theme-source="default"] .board-list-page:has(.gallery-grid) .board-list-pagination {
+  margin-top: 1.125rem;
+  border-radius: 14px;
+  box-shadow: var(--solune-shadow-sm);
+}
+
+/* 선택바: 고른 것이 생기면 파랑 테두리 + 옅은 파랑 바탕으로 깨운다. */
+body[data-g5-theme-source="default"] .gallery-selbar {
+  border-color: var(--solune-border);
+  padding: 0.6875rem 1.125rem;
+  background: var(--solune-surface);
+  box-shadow: var(--solune-shadow-sm);
+}
+body[data-g5-theme-source="default"] .gallery-selbar.is-open { border-color: var(--solune-primary); background: var(--solune-primary-soft); }
+body[data-g5-theme-source="default"] .gallery-selbar label { color: var(--solune-muted); }
+body[data-g5-theme-source="default"] .gallery-selbar.is-open label > span { color: var(--solune-primary); }
+body[data-g5-theme-source="default"] .gallery-selbar-actions button { border-color: var(--solune-border); border-radius: 8px; background: var(--solune-surface); color: var(--solune-text-soft); font-weight: 600; }
+body[data-g5-theme-source="default"] .gallery-selbar-actions button:not(:disabled):hover { border-color: var(--solune-primary); color: var(--solune-primary); }
+
+/* 카드 */
+body[data-g5-theme-source="default"] .gallery-card {
+  border-color: var(--solune-border);
+  background: var(--solune-surface);
+  box-shadow: var(--solune-shadow-sm);
+}
+body[data-g5-theme-source="default"] .gallery-card:is(:hover, :focus-within) { border-color: var(--solune-border-strong); box-shadow: var(--solune-shadow-lift); }
+body[data-g5-theme-source="default"] .gallery-card:is(.is-selected, .is-current) { border-color: var(--solune-primary); }
+body[data-g5-theme-source="default"] .gallery-card-media { background: var(--solune-surface-soft); }
+/* 사진 확대는 레퍼런스(1.04, 0.28s)처럼 살짝만. */
+body[data-g5-theme-source="default"] .gallery-card-media img { transition: transform 0.28s ease; }
+body[data-g5-theme-source="default"] .gallery-card:hover .gallery-card-media img { transform: scale(1.04); }
+/* 첨부가 없는 글: 빈 자리 대신 사선 무늬 — 카드 높이는 그대로, 사진이 없다는 것만 알린다. */
+body[data-g5-theme-source="default"] .gallery-card-noimg {
+  background: repeating-linear-gradient(135deg, transparent 0 9px, var(--solune-border) 9px 10px);
+  color: var(--solune-muted);
+}
+/* 사진 위에서는 옅은 파랑 바탕이 묻힌다. NEW · 공지는 꽉 찬 색으로 띄운다(앱 bg-primary 와 같다). */
+body[data-g5-theme-source="default"] .gallery-card-flag:not(.is-hot) { background: var(--solune-primary); color: var(--solune-primary-ink); }
+
+body[data-g5-theme-source="default"] .gallery-card-cat { background: var(--solune-primary-soft); color: var(--solune-primary); }
+body[data-g5-theme-source="default"] .gallery-card-title a { color: var(--solune-text); }
+body[data-g5-theme-source="default"] .gallery-card-title a:is(:hover, :focus-visible) { color: var(--solune-primary); }
+body[data-g5-theme-source="default"] .gallery-card-excerpt { color: var(--solune-text-soft); }
+body[data-g5-theme-source="default"] .gallery-card-foot { border-top-color: var(--solune-border); color: var(--solune-muted); }
+body[data-g5-theme-source="default"] .gallery-card-author button,
+body[data-g5-theme-source="default"] .gallery-card-author > :is(a, span):last-child { color: var(--solune-text-soft); font-weight: 500; }
+body[data-g5-theme-source="default"] .gallery-card-avatar { background: var(--solune-primary-soft); color: var(--solune-primary); }
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-g5-theme-source="default"] .gallery-card-media img { transition: none; }
+  body[data-g5-theme-source="default"] .gallery-card:hover .gallery-card-media img { transform: none; }
+}

@@ -114,7 +114,7 @@ if ($apiMethod === 'GET' && $ev_id > 0) {
             'it_type2'      => (string) $row['it_type2'],
             'it_type4'      => (string) $row['it_type4'],
             'it_type5'      => (string) $row['it_type5'],
-            'image_url'     => api_shop_item_image_url($row['it_id'], $row['it_img1']),
+            'image_url'     => api_image_url_with_width(api_shop_item_image_url($row['it_id'], $row['it_img1']), 800),
         ];
     }
 

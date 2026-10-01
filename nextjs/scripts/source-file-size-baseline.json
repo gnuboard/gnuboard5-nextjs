@@ -13,5 +13,5 @@
   "scripts/lib/local-order-scope-checks.mjs": 718,
   "src/app/(auth)/register/ClientPage.tsx": 775,
   "src/app/shop/orders/[od_id]/ClientPage.tsx": 766,
-  "src/app/shop/products/[it_id]/ProductDetailClient.tsx": 734
+  "src/app/shop/products/[it_id]/ProductDetailClient.tsx": 709
 }

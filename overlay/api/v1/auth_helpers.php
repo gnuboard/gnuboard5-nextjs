@@ -135,8 +135,11 @@ if (!function_exists('api_auth_open_php_session')) {
      * common.php 가 이미 세션을 시작해 두었으므로 같은 origin 이면 세션 쿠키가 그대로 따라간다;
      * 다른 origin(Vercel 프론트, 앱)에서는 쿠키가 안 붙을 뿐 해는 없다.
      * 그누보드 밖에서(단위 테스트 등) 불리면 조용히 넘어간다.
+     *
+     * $sessionId(로그인 세션 번호)를 함께 적어 두면, 그 로그인이 세션 목록에서 끊길 때 이 그누보드 세션도
+     * 다음 요청에서 닫힌다(plugin/webapp/bridge/api_session.php).
      */
-    function api_auth_open_php_session(array $member)
+    function api_auth_open_php_session(array $member, $sessionId = null)
     {
         if (!function_exists('set_session') || empty($member['mb_id'])) {
             return;
@@ -146,6 +149,8 @@ if (!function_exists('api_auth_open_php_session')) {
         }
         @session_regenerate_id(false);
         set_session('ss_mb_id', (string) $member['mb_id']);
+        set_session('ss_api_sid', (int) $sessionId > 0 ? (string) (int) $sessionId : '');
+        set_session('ss_api_sid_mb', (int) $sessionId > 0 ? (string) $member['mb_id'] : '');
         if (function_exists('generate_mb_key')) {
             generate_mb_key($member);
         }
@@ -320,7 +325,7 @@ if (!function_exists('api_auth_member_from_refresh_cookie')) {
             return null;
         }
 
-        $token = Auth::generateToken($member);
+        $token = Auth::generateToken($member, RefreshToken::sessionOf($result['new_refresh']));
         $autoLoginCookie = !empty($_COOKIE['g5_auto_login']) && (string) $_COOKIE['g5_auto_login'] === '1';
         api_auth_set_session_cookies($token, $result['new_refresh'], $autoLoginCookie);
 

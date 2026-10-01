@@ -8,14 +8,22 @@
 
 class Auth
 {
+    /** @var int|null 이 요청의 액세스 토큰이 속한 로그인 세션 번호(sid). 없으면 null. */
+    private static $sessionId = null;
+
     /**
      * Extract & decode the JWT from the Authorization header and return the
      * corresponding member row, or null if unauthenticated.
+     *
+     * 토큰에 sid(로그인 세션 번호)가 있으면 그 세션이 아직 살아 있는지도 본다 — 세션 목록에서 로그아웃하거나
+     * 전체 로그아웃하면 액세스 토큰 만료(30분)를 기다리지 않고 다음 요청부터 바로 끊긴다.
+     * sid 가 없는 토큰(칸이 생기기 전 발급분)은 종전대로 서명과 만료만 본다.
      *
      * @return array|null  Member row from g5_member or null
      */
     public static function getUser()
     {
+        self::$sessionId = null;
         $token = self::extractBearerToken();
         if (!$token) {
             return null;
@@ -27,6 +35,14 @@ class Auth
         }
 
         $mb_id = $payload['mb_id'];
+
+        $sessionId = isset($payload['sid']) ? (int) $payload['sid'] : 0;
+        if ($sessionId > 0) {
+            if (!class_exists('RefreshToken') || !RefreshToken::isSessionActive($sessionId, (string) $mb_id)) {
+                return null;
+            }
+            self::$sessionId = $sessionId;
+        }
 
         // Fetch fresh member data from DB
         $table = DB::table('member_table');
@@ -159,7 +175,7 @@ class Auth
      * @param  array  $member  Member row from g5_member
      * @return string JWT token
      */
-    public static function generateToken($member)
+    public static function generateToken($member, $sessionId = null)
     {
         $payload = [
             'mb_id'    => $member['mb_id'],
@@ -168,8 +184,21 @@ class Auth
             'mb_email' => $member['mb_email'],
             'mb_level' => (int) $member['mb_level'],
         ];
+        // 로그인 세션 번호(RefreshToken::sessionOf). getUser() 가 이 세션이 끊겼는지 요청마다 본다.
+        if ((int) $sessionId > 0) {
+            $payload['sid'] = (int) $sessionId;
+        }
 
         return JWT::encode($payload);
+    }
+
+    /**
+     * 이 요청의 액세스 토큰이 속한 로그인 세션 번호 — getUser()/requireAuth() 뒤에만 뜻이 있다.
+     * 비밀번호를 바꾼 기기만 남기거나(revokeAllFor), 액세스 토큰만으로 갱신할 때 번호를 이어 줄 때 쓴다.
+     */
+    public static function currentSessionId()
+    {
+        return self::$sessionId;
     }
 
     /**

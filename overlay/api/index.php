@@ -446,6 +446,7 @@ require_once __DIR__ . '/lib/Response.php';
 require_once __DIR__ . '/lib/Auth.php';
 require_once __DIR__ . '/lib/Validator.php';
 require_once __DIR__ . '/lib/helpers.php';
+require_once __DIR__ . '/lib/image-variants.php';
 require_once __DIR__ . '/lib/editor-images.php';
 require_once __DIR__ . '/lib/PushQueue.php';
 // 알림의 단 하나의 문. plugin/webapp/notify 에 있고, 없으면(옛 배치) 아무 것도 안 하는 대역을 둔다.
@@ -622,6 +623,69 @@ $handlers = [
 
 if (!$resource || !isset($handlers[$resource])) {
     Response::error('Unknown resource: ' . $resource, 404);
+}
+
+if (!function_exists('g5_api_session_free_read')) {
+    /**
+     * 세션을 읽기만 하는 공개 GET 인지. 아래 목록은 핸들러를 하나씩 확인해 세션에 쓰지 않는 것만 담았다.
+     *
+     * 세션을 쓰는 GET 은 넣지 않는다 — 장바구니(shop/cart 는 장바구니 id 를 세션에 남긴다), 글 보기
+     * (조회수 세션), 캡차, 소셜·본인인증, 주문·영수증 조회. 새 경로를 넣을 때는 그 핸들러와 핸들러가
+     * 부르는 함수가 set_session · $_SESSION 쓰기 · check_rate_limit · get_write_token ·
+     * generate_mb_key · set_cart_id 를 부르지 않는지 먼저 확인한다. 잠금을 푼 뒤의 쓰기는 오류 없이
+     * 사라진다.
+     */
+    function g5_api_session_free_read($method, $resource, array $segments)
+    {
+        if ($method !== 'GET' && $method !== 'HEAD') {
+            return false;
+        }
+
+        $count = count($segments);
+        $first = $count > 0 ? (string) $segments[0] : '';
+        $second = $count > 1 ? (string) $segments[1] : '';
+
+        switch ($resource) {
+            case 'boards':
+                // 게시판 목록 · 게시판 하나 · 글 목록. 글 하나와 첨부 정리는 다른 경로다.
+                return $count <= 1 || ($count === 2 && $second === 'posts');
+            case 'board-files':
+            case 'faqs':
+            case 'faq':
+            case 'menus':
+            case 'recent':
+            case 'settings':
+                return true;
+            case 'polls':
+            case 'poll':
+                return $count === 1 && $first === 'current';
+            case 'search':
+                return $count === 1 && $first === 'popular';
+            case 'auth':
+                return $count === 2 && $first === 'social' && $second === 'providers';
+            case 'shop':
+                if (in_array($first, array('banners', 'categories', 'popups', 'images', 'products', 'reviews'), true)) {
+                    return true;
+                }
+                return $count === 2 && $first === 'payment' && $second === 'config';
+        }
+
+        return false;
+    }
+}
+
+// 세션을 읽기만 하는 요청은 핸들러에 들어가기 전에 세션 잠금을 푼다.
+//
+// PHP 의 파일 세션은 요청이 끝날 때까지 세션 파일을 잠근다. 그래서 한 사람의 화면이 API 를
+// 한꺼번에 여러 개 부르면 서버에서는 하나씩 차례로 돈다(홈 첫 화면의 읽기 12개: 같은 세션
+// 약 265ms, 세션을 나눴을 때 약 68ms). 잠금을 풀어도 $_SESSION 은 그대로 읽힌다.
+//
+// 세션이 없거나(CLI · 세션을 안 여는 설치) 이미 닫혔으면 아무것도 하지 않는다.
+// 끄려면 extend/ 에서 define('G5_API_EARLY_SESSION_CLOSE', false);
+if ((!defined('G5_API_EARLY_SESSION_CLOSE') || G5_API_EARLY_SESSION_CLOSE)
+    && session_status() === PHP_SESSION_ACTIVE
+    && g5_api_session_free_read($apiMethod, $resource, $apiSegments)) {
+    session_write_close();
 }
 
 // Pass the full route and remaining segments to the handler

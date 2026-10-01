@@ -72,7 +72,7 @@ if ($action === 'refresh' && $apiMethod === 'POST') {
             Response::error('Account is not active.', 403);
         }
 
-        $token = Auth::generateToken($member);
+        $token = Auth::generateToken($member, RefreshToken::sessionOf($result['new_refresh']));
         $autoLoginCookie = !empty($_COOKIE['g5_auto_login']) && (string) $_COOKIE['g5_auto_login'] === '1';
         api_auth_set_session_cookies($token, $result['new_refresh'], $autoLoginCookie);
         Response::success([
@@ -83,9 +83,15 @@ if ($action === 'refresh' && $apiMethod === 'POST') {
         ]);
     }
 
-    // Legacy fallback — Authorization header 만 있을 때
+    // Legacy fallback — Authorization header 만 있을 때. 세션 번호는 지금 토큰의 것을 이어 준다
+    // (끊긴 세션의 토큰은 requireAuth 에서 이미 거절된다).
     $member = Auth::requireAuth();
-    $token = Auth::generateToken($member);
+    // sid 없는 토큰(세션 번호를 쓰기 전 발급분)은 더 늘려 주지 않는다 — 이 경로로 계속 갱신하면 세션 목록에서
+    // 끊을 수 없는 로그인이 남는다. 다시 로그인하면 sid 가 붙은 토큰을 받는다.
+    if (Auth::currentSessionId() === null && RefreshToken::tracksSessions()) {
+        Response::error('Session expired. Please log in again.', 401);
+    }
+    $token = Auth::generateToken($member, Auth::currentSessionId());
     if (!empty($_COOKIE['g5_refresh'])) {
         api_auth_set_cookie(
             'g5_token',

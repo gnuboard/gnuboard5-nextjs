@@ -43,6 +43,8 @@ export interface ShopProduct {
   it_info_title?: string;
   it_info_items?: ShopProductInfoItem[];
   it_option_subject?: string;
+  /** 목록 응답에만 있다: 쓰는 중인 선택옵션이 있어 옵션 없이는 담을 수 없는 상품 */
+  has_options?: boolean;
   it_supply_subject?: string;
   // 상품 메타 — 영카트 it_brand/it_maker/it_origin/it_model/it_seo_title.
   it_brand?: string;

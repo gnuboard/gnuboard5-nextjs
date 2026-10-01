@@ -44,15 +44,47 @@ function pad(value: number): string {
   return String(value).padStart(2, "0");
 }
 
-function BannerSlide({ banner, index, active, load }: { banner: ShopBanner; index: number; active: boolean; load: boolean }) {
+/** 이미 있는 묶음에 번호를 더한다. 더할 것이 없으면 같은 묶음을 돌려 다시 그리지 않게 한다. */
+function withSlides(prev: ReadonlySet<number>, slides: number[]): ReadonlySet<number> {
+  if (slides.every((slide) => prev.has(slide))) return prev;
+  return new Set([...prev, ...slides]);
+}
+
+function BannerSlide({
+  banner,
+  index,
+  active,
+  load,
+  onSettled,
+}: {
+  banner: ShopBanner;
+  index: number;
+  active: boolean;
+  load: boolean;
+  /** 사진을 다 받았거나(실패 포함) 이미 받아 둔 상태일 때. */
+  onSettled?: () => void;
+}) {
   const { eyebrow, title } = splitBannerCopy(banner.bn_alt);
   const { href, external } = bannerHref(banner);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  /* 캐시에 있던 사진은 붙기도 전에 다 받아져 onLoad 를 놓친다. complete 만 보면 안 된다 —
+     src 를 막 넣은 직후에도 true 로 나와(아직 요청 전) 앞뒤 장이 첫 장과 함께 내려간다.
+     크기를 아는 것은 실제로 다 받은 사진뿐이다. */
+  useEffect(() => {
+    const img = imgRef.current;
+    if (load && img?.complete && img.naturalWidth > 0) onSettled?.();
+  }, [load, onSettled]);
+
   const image = (
     <img
+      ref={imgRef}
       className={`solune-banner-img${banner.bn_border ? " sbn_border" : ""}`}
       /* 겹쳐 녹이는(fade) 효과라 여섯 장이 한자리에 쌓여 loading="lazy" 가 듣지 않는다.
-         첫 장만 바로 받고 나머지는 load 가 켜질 때(페이지를 다 받은 뒤 · 넘기기 직전) 채운다. */
+         그래서 load 가 켜진 장만 받는다 — 첫 장, 그리고 지금 장의 앞뒤. */
       src={load ? normalizeG5ImageSrc(banner.image_url) : undefined}
+      onLoad={onSettled}
+      onError={onSettled}
       alt={banner.bn_alt}
       width={1920}
       height={920}
@@ -117,15 +149,17 @@ export function SoluneShopBanner({ banners }: { banners: ShopBanner[] }) {
   const paginationRef = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [loaded, setLoaded] = useState<ReadonlySet<number>>(() => new Set([0, 1 % Math.max(count, 1)]));
+  /* 처음에는 첫 장만 받는다. 배너는 API 응답 뒤에 그려져 그때는 이미 페이지 load 가
+     지난 뒤라, "load 뒤에 전부" 로 두면 첫 장과 나머지가 한꺼번에 내려가 첫 장이
+     대역폭을 나눠 쓴다(여섯 장 약 930KB). */
+  const [loaded, setLoaded] = useState<ReadonlySet<number>>(() => new Set([0]));
 
-  /* 페이지를 다 받은 뒤에는 나머지 사진도 모두 받아 둔다. */
-  useEffect(() => {
-    const loadAll = () => setLoaded(new Set(banners.map((_, slideIndex) => slideIndex)));
-    if (document.readyState === "complete") loadAll();
-    else window.addEventListener("load", loadAll, { once: true });
-    return () => window.removeEventListener("load", loadAll);
-  }, [banners]);
+  /* 첫 장이 보인 뒤에 앞뒤 장을 받아 둔다 — 다음으로 넘기든 이전으로 넘기든 바로 보이게. */
+  const firstSettledRef = useRef(false);
+  const warmNeighbours = useCallback(() => {
+    firstSettledRef.current = true;
+    if (count > 1) setLoaded((prev) => withSlides(prev, [1, count - 1]));
+  }, [count]);
 
   const setProgress = useCallback((value: number) => {
     swiperRef.current?.el?.style.setProperty("--solune-banner-progress", String(Math.max(0, Math.min(1, value))));
@@ -170,15 +204,28 @@ export function SoluneShopBanner({ banners }: { banners: ShopBanner[] }) {
           })
         }
         onSlideChange={(swiper) => {
-          /* loop 라 슬라이드마다 복사본이 있다. 번호는 realIndex 로 센다. 넘어갈 장과 그다음 장은 바로 받는다. */
-          setIndex(swiper.realIndex);
-          setLoaded((prev) => new Set([...prev, swiper.realIndex, (swiper.realIndex + 1) % count]));
+          /* loop 라 슬라이드마다 복사본이 있다. 번호는 realIndex 로 센다. 지금 장과 그 앞뒤 장은 바로 받는다.
+             다만 loop 는 처음 세울 때도 이 이벤트를 한 번 낸다 — 그때(첫 장이 아직 받는 중)는
+             앞뒤 장을 미뤄 둔다. 첫 장이 다 받아지면 warmNeighbours 가 채운다. */
+          const current = swiper.realIndex;
+          setIndex(current);
+          const slides =
+            current === 0 && !firstSettledRef.current
+              ? [current]
+              : [current, (current + 1) % count, (current - 1 + count) % count];
+          setLoaded((prev) => withSlides(prev, slides));
         }}
         onAutoplayTimeLeft={(_swiper, _time, percentage) => setProgress(1 - percentage)}
       >
         {banners.map((banner, slideIndex) => (
           <SwiperSlide key={banner.bn_id} className="solune-banner-slide">
-            <BannerSlide banner={banner} index={slideIndex} active={slideIndex === index} load={loaded.has(slideIndex)} />
+            <BannerSlide
+              banner={banner}
+              index={slideIndex}
+              active={slideIndex === index}
+              load={loaded.has(slideIndex)}
+              onSettled={slideIndex === 0 ? warmNeighbours : undefined}
+            />
           </SwiperSlide>
         ))}
 

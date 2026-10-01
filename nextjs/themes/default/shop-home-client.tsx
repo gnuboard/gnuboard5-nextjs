@@ -35,6 +35,8 @@ const ROW_COUNT = SHOP_HOME_ROW_LIMIT;
 /* 레퍼런스 쇼핑몰 공지는 latest(notice, 3) — 세 줄. 공지 글이 목록에 섞여 오면 더 오므로 잘라 쓴다. */
 export const NOTICE_COUNT = 3;
 export const NOTICE_BOARD = "notice";
+/* 이 홈이 그리는 진열과 후기만 받는다 — 대표 상품(featuredProducts) 줄은 없다. */
+const SHOP_HOME_INCLUDE = [...SOLUNE_SHOP_HOME_SECTIONS.map((section) => section.key), "reviews"] as const;
 
 /* 이미지가 없는 후기는 빈 src 를 next/image 에 넘기지 않고 앱의 대체 그림을 쓴다. */
 function ShopImage({ src, alt, sizes }: { src?: string | null; alt: string; sizes: string }) {
@@ -239,11 +241,20 @@ async function loadBankAccounts(): Promise<string[]> {
   );
 }
 
-/** 브라우저에서 부른다. 어느 하나가 실패해도 나머지는 채워지도록 개별로 감싼다. */
-export async function loadSoluneShopHomeExtras(): Promise<SoluneShopHomeExtras> {
-  const [banners, categories, noticeResult, settings, bankAccounts] = await Promise.all([
-    getShopBanners({ position: "메인", device: "all" }, 0).catch(() => [] as ShopBanner[]),
-    getShopCategories(0).catch(() => [] as ShopCategory[]),
+/**
+ * 브라우저에서 부른다. 조각마다 따로 끝나며, 어느 하나가 실패해도 빈 값으로 끝난다.
+ *
+ * 한데 모아 기다리지 않는 까닭: 배너(첫 화면의 가장 큰 그림)가 계좌·공지처럼 화면 맨
+ * 아래에 놓일 응답까지 기다리게 된다. 도착하는 대로 그 칸만 채운다.
+ */
+export function loadSoluneShopHomeExtraParts(): Promise<Partial<SoluneShopHomeExtras>>[] {
+  return [
+    getShopBanners({ position: "메인", device: "all" }, 0)
+      .catch(() => [] as ShopBanner[])
+      .then((banners) => ({ banners })),
+    getShopCategories(0)
+      .catch(() => [] as ShopCategory[])
+      .then((categories) => ({ categories })),
     // getBoardPosts 자체는 나눠 쓰지 않는다 — 게시판 화면은 방금 쓴 글이 바로 보여야 한다.
     // 이 화면의 공지 세 줄만, 두 번 도는 갱신을 합치려고 여기서 잠깐 나눠 쓴다.
     requestShare
@@ -253,18 +264,18 @@ export async function loadSoluneShopHomeExtras(): Promise<SoluneShopHomeExtras> 
         () => getBoardPosts({ boTable: NOTICE_BOARD, perPage: NOTICE_COUNT, revalidate: 0 }),
         (result) => result.list.length === 0
       )
-      .catch(() => ({ list: [] as WritePost[] })),
-    getClientPublicSettings().catch(() => null),
-    loadBankAccounts().catch(() => [] as string[]),
-  ]);
-  return {
-    banners,
-    categories,
-    notices: noticeResult.list,
-    rewriteMode: settings?.cf_bbs_rewrite ?? 0,
-    company: toSoluneCompany((settings as Record<string, unknown> | null)?.company),
-    bankAccounts,
-  };
+      .catch(() => ({ list: [] as WritePost[] }))
+      .then((result) => ({ notices: result.list })),
+    getClientPublicSettings()
+      .catch(() => null)
+      .then((settings) => ({
+        rewriteMode: settings?.cf_bbs_rewrite ?? 0,
+        company: toSoluneCompany((settings as Record<string, unknown> | null)?.company),
+      })),
+    loadBankAccounts()
+      .catch(() => [] as string[])
+      .then((bankAccounts) => ({ bankAccounts })),
+  ];
 }
 
 type SoluneShopHomeClientProps = {
@@ -287,11 +298,10 @@ export function SoluneShopHomeClient({ config, initialHome, initialExtras }: Sol
 
   useEffect(() => {
     let alive = true;
-    Promise.all([buildShopHomeData({ runtime: true }), loadSoluneShopHomeExtras()])
-      .then(([nextHome, nextExtras]) => {
-        if (!alive) return;
-        setShopHome(nextHome);
-        setExtras(nextExtras);
+    // 상품 줄과 부가 조각은 서로 기다리지 않는다 — 배너는 상품 목록이 오기 전에 뜰 수 있다.
+    buildShopHomeData({ runtime: true, include: SHOP_HOME_INCLUDE })
+      .then((nextHome) => {
+        if (alive) setShopHome(nextHome);
       })
       .catch((error: unknown) => {
         console.error("[solune-shop-home:refresh]", error);
@@ -299,6 +309,11 @@ export function SoluneShopHomeClient({ config, initialHome, initialExtras }: Sol
       .finally(() => {
         if (alive) setIsLoading(false);
       });
+    for (const part of loadSoluneShopHomeExtraParts()) {
+      void part.then((patch) => {
+        if (alive) setExtras((prev) => ({ ...prev, ...patch }));
+      });
+    }
     return () => {
       alive = false;
     };

@@ -205,6 +205,25 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'GET') {
         $noticeIds = array_filter($noticeIds, function($v) { return $v !== ''; });
     }
 
+    if (!function_exists('api_post_excerpt')) {
+        /**
+         * 목록 카드(갤러리)에 깔 두 줄 발췌. 목록 질의가 이미 wr_content 를 들고 오므로
+         * 따로 묻지 않고, 본문 HTML 에서 태그만 걷은 평문을 $len 자로 자른다.
+         * <br> · </p> 는 공백으로 바꿔야 앞뒤 문장이 붙지 않는다.
+         */
+        function api_post_excerpt($content, $len = 70)
+        {
+            $text = preg_replace('#<(br\s*/?|/p|/div|/li|/h[1-6])>#i', ' ', (string) $content);
+            $text = preg_replace('/\{(이미지|동영상)\s*:\s*\d+\}/u', ' ', $text);
+            $text = html_entity_decode(strip_tags($text), ENT_QUOTES, 'UTF-8');
+            $text = trim(preg_replace('/\s+/u', ' ', $text));
+            if ($text === '') {
+                return '';
+            }
+            return mb_strlen($text, 'UTF-8') > $len ? mb_substr($text, 0, $len, 'UTF-8') . '…' : $text;
+        }
+    }
+
     $memberTable    = DB::table('member_table');
     $boardFileTable = DB::table('board_file_table');
 
@@ -285,6 +304,7 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'GET') {
                 : $post['wr_name'];
 
             $post['thumbnail'] = $post['is_secret'] ? '' : ($thumbByWr[(int) $post['wr_id']] ?? '');
+            $post['wr_excerpt'] = $post['is_secret'] ? '' : api_post_excerpt($post['wr_content'] ?? '');
             unset($post['wr_content'], $post['wr_ip']);
             $out[] = $post;
         }

@@ -7,26 +7,23 @@ import type { Board, WritePost } from "@/lib/types";
 import { canWriteToBoard } from "@/lib/board-permissions";
 import { useAuthStore } from "@/store/auth";
 import { GALLERY_BOARDS } from "@/lib/config";
-import { cn, formatDate } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { applyClientPageMetadata } from "@/lib/client-metadata";
 import { useRuntimeRouteParam, useRuntimeRouteReady } from "@/hooks/use-runtime-route-param";
 import { getBoard, getBoardPosts } from "@/services/boards";
 import { getClientPublicSettings } from "@/services/settings";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Pagination } from "@/components/ui/pagination";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { StaticFallbackNotice } from "@/components/StaticFallbackNotice";
-import { ImageIcon, RssIcon, FolderX } from "lucide-react";
+import { RssIcon, FolderX } from "lucide-react";
 import { BatchPostList } from "./BatchActions";
-import { GalleryThumbnail } from "./GalleryThumbnail";
+import { GalleryPostGrid } from "./GalleryPostGrid";
 import { InfinitePostList } from "./InfinitePostList";
 import { SearchForm } from "./SearchForm";
 import { g5ShortHref } from "@/lib/g5-short-url";
-import { boardPostHref } from "@/lib/board-url";
 
 interface ClientPageProps {
   boTable?: string;
@@ -298,78 +295,20 @@ export default function BoardPostListClient({ boTable, embedded = false, current
       )}
 
       {!postsError && isGallery ? (
-        <>
-          {notices.length > 0 && (
-            <div className="mb-4 space-y-1">
-              {notices.map((post) => (
-                <div
-                  key={`notice-${post.wr_id}`}
-                  className="flex items-center gap-2 rounded bg-primary/5 px-2 py-1.5"
-                >
-                  <Badge variant="destructive" className="shrink-0 text-xs">
-                    Notice
-                  </Badge>
-                  <a
-                    href={boardPostHref(bo_table, post, bbsRewriteMode)}
-                    className="truncate text-sm font-medium transition-colors hover:text-primary"
-                  >
-                    {post.wr_subject}
-                  </a>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {regularPosts.length > 0 ? (
-            <div className="gallery-grid grid grid-cols-2 gap-4 sm:grid-cols-3">
-              <style>{`
-                @media (min-width: 768px) {
-                  .gallery-grid { grid-template-columns: repeat(${galleryCols}, minmax(0, 1fr)) !important; }
-                }
-              `}</style>
-              {regularPosts.map((post, index) => (
-                <a
-                  key={post.wr_id}
-                  href={boardPostHref(bo_table, post, bbsRewriteMode)}
-                  className="group"
-                >
-                  <Card className="h-full overflow-hidden transition-shadow hover:shadow-lg">
-                    <div className="relative aspect-square bg-muted">
-                      {post.thumbnail ? (
-                        <GalleryThumbnail
-                          src={post.thumbnail}
-                          alt={post.wr_subject}
-                          sizes={`(max-width: 768px) 50vw, ${Math.floor(100 / galleryCols)}vw`}
-                          priority={index < galleryCols * 2}
-                        />
-                      ) : (
-                        <div className="flex h-full items-center justify-center">
-                          <ImageIcon className="h-12 w-12 text-muted-foreground/30" />
-                        </div>
-                      )}
-                    </div>
-                    <CardContent className="p-3">
-                      <h3 className="truncate text-sm font-medium transition-colors group-hover:text-primary">
-                        {post.wr_subject}
-                        {post.wr_comment > 0 && (
-                          <Badge variant="secondary" className="ml-1.5 text-xs">
-                            {post.wr_comment}
-                          </Badge>
-                        )}
-                      </h3>
-                      <div className="mt-1.5 flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{post.mb_nick || post.wr_name}</span>
-                        <span>{formatDate(post.wr_datetime)}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </a>
-              ))}
-            </div>
-          ) : (
-            posts.length === 0 && <EmptyState title="아직 등록된 게시글이 없습니다" />
-          )}
-        </>
+        posts.length > 0 ? (
+          <GalleryPostGrid
+            boTable={bo_table}
+            notices={notices}
+            posts={regularPosts}
+            cols={galleryCols}
+            bbsRewriteMode={bbsRewriteMode}
+            boNew={board?.bo_new ?? 0}
+            boHot={board?.bo_hot ?? 0}
+            currentWrId={currentWrId}
+          />
+        ) : (
+          <EmptyState title="아직 등록된 게시글이 없습니다" />
+        )
       ) : !postsError && infiniteScroll ? (
         <InfinitePostList
           boTable={bo_table}

@@ -123,15 +123,16 @@ if (!function_exists('api_apple_provider_enabled')) {
         if (isset($input['device_label']) && is_string($input['device_label']) && trim($input['device_label']) !== '') {
             $label .= ' ' . mb_substr(trim(strip_tags($input['device_label'])), 0, 64, 'UTF-8');
         }
-        $token = Auth::generateToken($member);
         $refresh = RefreshToken::issue(
             (string) $member['mb_id'],
             $label,
             isset($_SERVER['HTTP_USER_AGENT']) ? (string) $_SERVER['HTTP_USER_AGENT'] : null,
             isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : null
         );
+        $sessionId = RefreshToken::sessionOf($refresh);
+        $token = Auth::generateToken($member, $sessionId);
         api_auth_set_session_cookies($token, $refresh, false);
-        api_auth_open_php_session($member);
+        api_auth_open_php_session($member, $sessionId);
         Response::success(api_auth_with_merged_cart([
             'token'         => $token,
             'refresh_token' => $refresh,

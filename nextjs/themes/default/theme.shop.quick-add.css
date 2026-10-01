@@ -1,0 +1,9 @@
+/* 상품 카드 "담기" 단추 (앱 ProductQuickAdd). theme.shop.home.css 의 .ondam-card-add 모양 위에
+   단추(<button>)로서의 상태만 더한다 — 옵션 없는 상품은 바로 담고, 옵션 상품은 옵션 고르기 창을 연다. */
+.solune-shop-page .ondam-card-add { border: 0; cursor: pointer; font: inherit; font-size: 11px; }
+.solune-shop-page .ondam-card-add:focus-visible { outline: 2px solid var(--solune-primary); outline-offset: 2px; background: var(--solune-primary); color: #fff; }
+/* 품절: 누를 수 없는 단추. 흐리기 대신 옅은 글자색으로 — 흐리면 대비가 3:1 아래로 떨어진다.
+   theme.shop.home.css 의 :hover(파랑 채움)가 누를 수 없는 단추에도 걸리지 않게 되돌린다. */
+.solune-shop-page .ondam-card-add:disabled,
+.solune-shop-page .ondam-card-add:disabled:hover { cursor: not-allowed; background: var(--solune-surface-soft); color: var(--solune-muted); }
+.solune-shop-page .ondam-card-add[aria-busy="true"] { cursor: progress; }

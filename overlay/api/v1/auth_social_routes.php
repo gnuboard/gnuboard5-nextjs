@@ -221,15 +221,16 @@ if ($action === 'social' && isset($apiSegments[1]) && $apiSegments[1] === 'link-
         api_social_profile_to_object($socialSignupProfile)
     );
 
-    $token = Auth::generateToken($member);
     $refresh = RefreshToken::issue(
         (string) $member['mb_id'],
         'social-link:' . $provider,
         isset($_SERVER['HTTP_USER_AGENT']) ? (string) $_SERVER['HTTP_USER_AGENT'] : null,
         $ip
     );
+    $sessionId = RefreshToken::sessionOf($refresh);
+    $token = Auth::generateToken($member, $sessionId);
     api_auth_set_session_cookies($token, $refresh, false);
-    api_auth_open_php_session($member);
+    api_auth_open_php_session($member, $sessionId);
 
     Response::success(api_auth_with_merged_cart([
         'token'         => $token,
@@ -323,15 +324,16 @@ if ($action === 'social' && isset($apiSegments[1]) && $apiSegments[1] === 'excha
         "DELETE FROM {$ticketTable} WHERE expires_at < (NOW() - INTERVAL 1 HOUR)"
     );
 
-    $token = Auth::generateToken($member);
     $refresh = RefreshToken::issue(
         $member['mb_id'],
         !empty($row['provider']) ? 'social:' . (string) $row['provider'] : 'social',
         isset($_SERVER['HTTP_USER_AGENT']) ? (string) $_SERVER['HTTP_USER_AGENT'] : null,
         isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : null
     );
+    $sessionId = RefreshToken::sessionOf($refresh);
+    $token = Auth::generateToken($member, $sessionId);
     api_auth_set_session_cookies($token, $refresh, false);
-    api_auth_open_php_session($member);
+    api_auth_open_php_session($member, $sessionId);
     Response::success(api_auth_with_merged_cart([
         'token'         => $token,
         'refresh_token' => $refresh,

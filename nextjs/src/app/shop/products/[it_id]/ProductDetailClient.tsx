@@ -5,27 +5,24 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ShopPolicy, ShopProduct, ShopReview, ShopReviewSummary, ShopQA } from "@/lib/api";
 import type { ShopNaverPayConfig, ShopNaverPayOrderOption } from "@/lib/api";
 import { toastSuccess, toastError } from "@/lib/toast";
-import { ToastAction } from "@/components/ui/toast";
 import {
   currentPathForRuntime,
   currentPathHasTrailingSlashForRuntime,
   g5PathForRuntime,
 } from "@/lib/config";
 import { runtimeRouterPush } from "@/lib/runtime-router";
-import { notifyCartChanged } from "@/lib/cart-events";
+import { addProductToCart, toastAddedToCart } from "@/components/shop/addProductToCart";
 import type { BbsRewriteMode } from "@/lib/board-url";
 import { isBbsSeoRewrite } from "@/lib/board-url";
-import { g5ShortHref } from "@/lib/g5-short-url";
 import { useRuntimeRouteParam, useRuntimeRouteReady } from "@/hooks/use-runtime-route-param";
 import { STATIC_PRODUCT_SENTINELS } from "./static-fallback";
 import { useRecentProductsStore } from "@/store/recent-products";
 import {
-  addCartItem,
   addCartItemDirect,
   addCartItems,
   addWishlistItem,
 } from "@/services/cart";
-import { gaViewItem, gaAddToCart } from "@/lib/analytics";
+import { gaViewItem } from "@/lib/analytics";
 import {
   getShopProductResult,
   getShopProductBySeoResult,
@@ -390,48 +387,17 @@ export default function ProductDetailClient({
     }
     setAddingToCart(true);
     try {
+      await addProductToCart({
+        product,
+        quantity,
+        cartOptions,
+        hasOptionSubjects: optionSubjects.length > 0,
+        ctSendCost: shippingPayment.ctSendCost,
+      });
       if (cartOptions.length > 0) {
-        if (optionSubjects.length === 0) {
-          await addCartItem(product.it_id, quantity, "", {
-            ctSendCost: shippingPayment.ctSendCost,
-          });
-        }
-        await addCartItems(
-          product.it_id,
-          cartOptions.map((option) => ({
-            io_id: option.io_id,
-            ct_qty: option.qty,
-          })),
-          { ctSendCost: shippingPayment.ctSendCost }
-        );
         setSelectedCartOptions([]);
-      } else {
-        await addCartItem(product.it_id, quantity, "", {
-          ctSendCost: shippingPayment.ctSendCost,
-        });
       }
-      // GA4 add_to_cart — 옵션 합계 수량 + 단가 기준.
-      gaAddToCart({
-        item_id: product.it_id,
-        item_name: product.it_name,
-        item_category: product.ca_name,
-        item_brand: product.it_brand,
-        price: product.it_price,
-        quantity: cartOptions.length > 0
-          ? cartOptions.reduce((s, o) => s + o.qty, 0)
-          : quantity,
-      });
-      notifyCartChanged();
-      toastSuccess("장바구니에 추가되었습니다.", {
-        action: (
-          <ToastAction
-            altText="장바구니 페이지로 이동"
-            onClick={() => runtimeRouterPush(router, g5ShortHref("/shop/cart"))}
-          >
-            바로가기
-          </ToastAction>
-        ),
-      });
+      toastAddedToCart(router);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "장바구니 추가에 실패했습니다.";

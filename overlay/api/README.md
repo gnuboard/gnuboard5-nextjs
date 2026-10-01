@@ -106,3 +106,16 @@ location ~ ^/api/\.env {
 `POST /v1/auth/login`(비밀번호·소셜 완료 포함)이 성공하면 JWT 쿠키와 **함께 그누보드 PHP 세션(`ss_mb_id`)도 연다** —
 `bbs/login_check.php` 와 같은 세 줄. 같은 origin 에서 Next 화면으로 로그인한 관리자가 `/adm` 에 바로 들어갈 수 있다.
 다른 origin(Vercel 프론트, 앱)에서는 세션 쿠키가 안 붙을 뿐이다. `POST /v1/auth/logout` 은 그 세션도 닫는다.
+
+### 세션을 끊으면 바로 끊긴다 (2026-10-01)
+
+로그인 한 번 = `g5_refresh_token.session_family` 번호 하나(회전해도 그대로). 액세스 토큰(JWT)에 `sid` 로 싣고
+`Auth::getUser()` 가 요청마다 그 번호의 active 행이 있는지 본다 — 마이페이지 세션 목록(`POST /v1/auth/sessions/revoke`)·
+전체 로그아웃·비밀번호 변경으로 끊긴 기기는 액세스 토큰 만료(30분)를 기다리지 않고 **다음 요청부터 401** 이다.
+같이 열린 그누보드 세션에는 `ss_api_sid` 로 번호를 적어 두고 `plugin/webapp/bridge/api_session.php` 가 매 요청 확인해
+`/adm` 도 그 자리에서 닫는다(세션 저장 방식과 무관).
+
+- 비밀번호 변경(`PATCH /v1/members/me`)은 **그 요청을 보낸 기기만 남기고** 나머지를 끊는다.
+- 서버가 끊은 토큰은 `revoked_remotely = 1` — 끊긴 기기가 그 리프레시 토큰을 다시 내밀어도 재사용 감지(전 세션 폐기)로
+  보지 않고 거절만 한다. 회전된 토큰·본인이 로그아웃한 토큰의 재제시는 종전대로 재사용 감지다.
+- `sid` 가 없는 토큰(칸이 생기기 전 발급분)은 종전대로 서명·만료만 본다. 칸은 `Schema::ensure()` 가 만든다.

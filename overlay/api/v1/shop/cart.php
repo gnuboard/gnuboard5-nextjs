@@ -431,7 +431,7 @@ if ($apiMethod === 'PATCH' && $ct_id !== '') {
 
     // Verify ownership
     $cartItem = DB::fetch(
-        "SELECT ct_id, it_id, ct_option, io_type, ct_direct FROM " . DB::table('g5_shop_cart_table') . "
+        "SELECT ct_id, it_id, ct_option, io_id, io_type, ct_direct FROM " . DB::table('g5_shop_cart_table') . "
          WHERE ct_id = ?
            AND od_id = ?
            AND " . shop_api_cart_active_status_sql() . "
@@ -457,17 +457,6 @@ if ($apiMethod === 'PATCH' && $ct_id !== '') {
              WHERE it_id = ? LIMIT 1",
             [$cartItem['it_id']]
         );
-        if ($item && (int) $item['it_stock_qty'] > 0) {
-            $activeQty = DB::fetch(
-                "SELECT IFNULL(SUM(ct_qty), 0) AS qty FROM " . DB::table('g5_shop_cart_table') . "
-                 WHERE od_id = ? AND it_id = ? AND io_type = 0 AND ct_id <> ?
-                    AND " . shop_api_cart_active_status_sql(),
-                array_merge([$cart_id, $cartItem['it_id'], $ct_id], shop_api_cart_active_statuses())
-            );
-            if ((int) ($activeQty['qty'] ?? 0) + $newQty > (int) $item['it_stock_qty']) {
-                Response::error('Requested quantity exceeds available stock (' . $item['it_stock_qty'] . ').', 400);
-            }
-        }
         if ($item) {
             $activeBaseQty = shop_api_cart_active_base_qty($cart_id, $cartItem['it_id'], $isDirectCart, (int) $ct_id);
             shop_api_cart_validate_buy_qty($item, $newQty, $activeBaseQty, true);
@@ -482,10 +471,19 @@ if ($apiMethod === 'PATCH' && $ct_id !== '') {
         if (!$optStock) {
             Response::error('Selected option is no longer available.', 400);
         }
-        $optQty = (int) $optStock['io_stock_qty'];
-        if ($optQty > 0 && $newQty > $optQty) {
-            Response::error('Requested quantity exceeds available option stock (' . $optQty . ').', 400);
-        }
+    }
+
+    // 수량만 바꿀 때: 이 줄(이 행을 뺀 같은 상품 · 옵션) + 새 수량이 쓸 수 있는 재고를 넘으면 거부.
+    //   담기와 같은 shop_api_cart_assert_stock — 재고 0 은 품절, 옵션 행은 옵션 재고로 센다.
+    if (!$isChangingOption) {
+        $lineIoId = (string) ($cartItem['io_id'] ?? '');
+        $lineIoType = (int) ($cartItem['io_type'] ?? 0);
+        shop_api_cart_assert_stock(
+            $cartItem['it_id'],
+            $lineIoId,
+            $lineIoType,
+            shop_api_cart_line_qty($cart_id, $cartItem['it_id'], $lineIoId, $lineIoType, $isDirectCart, (int) $ct_id) + $newQty
+        );
     }
 
     // 옵션 변경 — input 에 ct_option(io_id) 가 들어오고 기존과 다르면 옵션 갱신.
@@ -506,10 +504,13 @@ if ($apiMethod === 'PATCH' && $ct_id !== '') {
         } else {
             $newIoType  = (int) $newOpt['io_type'];
             $newIoPrice = (int) $newOpt['io_price'];
-            $newIoStock = (int) $newOpt['io_stock_qty'];
-            if ($newIoStock > 0 && $newQty > $newIoStock) {
-                Response::error('옵션 재고 부족 (' . $newIoStock . ').', 400);
-            }
+            // 새 옵션 줄에 이미 담긴 수량(아래에서 합칠 행) + 새 수량으로 재고를 본다.
+            shop_api_cart_assert_stock(
+                $cartItem['it_id'],
+                $newCtOption,
+                $newIoType,
+                shop_api_cart_line_qty($cart_id, $cartItem['it_id'], $newCtOption, $newIoType, $isDirectCart, (int) $ct_id) + $newQty
+            );
 
             // 같은 it_id + 같은 새 io_id 의 다른 행이 이미 있으면 합쳐.
             if ($newIoType === 0) {
@@ -519,9 +520,6 @@ if ($apiMethod === 'PATCH' && $ct_id !== '') {
                     [$cartItem['it_id']]
                 );
                 $activeBaseQty = shop_api_cart_active_base_qty($cart_id, $cartItem['it_id'], $isDirectCart, (int) $ct_id);
-                if ($itemForLimit && (int) $itemForLimit['it_stock_qty'] > 0 && $activeBaseQty + $newQty > (int) $itemForLimit['it_stock_qty']) {
-                    Response::error('Requested quantity exceeds available stock (' . $itemForLimit['it_stock_qty'] . ').', 400);
-                }
                 if ($itemForLimit) {
                     shop_api_cart_validate_buy_qty($itemForLimit, $newQty, $activeBaseQty, true);
                 }

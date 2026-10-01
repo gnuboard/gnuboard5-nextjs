@@ -2,6 +2,8 @@
 
 import { GalleryThumbnail } from "@/app/boards/[bo_table]/GalleryThumbnail";
 import { ProductImageFallback } from "@/components/shop/ProductImageFallback";
+import { ProductQuickAdd } from "@/components/shop/ProductQuickAdd";
+import { isProductSoldOut } from "@/lib/shop-product-state";
 import { G5Link as Link } from "@/components/ui/g5-link";
 import { normalizeG5ImageSrc } from "@/lib/image";
 import type { G5ThemeProductCardProps } from "@/lib/theme-types";
@@ -14,13 +16,10 @@ function discountPercent(product: ShopProduct): number {
   return Math.round(((product.it_cust_price - product.it_price) / product.it_cust_price) * 100);
 }
 
-function isSoldOut(product: ShopProduct): boolean {
-  return String(product.it_soldout ?? "0") === "1" || Number(product.it_stock_qty) <= 0;
-}
-
 /**
  * 레퍼런스 온담 상품 카드(sct_li). 홈의 상품 줄과 목록 페이지(ProductCard 슬롯)가
  * 같은 한 장을 쓴다: 정사각 이미지 · 브랜드 · 이름 · 할인율/판매가/정가 · 별점/리뷰/담기.
+ * "담기"는 앱의 ProductQuickAdd — 옵션 없는 상품은 바로 담고, 옵션 상품은 옵션 고르기 창을 연다.
  */
 export function SoluneProductCard({ product, href, priority = false }: G5ThemeProductCardProps) {
   const discount = discountPercent(product);
@@ -38,7 +37,7 @@ export function SoluneProductCard({ product, href, priority = false }: G5ThemePr
           <ProductImageFallback compact />
         )}
         {String(product.it_type3 ?? "0") === "1" ? <span className="ondam-card-badge">NEW</span> : null}
-        {isSoldOut(product) ? <span className="ondam-card-soldout">SOLD OUT</span> : null}
+        {isProductSoldOut(product) ? <span className="ondam-card-soldout">SOLD OUT</span> : null}
       </Link>
       {brand ? <p className="ondam-card-brand">{brand}</p> : null}
       <Link className="sct_txt" href={href}>
@@ -52,9 +51,7 @@ export function SoluneProductCard({ product, href, priority = false }: G5ThemePr
       <div className="ondam-card-meta">
         {rating > 0 ? <span className="ondam-card-star">★ {rating.toFixed(1)}</span> : null}
         <span>리뷰 {formatNumber(Number(product.review_count ?? 0))}</span>
-        <Link className="ondam-card-add" href={href}>
-          담기
-        </Link>
+        <ProductQuickAdd product={product} href={href} className="ondam-card-add" />
       </div>
     </article>
   );

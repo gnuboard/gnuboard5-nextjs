@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { buildCommunityHomeData } from "@/lib/community-home";
 import type { G5ThemeCommunityHomeData, G5ThemeComponentProps } from "@/lib/theme-types";
-import { loadSoluneHomeExtras, type SoluneHomeExtras } from "./home-data";
+import { loadSoluneHomeExtraParts, type SoluneHomeExtras } from "./home-data";
 import { BOARD_PANEL_LIMIT, BOARD_ROW_LIMIT, BoardPanel, LatestPanel } from "./home-panels";
 import {
   SoluneCommentWidget,
@@ -28,6 +28,9 @@ type SoluneHomeClientProps = {
   initialExtras: SoluneHomeExtras;
 };
 
+/** 따로 도착하는 칸: 게시판 패널 묶음(home) · FAQ 가 없을 때의 최신글(latest) · 위젯 하나하나. */
+type HomePart = "home" | "latest" | keyof SoluneHomeExtras;
+
 /**
  * 홈 본체. 서버가 준 초기값으로 먼저 그리고(하이드레이션이 서버 HTML 과 맞도록),
  * 붙은 뒤 브라우저에서 같은 데이터를 한 번 더 받아 갈아 끼운다.
@@ -38,27 +41,52 @@ type SoluneHomeClientProps = {
 export function SoluneHomeClient({ config, initialHome, initialExtras }: SoluneHomeClientProps) {
   const [home, setHome] = useState(initialHome);
   const [extras, setExtras] = useState(initialExtras);
-  const [refreshed, setRefreshed] = useState(false);
+  // 최신글 칸은 패널과 따로 받는다(아래 효과) — 패널 묶음이 나중에 와도 덮어쓰지 않게 따로 둔다.
+  const [latestPosts, setLatestPosts] = useState(initialHome.latestPosts);
+  // 응답이 온(성공이든 실패든) 칸. 칸마다 따로 채운다 — 전부 모일 때까지 기다리면
+  // 가장 느린 응답 하나가 첫 화면 전체를 붙잡는다(설문 API 를 1.5초 늦추자 갤러리가
+  // 0.78초에서 2.0초로 밀렸다).
+  const [done, setDone] = useState<ReadonlySet<HomePart>>(() => new Set());
 
   useEffect(() => {
     let alive = true;
+    const settle = (part: HomePart) => {
+      if (alive) setDone((prev) => new Set(prev).add(part));
+    };
 
-    Promise.all([
-      buildCommunityHomeData({ runtime: true }),
-      loadSoluneHomeExtras({ runtime: true }),
-    ])
-      .then(([nextHome, nextExtras]) => {
-        if (!alive) return;
-        setHome(nextHome);
-        setExtras(nextExtras);
+    // 게시판 글은 패널에 그릴 게시판 것만 받는다(기본은 12개 게시판을 받는다).
+    buildCommunityHomeData({ runtime: true, postBoards: BOARD_PANEL_LIMIT })
+      .then((nextHome) => {
+        if (alive) setHome(nextHome);
       })
       .catch((error: unknown) => {
         // 빌드 시점 값을 유지하되, 장애가 조용히 묻히지 않도록 남긴다.
         console.error("[solune-home:refresh]", error);
       })
-      .finally(() => {
-        if (alive) setRefreshed(true);
+      .finally(() => settle("home"));
+
+    // 각 조회는 실패해도 빈 값으로 끝난다(home-data.ts).
+    const parts = loadSoluneHomeExtraParts({ runtime: true });
+    (Object.keys(parts) as (keyof SoluneHomeExtras)[]).forEach((key) => {
+      void parts[key].then((value) => {
+        if (alive) setExtras((prev) => ({ ...prev, [key]: value }));
+        settle(key);
       });
+    });
+
+    // 마지막 칸은 FAQ 가 없을 때만 최신글이다. 그때만 여러 게시판에서 최신글을 고른다 —
+    // 앞의 패널 게시판 글은 홈 묶음끼리 나눠 써서 다시 받지 않는다(lib/community-home.ts).
+    void parts.faqs.then((faqs) => {
+      if (faqs.length > 0) return;
+      buildCommunityHomeData({ runtime: true })
+        .then((fullHome) => {
+          if (alive) setLatestPosts(fullHome.latestPosts);
+        })
+        .catch((error: unknown) => {
+          console.error("[solune-home:latest]", error);
+        })
+        .finally(() => settle("latest"));
+    });
 
     return () => {
       alive = false;
@@ -66,10 +94,10 @@ export function SoluneHomeClient({ config, initialHome, initialExtras }: SoluneH
   }, []);
 
   const columns = home.boardPosts.slice(0, BOARD_PANEL_LIMIT);
-  const latestPosts = home.latestPosts;
   const rewriteMode = home.bbsRewriteMode;
   const { comments, faqs, poll, gallery, popularKeywords, visit } = extras;
-  const loading = !refreshed && columns.length === 0 && latestPosts.length === 0;
+  const waiting = (part: HomePart) => !done.has(part);
+  const loading = waiting("home") && columns.length === 0 && latestPosts.length === 0;
 
   return (
     <div className="solune-content-shell" aria-busy={loading}>
@@ -100,16 +128,20 @@ export function SoluneHomeClient({ config, initialHome, initialExtras }: SoluneH
                   <SolunePanelSkeleton key={`board-${index}`} rows={BOARD_ROW_LIMIT} />
                 ))
               : null}
+          {/* FAQ 가 올지 모르는 동안은 자리만 잡는다 — 최근 글을 먼저 보였다가 FAQ 로
+              바꿔 끼우면 칸 내용이 한 번 뒤집힌다. */}
           {faqs.length > 0 ? (
             <SoluneFaqPanel faqs={faqs} />
+          ) : waiting("faqs") ? (
+            <SolunePanelSkeleton rows={BOARD_ROW_LIMIT} />
           ) : (
-            <LatestPanel posts={latestPosts.slice(0, BOARD_ROW_LIMIT)} loading={loading} />
+            <LatestPanel posts={latestPosts.slice(0, BOARD_ROW_LIMIT)} loading={waiting("latest")} />
           )}
         </div>
 
         {gallery ? (
           <SoluneGalleryPanel gallery={gallery} rewriteMode={rewriteMode} />
-        ) : loading ? (
+        ) : waiting("gallery") ? (
           <SoluneGalleryPanelSkeleton />
         ) : null}
       </div>
@@ -117,16 +149,16 @@ export function SoluneHomeClient({ config, initialHome, initialExtras }: SoluneH
       <aside className="solune-sidebar" aria-label="사이드바">
         <SoluneLoginCard />
         {/* 레퍼런스 사이드바 순서: 로그인 · 최근 댓글 · 인기검색어 · 설문 · 접속자집계. */}
-        <SoluneCommentWidget comments={comments} loading={loading} />
-        <SolunePopularKeywordWidget keywords={popularKeywords} loading={loading} />
+        <SoluneCommentWidget comments={comments} loading={waiting("comments")} />
+        <SolunePopularKeywordWidget keywords={popularKeywords} loading={waiting("popularKeywords")} />
         {poll ? (
           <SolunePollWidget initialPoll={poll} />
-        ) : loading ? (
+        ) : waiting("poll") ? (
           <SolunePollWidgetSkeleton />
         ) : null}
         {visit ? (
           <SoluneVisitWidget visit={visit} />
-        ) : loading ? (
+        ) : waiting("visit") ? (
           <SoluneVisitWidgetSkeleton />
         ) : null}
       </aside>

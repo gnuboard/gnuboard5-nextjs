@@ -336,7 +336,8 @@ if ($seg0 === 'me' && $apiMethod === 'PATCH') {
 
     if ($passwordChanged) {
         try {
-            RefreshToken::revokeAllFor($member['mb_id']);
+            // 다른 기기는 모두 바로 끊고, 비밀번호를 바꾼 이 기기의 로그인만 남긴다.
+            RefreshToken::revokeAllFor($member['mb_id'], Auth::currentSessionId());
         } catch (\Throwable $e) {
             error_log('[api/members] Failed to revoke refresh tokens after password change: ' . $e->getMessage());
         }

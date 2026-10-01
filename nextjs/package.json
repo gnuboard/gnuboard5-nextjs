@@ -143,6 +143,7 @@
     "check:local-scrap-actions": "node scripts/check-local-scrap-actions.mjs",
     "check:local-coupon-actions": "node scripts/check-local-coupon-actions.mjs",
     "check:local-qa-actions": "node scripts/check-local-qa-actions.mjs",
+    "check:local-cart-stock": "node scripts/check-local-cart-stock.mjs",
     "check:local-personalpay-actions": "node scripts/check-local-personalpay-actions.mjs",
     "check:local-point-actions": "node scripts/check-local-point-actions.mjs",
     "check:local-poll-actions": "node scripts/check-local-poll-actions.mjs",

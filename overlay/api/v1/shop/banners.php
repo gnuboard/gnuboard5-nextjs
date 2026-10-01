@@ -24,7 +24,8 @@ function api_shop_banner_image_url(array $row): string
     }
 
     $stamp = preg_replace('/[^0-9]/', '', (string) ($row['bn_time'] ?? ''));
-    return shop_api_image_url('banner', (string) $id) . ($stamp ? '?' . $stamp : '');
+    // 첫 화면 배너 — 1920 폭 안으로 맞추고 받아 주는 브라우저에는 WebP 로(lib/image-variants.php).
+    return api_image_url_with_width(shop_api_image_url('banner', (string) $id) . ($stamp ? '?' . $stamp : ''), 1920);
 }
 
 function api_shop_banner_summary(array $row): array

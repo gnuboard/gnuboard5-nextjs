@@ -193,7 +193,7 @@ if ($apiMethod === 'GET' && $action === '') {
             'option_count'   => $optionCount,
             'can_add_cart'   => $cartBlockReason === '',
             'cart_block_reason' => $cartBlockReason,
-            'image_url'      => api_shop_item_image_url($row['it_id'], $row['it_img1']),
+            'image_url'      => api_image_url_with_width(api_shop_item_image_url($row['it_id'], $row['it_img1']), 800),
         ];
     }
 

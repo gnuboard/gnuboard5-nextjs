@@ -149,7 +149,8 @@ if ($apiMethod === 'GET' && $ca_id !== '') {
     $itemRows = DB::fetchAll(
         "SELECT it_id, ca_id, it_name, it_price, it_cust_price,
                 it_point, it_stock_qty, it_soldout, it_tel_inq, it_img1, it_seo_title,
-                it_brand, it_maker, it_type1, it_type2, it_type3, it_type4, it_type5
+                it_brand, it_maker, it_type1, it_type2, it_type3, it_type4, it_type5,
+                it_buy_min_qty, it_buy_max_qty, it_sc_type, it_sc_method
          FROM " . DB::table('g5_shop_item_table') . "
          WHERE ca_id LIKE ? AND it_use = '1' AND it_soldout != '1'
          ORDER BY {$orderBy}
@@ -185,7 +186,12 @@ if ($apiMethod === 'GET' && $ca_id !== '') {
             'it_stock_qty'   => (int) $row['it_stock_qty'],
             'it_soldout'     => $row['it_soldout'],
             'it_tel_inq'     => (string) (int) ($row['it_tel_inq'] ?? 0),
-            'image_url'      => api_shop_item_image_url($row['it_id'], $row['it_img1']),
+            'it_buy_min_qty' => (int) ($row['it_buy_min_qty'] ?? 0),
+            'it_buy_max_qty' => (int) ($row['it_buy_max_qty'] ?? 0),
+            'it_sc_type'     => (int) ($row['it_sc_type'] ?? 0),
+            'it_sc_method'   => (int) ($row['it_sc_method'] ?? 0),
+            'has_options'    => isset($extras['options'][(string) $row['it_id']]),
+            'image_url'      => api_image_url_with_width(api_shop_item_image_url($row['it_id'], $row['it_img1']), 800),
         ];
     }
 
