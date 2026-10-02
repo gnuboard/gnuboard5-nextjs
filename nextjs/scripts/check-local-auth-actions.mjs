@@ -34,7 +34,8 @@ function printFailure(error, prefix = 'check-local-auth-actions') {
 }
 
 function runPhp(script, env = {}, args = []) {
-  const scriptPath = fileURLToPath(new URL(`../../scripts/${script}`, import.meta.url));
+  // 시드 PHP 는 nextjs/scripts/smoke/ 에 있다(예전 저장소 루트 scripts/ 에서 옮김).
+  const scriptPath = fileURLToPath(new URL(`./smoke/${script}`, import.meta.url));
   const result = spawnSync('php', [scriptPath, '--json', ...args], {
     env: {
       ...process.env,

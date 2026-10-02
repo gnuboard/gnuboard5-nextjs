@@ -34,6 +34,7 @@ class Schema
         'device_table'                   => 'plugin/webapp/notify/tables.php',
         'content_report_table'           => 'plugin/webapp/notify/tables.php',
         'account_deletion_request_table' => 'plugin/webapp/notify/tables.php',
+        'member_public_key_table'        => 'plugin/webapp/notify/tables.php',
     );
 
     /**

@@ -218,3 +218,11 @@ CREATE TABLE IF NOT EXISTS `g5_social_apple_token` (
     `updated_at`        DATETIME NOT NULL,
     PRIMARY KEY (`sub_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `g5_member_public_key` (
+    `mb_id`      VARCHAR(20) NOT NULL,
+    `mk_key`     VARCHAR(20) NOT NULL,
+    `created_at` DATETIME NOT NULL,
+    PRIMARY KEY (`mb_id`),
+    UNIQUE KEY `uniq_mk_key` (`mk_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -1,6 +1,7 @@
 import * as z from "zod";
 import type {
   Board,
+  BoardCategoryCounts,
   Comment,
   PostFile,
   RecentGroup,
@@ -39,7 +40,6 @@ export const boardSchema = z
     bo_subject: stringValue,
     bo_content: optionalString,
     bo_category_list: stringValue,
-    category_counts: z.record(z.string(), numberValue).optional(),
     bo_page_rows: numberValue,
     bo_gallery_cols: numberValue,
     bo_count_write: numberValue,
@@ -49,6 +49,11 @@ export const boardSchema = z
   .passthrough() as unknown as z.ZodType<Board>;
 
 export const boardListSchema = z.array(boardSchema);
+
+export const boardCategoryCountsSchema = z.object({
+  counts: z.record(z.string(), numberValue).nullable(),
+  reason: z.string().nullable(),
+}) as unknown as z.ZodType<BoardCategoryCounts>;
 
 const writePostShape = {
   wr_id: numberValue,
@@ -259,6 +264,10 @@ export const publicSettingsSchema = z
     cf_title: z.string().optional(),
     infinite_scroll: booleanValue.optional(),
     comment_editor: booleanValue.optional(),
+    /** 그누보드 기본환경설정의 에디터(빈 값이면 에디터 없음) — 글쓰기 화면의 에디터 사용 조건(write.php). */
+    cf_editor: z.string().optional(),
+    /** 메일 사용(0 · 1) — 게시판 bo_use_email 과 함께 켜졌을 때만 "답변메일받기" 를 보인다. */
+    cf_email_use: numberValue.optional(),
     pwa_enabled: booleanValue.optional(),
     visit: visitStatsSchema.optional(),
     /** 회원아이콘 · 회원이미지 설정(관리자 > 기본환경설정 > 회원가입). size 는 바이트, width · height 는 px. */

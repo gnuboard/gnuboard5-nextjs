@@ -3,25 +3,30 @@
 import { useCallback, useEffect, useState } from "react";
 import { G5Link as Link } from "@/components/ui/g5-link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { HelpCircle, PenSquare } from "lucide-react";
+import { HelpCircle, PenSquare, Settings, Trash2 } from "lucide-react";
 import { runtimeRouterPush } from "@/lib/runtime-router";
 import type { ApiMeta } from "@/lib/api-response";
-import type { QaItem } from "@/lib/types";
-import { cn, formatDate, truncate } from "@/lib/utils";
-import { getQas } from "@/services/qas";
+import type { QaConfig, QaItem } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { g5PathForRuntime } from "@/lib/config";
+import { g5ShortHref } from "@/lib/g5-short-url";
+import { deleteQa, getQaConfig, getQas } from "@/services/qas";
+import { useAuthStore } from "@/store/auth";
 import { Button } from "@/components/ui/button";
-import { toastError } from "@/lib/toast";
+import { Pagination } from "@/components/ui/pagination";
+import { SafeHtml } from "@/components/SafeHtml";
+import { toastError, toastSuccess } from "@/lib/toast";
 import { MypagePanel } from "../MypagePanel";
+import { QaCategoryTabs, QaListRow, QaSearchForm, qaSearchField, type QaSearchField } from "./QaListParts";
 
-function statusLabel(status: number) {
-  return status === 1 ? "답변완료" : "답변대기";
-}
+/*
+ * 1:1 문의 목록 — 그누보드 bbs/qalist.php 와 같은 규칙:
+ * - 최고관리자는 모든 회원의 문의를 보고(글쓴이 · 회원아이디 검색 · 선택삭제), 회원은 자기 문의만 본다.
+ * - 제목 · 분류 · 쪽당 줄 수 · 제목 길이 · 목록 위아래 내용은 관리자의 1:1문의 설정(qa_config)을 따른다.
+ * 답변 상태 탭(전체 · 답변대기 · 답변완료)은 이 화면에만 있는 편의 기능이다.
+ */
 
-function qaSearchField(value: string | null) {
-  return value === "qa_content" || value === "qa_name" || value === "mb_id"
-    ? value
-    : "qa_subject";
-}
+const DEFAULT_TITLE = "1:1 문의";
 
 export default function MyQasPage() {
   const router = useRouter();
@@ -32,17 +37,29 @@ export default function MyQasPage() {
   const sca = searchParams.get("sca") || undefined;
   const stx = searchParams.get("stx") || searchParams.get("q") || undefined;
   const sfl = qaSearchField(searchParams.get("sfl"));
+  const isSuperAdmin = useAuthStore((state) => state.user?.is_super_admin === true);
 
+  const [config, setConfig] = useState<QaConfig | null>(null);
   const [items, setItems] = useState<QaItem[]>([]);
   const [meta, setMeta] = useState<ApiMeta | undefined>();
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<Set<number>>(() => new Set());
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    getQaConfig()
+      .then(setConfig)
+      .catch(() => setConfig(null));
+  }, []);
 
   const loadQas = useCallback(async () => {
     setLoading(true);
+    setSelected(new Set());
     try {
+      // 쪽당 줄 수는 보내지 않는다 — API 가 관리자 설정(qa_page_rows)을 쓴다.
       const result = await getQas({
         page,
-        perPage: 20,
+        scope: isSuperAdmin ? "admin" : "mine",
         status: status as 0 | 1 | "all",
         sca,
         sfl,
@@ -57,43 +74,81 @@ export default function MyQasPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, sca, sfl, status, stx]);
+  }, [isSuperAdmin, page, sca, sfl, status, stx]);
 
   useEffect(() => {
     loadQas();
   }, [loadQas]);
 
-  function updateStatus(nextStatus: "all" | 0 | 1) {
+  /** 주소의 조건을 바꾼다(쪽은 처음으로). undefined 는 지운다. */
+  function updateQuery(patch: Record<string, string | undefined>) {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("page");
-    if (nextStatus !== "all") params.set("status", String(nextStatus));
-    else params.delete("status");
-    runtimeRouterPush(router, `/mypage/qas${params.toString() ? `?${params.toString()}` : ""}`);
+    params.delete("q");
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === undefined || value === "") params.delete(key);
+      else params.set(key, value);
+    }
+    const query = params.toString();
+    runtimeRouterPush(router, `/mypage/qas${query ? `?${query}` : ""}`);
   }
 
-  function goToPage(nextPage: number) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (nextPage > 1) params.set("page", String(nextPage));
-    else params.delete("page");
-    runtimeRouterPush(router, `/mypage/qas${params.toString() ? `?${params.toString()}` : ""}`);
+  async function deleteSelected() {
+    const ids = [...selected];
+    if (ids.length === 0) {
+      toastError("삭제할 문의를 하나 이상 선택하세요.");
+      return;
+    }
+    if (!confirm(`선택한 문의 ${ids.length}건을 정말 삭제하시겠습니까?\n답변도 함께 삭제됩니다.`)) return;
+
+    setDeleting(true);
+    let failed = 0;
+    for (const id of ids) {
+      try {
+        await deleteQa(id);
+      } catch {
+        failed += 1;
+      }
+    }
+    setDeleting(false);
+    if (failed > 0) toastError(`${ids.length}건 중 ${failed}건을 삭제하지 못했습니다.`);
+    else toastSuccess(`${ids.length}건을 삭제했습니다.`);
+    await loadQas();
   }
 
   const lastPage = meta?.last_page ?? 1;
+  const perPage = meta?.per_page || items.length;
+  const total = meta?.total ?? items.length;
+  const allSelected = items.length > 0 && items.every((item) => selected.has(item.qa_id));
 
   return (
     <MypagePanel
-      title="1:1 문의"
-      description="문의를 남기고 답변 상태를 확인합니다."
+      title={config?.qa_title || DEFAULT_TITLE}
+      description={isSuperAdmin ? "모든 회원의 문의를 봅니다(최고관리자)." : "문의를 남기고 답변 상태를 확인합니다."}
       actions={
-        <Button asChild>
-          <Link href="/mypage/qas/new">
-            <PenSquare className="mr-2 size-4" />
-            문의하기
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          {isSuperAdmin ? (
+            <Button asChild variant="outline" size="icon" title="1:1문의 설정">
+              <a href={g5PathForRuntime("/adm/qa_config.php")}>
+                <Settings className="size-4" aria-hidden />
+                <span className="sr-only">1:1문의 설정</span>
+              </a>
+            </Button>
+          ) : null}
+          <Button asChild>
+            <Link href="/mypage/qas/new">
+              <PenSquare className="mr-2 size-4" />
+              문의하기
+            </Link>
+          </Button>
+        </div>
       }
     >
-      <div className="g5-tabs flex gap-2 border-b">
+      <ContentBlock pc={config?.qa_content_head ?? ""} mobile={config?.qa_mobile_content_head ?? ""} />
+
+      <QaCategoryTabs categories={config?.categories ?? []} current={sca} onSelect={(category) => updateQuery({ sca: category })} />
+
+      <div className="g5-tabs flex flex-wrap gap-2 border-b">
         {[
           { value: "all" as const, label: "전체" },
           { value: 0 as const, label: "답변대기" },
@@ -102,7 +157,7 @@ export default function MyQasPage() {
           <button
             key={String(item.value)}
             type="button"
-            onClick={() => updateStatus(item.value)}
+            onClick={() => updateQuery({ status: item.value === "all" ? undefined : String(item.value) })}
             aria-pressed={status === item.value}
             className={cn(
               "g5-tab border-b-2 px-4 py-2 text-sm font-medium transition-colors",
@@ -116,86 +171,99 @@ export default function MyQasPage() {
         ))}
         {meta && (
           <span className="ml-auto self-center text-xs text-muted-foreground">
-            총 {meta.total.toLocaleString()}건
+            총 {meta.total.toLocaleString()}건 · {page} 페이지
           </span>
         )}
       </div>
 
-      <div>
-          {loading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="skeleton h-20 rounded-md" />
-              ))}
-            </div>
-          ) : items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <HelpCircle className="mb-3 size-12 text-muted-foreground/50" />
-              <p className="text-sm text-muted-foreground">등록된 문의가 없습니다.</p>
-            </div>
-          ) : (
-            <div className="divide-y rounded-md border">
-              {items.map((item) => (
-                <Link
-                  key={item.qa_id}
-                  href={`/mypage/qas/${item.qa_id}`}
-                  className="block p-4 transition-colors hover:bg-muted/50"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-xs font-medium",
-                        item.qa_status === 1
-                          ? "bg-primary/10 text-primary"
-                          : "bg-muted text-muted-foreground"
-                      )}
-                    >
-                      {statusLabel(item.qa_status)}
-                    </span>
-                    {item.qa_category && (
-                      <span className="text-xs text-muted-foreground">
-                        {item.qa_category}
-                      </span>
-                    )}
-                    <span className="text-xs text-muted-foreground">
-                      {formatDate(item.qa_datetime)}
-                    </span>
-                  </div>
-                  <p className="mt-2 break-words text-sm font-medium">
-                    {item.qa_subject}
-                  </p>
-                  <p className="mt-1 break-words text-sm text-muted-foreground">
-                    {truncate(item.qa_content.replace(/\s+/g, " "), 120)}
-                  </p>
-                </Link>
-              ))}
-            </div>
-          )}
-      </div>
+      <QaSearchForm
+        key={`${sfl}:${stx ?? ""}`}
+        field={sfl}
+        keyword={stx}
+        isAdmin={isSuperAdmin}
+        onSearch={(field: QaSearchField, keyword) => updateQuery({ sfl: field, stx: keyword })}
+        onReset={() => updateQuery({ sfl: undefined, stx: undefined })}
+      />
 
-      {lastPage > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => goToPage(page - 1)}
-          >
-            이전
-          </Button>
-          <span className="px-2 text-sm text-muted-foreground">
-            {page} / {lastPage}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= lastPage}
-            onClick={() => goToPage(page + 1)}
-          >
-            다음
+      {isSuperAdmin && items.length > 0 ? (
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={(event) => setSelected(event.target.checked ? new Set(items.map((item) => item.qa_id)) : new Set())}
+              className="rounded"
+            />
+            현재 페이지 전체선택
+          </label>
+          <Button variant="outline" size="sm" onClick={deleteSelected} disabled={deleting || selected.size === 0}>
+            <Trash2 className="mr-1 size-4" aria-hidden />
+            선택삭제{selected.size > 0 ? ` (${selected.size})` : ""}
           </Button>
         </div>
-      )}
+      ) : null}
+
+      <div>
+        {loading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="skeleton h-20 rounded-md" />
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <HelpCircle className="mb-3 size-12 text-muted-foreground/50" />
+            <p className="text-sm text-muted-foreground">{stx ? "검색 결과가 없습니다." : "등록된 문의가 없습니다."}</p>
+          </div>
+        ) : (
+          <ul className="divide-y rounded-md border">
+            {items.map((item, index) => (
+              <QaListRow
+                key={item.qa_id}
+                item={item}
+                number={total - (page - 1) * perPage - index}
+                subjectLength={config?.qa_subject_len ?? 0}
+                showWriter={isSuperAdmin}
+                selectable={isSuperAdmin}
+                checked={selected.has(item.qa_id)}
+                onCheckedChange={(checked) =>
+                  setSelected((previous) => {
+                    const next = new Set(previous);
+                    if (checked) next.add(item.qa_id);
+                    else next.delete(item.qa_id);
+                    return next;
+                  })
+                }
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <Pagination
+        currentPage={Math.min(page, lastPage)}
+        totalPages={lastPage}
+        baseUrl={g5ShortHref("/mypage/qas")}
+        searchParams={{
+          status: status === "all" ? undefined : String(status),
+          sca,
+          sfl: stx ? sfl : undefined,
+          stx,
+        }}
+      />
+
+      <ContentBlock pc={config?.qa_content_tail ?? ""} mobile={config?.qa_mobile_content_tail ?? ""} />
     </MypagePanel>
+  );
+}
+
+/** 관리자가 1:1문의 설정에 넣은 목록 위 · 아래 내용. 그누보드처럼 작은 화면은 모바일용을 쓴다. */
+function ContentBlock({ pc, mobile }: { pc: string; mobile: string }) {
+  if (!pc && !mobile) return null;
+  return (
+    <>
+      {pc ? <SafeHtml html={pc} className="g5-content hidden md:block" /> : null}
+      {mobile ? <SafeHtml html={mobile} className="g5-content md:hidden" /> : null}
+    </>
   );
 }

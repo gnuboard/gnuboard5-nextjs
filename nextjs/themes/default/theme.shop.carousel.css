@@ -51,6 +51,14 @@
 .solune-shop-page .solune-catrow-scrollbar .swiper-scrollbar-drag { border-radius: 999px; background: var(--solune-primary); }
 /* 분류가 한 줄에 다 들어가면 Swiper 가 막대를 잠근다. 통째로 감춘다. */
 .solune-shop-page .solune-catrow-pager:has(.swiper-scrollbar-lock) { display: none; }
+/* Swiper 가 서기 전의 막대 자리(SoluneCatrowPagerReserve)도 같은 때 감춘다 — 칩 수가 그 화면 폭의 한 화면 칸 수
+   (shop-home-swipers.tsx 의 slidesPerView · breakpoints: 2 · 640 3 · 780 4 · 1080 8 · 1280 10) 이하일 때. */
+.solune-shop-page .ondam-catrow:not(:has(.swiper-slide:nth-child(3))) .solune-catrow-pager-reserve { display: none; }
+@media (min-width: 640px) { .solune-shop-page .ondam-catrow:not(:has(.swiper-slide:nth-child(4))) .solune-catrow-pager-reserve { display: none; } }
+@media (min-width: 780px) { .solune-shop-page .ondam-catrow:not(:has(.swiper-slide:nth-child(5))) .solune-catrow-pager-reserve { display: none; } }
+@media (min-width: 1080px) { .solune-shop-page .ondam-catrow:not(:has(.swiper-slide:nth-child(9))) .solune-catrow-pager-reserve { display: none; } }
+@media (min-width: 1280px) { .solune-shop-page .ondam-catrow:not(:has(.swiper-slide:nth-child(11))) .solune-catrow-pager-reserve { display: none; } }
+.solune-shop-page .solune-catrow-pager-reserve { pointer-events: none; }
 
 /* Swiper 가 서기 전에는 제 CSS 의 .swiper-slide { width: 100% } 가 남아 한 장이 줄을 통째로
    차지하고 줄 높이도 부푼다. 그 틈에도 한 줄로 보이게 받쳐 둔다(배너는 뺀다 — 거기서는 한 장이

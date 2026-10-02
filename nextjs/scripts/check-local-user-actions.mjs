@@ -33,7 +33,8 @@ function printFailure(error, prefix = 'check-local-user-actions') {
 }
 
 function runSeed(script, env = {}, args = []) {
-  const scriptPath = fileURLToPath(new URL(`../../scripts/${script}`, import.meta.url));
+  // 시드 PHP 는 nextjs/scripts/smoke/ 에 있다(예전 저장소 루트 scripts/ 에서 옮김).
+  const scriptPath = fileURLToPath(new URL(`./smoke/${script}`, import.meta.url));
   const result = spawnSync('php', [scriptPath, '--json', ...args], {
     env: {
       ...process.env,
@@ -251,6 +252,8 @@ async function verifyBoardPostAndComment(page, token, state) {
 
   await page.goto(`${appUrl}/${smokeBoard}/write`, { waitUntil: 'networkidle' });
   await page.locator('#wr_subject').fill(subject);
+  // 에디터 화면인지 — 그누보드처럼 에디터로 쓴 글은 wr_option 에 html1 이 남아야 한다(아래에서 확인).
+  const usedEditor = (await page.locator('.ProseMirror').count()) > 0;
   await fillRichTextOrTextarea(page, 'textarea#wr_content', content);
   const writeForm = page.locator('form').filter({ has: page.locator('#wr_subject') }).first();
 
@@ -280,6 +283,11 @@ async function verifyBoardPostAndComment(page, token, state) {
   ) {
     fail('board post create did not persist through the API', createdPost.data);
   }
+  // wr_option — 그누보드 write_update.php 와 같이 에디터 글은 html1, 글자 상자(HTML 사용 안 함)는 html 값 없음.
+  const createdOption = String(createdPost.data?.wr_option || '');
+  if (usedEditor ? !createdOption.includes('html1') : /html[12]/.test(createdOption)) {
+    fail('board post wr_option does not match the editor mode', { usedEditor, wr_option: createdOption });
+  }
 
   await page.goto(`${appUrl}/${smokeBoard}/${postId}`, { waitUntil: 'networkidle' });
   await fillRichTextOrTextarea(page, 'textarea[placeholder="댓글을 입력하세요"]', comment);
@@ -293,6 +301,11 @@ async function verifyBoardPostAndComment(page, token, state) {
     page.locator('button').filter({ hasText: '댓글 등록' }).last().click(),
   ]);
   await assertOkResponse(commentResponse, 'comment create');
+  // 비밀 댓글 필드(그누보드 wr_secret)를 보낸다 — 체크하지 않았으니 빈 값.
+  const commentBody = commentResponse.request().postDataJSON() || {};
+  if (!('wr_secret' in commentBody) || commentBody.wr_secret !== '') {
+    fail('comment create did not send the wr_secret field', commentBody);
+  }
 
   const commentedPost = await apiJson(`/posts/${smokeBoard}/${postId}`, {
     headers: authHeaders(token),

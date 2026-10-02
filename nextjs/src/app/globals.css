@@ -870,3 +870,17 @@
   margin: 0;
   color: hsl(var(--foreground));
 }
+
+/* 글 본문의 사진 링크(그누보드 get_view_thumbnail 이 원본으로 감싼 <a class="view_image">).
+   img 가 block 이라 inline <a> 가 본문 폭 전체로 늘어나, 사진 옆 빈 곳을 눌러도 원본이 새 창으로 열렸다.
+   링크를 사진 크기만큼만 두고, 아래 글자 기준선 틈은 vertical-align 으로 없앤다.
+   prose 가 사진에 준 위아래 여백은 링크 바깥으로 옮긴다 — 안에 두면 사진 위아래 띠도 눌린다. */
+.board-view-content a.view_image {
+  display: inline-block;
+  max-width: 100%;
+  margin-block: 1.75rem;
+  vertical-align: top;
+}
+.board-view-content a.view_image > img {
+  margin-block: 0;
+}

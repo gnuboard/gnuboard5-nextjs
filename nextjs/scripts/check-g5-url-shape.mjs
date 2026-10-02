@@ -30,6 +30,8 @@ const themeLegacyRouteResolversPath = join(repoRoot, '..', 'overlay', 'theme', T
 const themeRoutePath = join(repoRoot, '..', 'overlay', 'theme', THEME_NAME, 'route.php');
 const productDetailPath = join(repoRoot, 'src/app/shop/products/[it_id]/ProductDetailClient.tsx');
 const productDetailTabsPath = join(repoRoot, 'src/app/shop/products/[it_id]/ProductDetailTabs.tsx');
+// 상세의 장바구니 담기(갱신 알림 notifyCartChanged 포함)는 빠른 담기와 같이 쓰는 공용 함수에 있다.
+const productAddToCartPath = join(repoRoot, 'src/components/shop/addProductToCart.tsx');
 const shopWishlistPagePath = join(repoRoot, 'src/app/shop/wishlist/page.tsx');
 const shopWishlistClientPath = join(repoRoot, 'src/app/shop/wishlist/ClientPage.tsx');
 const shopContentPagePath = join(repoRoot, 'src/app/shop/content/[co_id]/page.tsx');
@@ -127,7 +129,7 @@ const themeLegacyRouteResolversSource = readIfExists(themeLegacyRouteResolversPa
 const themeRouteSource = read(themeRoutePath);
 const themeStaticRoutingSource = `${themeAppShellSource}\n${themeBridgeConfigSource}\n${themeAssetResponsesSource}\n${themeShortRoutesSource}\n${themeShortRoutesCommunitySource}\n${themeShortRoutesShopSource}\n${themeStaticPathsSource}\n${themeLegacyRoutesSource}\n${themeLegacyRouteResolversSource}\n${themeRouteSource}`;
 const productDetailSource = read(productDetailPath);
-const productDetailBridgeSource = `${productDetailSource}\n${read(productDetailTabsPath)}`;
+const productDetailBridgeSource = `${productDetailSource}\n${read(productDetailTabsPath)}\n${read(productAddToCartPath)}`;
 const orderPageSource = read(orderPagePath);
 const orderDataFlowSource = `${orderPageSource}\n${read(orderPageControllerPath)}\n${read(orderDataHookPath)}\n${read(orderDataHelpersPath)}`;
 

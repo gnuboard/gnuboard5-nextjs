@@ -57,7 +57,6 @@ export function ProductPurchasePanel({
   onAddToCart,
   onBuyNow,
   onWishlist,
-  onOpenRecommendDialog,
   naverPayConfig,
   naverPaySubmitting,
   onNaverPayOrder,
@@ -266,7 +265,6 @@ export function ProductPurchasePanel({
         onAddToCart={onAddToCart}
         onBuyNow={onBuyNow}
         onWishlist={onWishlist}
-        onOpenRecommendDialog={onOpenRecommendDialog}
         naverPayConfig={naverPayConfig}
         naverPaySubmitting={naverPaySubmitting}
         onNaverPayOrder={onNaverPayOrder}

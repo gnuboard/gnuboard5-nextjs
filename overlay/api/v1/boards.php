@@ -5,6 +5,7 @@
  * Routes handled (prefix: v1/boards):
  *   GET    /v1/boards                      - List all boards
  *   GET    /v1/boards/{bo_table}           - Get single board info
+ *   GET    /v1/boards/{bo_table}/category-counts - 분류별 글 수 (기본 끔, on 일 때만 · 큰 게시판 자동 끄기 · 5분 캐시)
  *   GET    /v1/boards/{bo_table}/posts     - List posts in a board
  *   POST   /v1/boards/{bo_table}/posts     - Create new post (auth required)
  *                                              body.reply_to = 원글 wr_id 면 답글(w=r)로 만든다
@@ -88,17 +89,46 @@ if ($bo_table && !$subResource && $apiMethod === 'GET') {
         Response::error('Board not found.', 404);
     }
 
-    // 분류별 글 수. 목록 화면의 분류 칩이 "이 갈래에 몇 개가 있는지" 를 함께
-    // 보여 줄 수 있도록 한 번의 GROUP BY 로 세어 붙인다. 분류를 쓰지 않는
-    // 게시판에는 넣지 않는다.
-    if ((int) ($board['bo_use_category'] ?? 0) === 1) {
-        $writeTable = DB::writeTable($bo_table);
-        $counts = [];
+    // 분류별 글 수는 여기서 세지 않는다 — 글보기 · RSS 도 이 응답을 쓰므로 글이 많은 게시판에서는
+    // 조회마다 글 테이블 전체를 훑게 된다. 목록 화면만 /category-counts 를 따로 부른다(아래).
+    Response::success($board);
+}
 
+// -------------------------------------------------------------------------
+// GET /v1/boards/{bo_table}/category-counts - 분류별 글 수 (목록 화면의 분류 칩)
+//
+// 글 테이블 전체를 GROUP BY 로 세는 일이라(ca_name 인덱스 없음) 세 겹으로 줄인다.
+//   1) 기본은 끔. G5_API_BOARD_CATEGORY_COUNTS=on 일 때만 센다 (api/.env, 또는 extend 등에서 define)
+//   2) 켜도 큰 게시판은 스스로 끔  글 수(bo_count_write) > G5_API_BOARD_CATEGORY_COUNTS_MAX_POSTS
+//      (기본 50000, 0 이면 제한 없음)
+//   3) 게시판별 5분 캐시(그누보드 파일 캐시, data/cache) — 숫자가 몇 분 늦어도 괜찮다.
+// 세지 않을 때는 counts 를 null 로, 그 까닭을 reason 으로 준다. 화면은 숫자만 빼고 분류는 그대로 둔다.
+// -------------------------------------------------------------------------
+if (!function_exists('api_board_category_counts_enabled')) {
+    function api_board_category_counts_enabled()
+    {
+        $value = strtolower(g5_api_config_value('G5_API_BOARD_CATEGORY_COUNTS'));
+        return in_array($value, array('1', 'on', 'true', 'yes', 'enabled'), true);
+    }
+}
+
+if (!function_exists('api_board_category_counts_max_posts')) {
+    function api_board_category_counts_max_posts()
+    {
+        $value = g5_api_config_value('G5_API_BOARD_CATEGORY_COUNTS_MAX_POSTS');
+        return ($value !== '' && ctype_digit($value)) ? (int) $value : 50000;
+    }
+}
+
+if (!function_exists('api_board_category_counts_query')) {
+    /** 분류별 글 수를 센다. 글 테이블이 없거나 조회에 실패하면 빈 배열. */
+    function api_board_category_counts_query($bo_table)
+    {
+        $counts = array();
         try {
             $rows = DB::readFetchAll(
                 "SELECT ca_name, COUNT(*) AS cnt
-                 FROM {$writeTable}
+                 FROM " . DB::writeTable($bo_table) . "
                  WHERE wr_is_comment = 0 AND ca_name <> ''
                  GROUP BY ca_name"
             );
@@ -106,14 +136,38 @@ if ($bo_table && !$subResource && $apiMethod === 'GET') {
                 $counts[(string) $row['ca_name']] = (int) $row['cnt'];
             }
         } catch (Throwable $e) {
-            // 글 테이블이 아직 없거나 조회에 실패해도 게시판 정보는 내보낸다.
-            $counts = [];
+            $counts = array();
         }
+        return $counts;
+    }
+}
 
-        $board['category_counts'] = (object) $counts;
+if ($bo_table && $subResource === 'category-counts' && $apiMethod === 'GET') {
+    $board = api_get_board($bo_table);
+    if (!$board) {
+        Response::error('Board not found.', 404);
+    }
+    if ((int) ($board['bo_use_category'] ?? 0) !== 1) {
+        Response::success(array('counts' => null, 'reason' => 'no_category'));
+    }
+    if (!api_board_category_counts_enabled()) {
+        Response::success(array('counts' => null, 'reason' => 'disabled'));
+    }
+    $maxPosts = api_board_category_counts_max_posts();
+    if ($maxPosts > 0 && (int) ($board['bo_count_write'] ?? 0) > $maxPosts) {
+        Response::success(array('counts' => null, 'reason' => 'too_many_posts'));
     }
 
-    Response::success($board);
+    $cacheKey = 'api-board-category-counts-' . $bo_table;
+    $counts = function_exists('g5_get_cache') ? g5_get_cache($cacheKey, 300) : false;
+    if (!is_array($counts)) {
+        $counts = api_board_category_counts_query($bo_table);
+        if (function_exists('g5_set_cache')) {
+            g5_set_cache($cacheKey, $counts, 300);
+        }
+    }
+
+    Response::success(array('counts' => (object) $counts, 'reason' => null));
 }
 
 // -------------------------------------------------------------------------
@@ -234,12 +288,13 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'GET') {
      */
     // 목록 썸네일 크기 — 그누보드 갤러리 목록과 같은 게시판 갤러리 크기 · 자르기(2배 밀도, lib/image-variants.php).
     $listThumbSize = api_image_board_list_size($board);
-    // 본문 발췌(wr_excerpt)는 글을 읽을 수 있는 사람에게만 낸다 — 목록 보기 권한만으로 본문 일부가 보이면 안 된다.
-    // 읽을 때 포인트를 깎는 게시판(bo_read_point < 0)도 발췌로 본문을 공짜로 보이지 않게 뺀다.
-    $canExcerpt = api_can_read_board($viewer, $bo_table, $board) && (int) ($board['bo_read_point'] ?? 0) >= 0;
+    // 본문 발췌(wr_excerpt)는 ?with=excerpt 로 달라는 목록(갤러리 카드)에만, 글을 읽을 수 있는 사람에게만 낸다
+    // — 목록 보기 권한만으로 본문 일부가 보이면 안 된다. 읽기 포인트 게시판의 예외까지 api_board_excerpt_allowed_ids().
+    $wantsExcerpt = in_array('excerpt', array_map('trim', explode(',', (string) ($_GET['with'] ?? ''))), true);
 
-    $enrichPosts = function(array $posts, bool $isNotice) use ($bo_table, $memberTable, $boardFileTable, $listThumbSize, $canExcerpt): array {
+    $enrichPosts = function(array $posts, bool $isNotice) use ($bo_table, $memberTable, $boardFileTable, $listThumbSize, $wantsExcerpt, $viewer, $board): array {
         if (!$posts) return [];
+        $excerptIds = $wantsExcerpt ? api_board_excerpt_allowed_ids($viewer, $bo_table, $board, $posts) : [];
 
         // 1) mb_id 들 모아 한 번에 mb_nick 조회
         $mbIds = [];
@@ -326,7 +381,7 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'GET') {
             if ($post['thumbnail'] === '' && !$post['is_secret']) {
                 $post['thumbnail'] = api_editor_first_image_url($post['wr_content'] ?? '', $listThumbSize[0], $listThumbSize[1]);
             }
-            $post['wr_excerpt'] = ($canExcerpt && !$post['is_secret']) ? api_post_excerpt($post['wr_content'] ?? '') : '';
+            $post['wr_excerpt'] = (isset($excerptIds[(int) $post['wr_id']]) && !$post['is_secret']) ? api_post_excerpt($post['wr_content'] ?? '') : '';
             unset($post['wr_content'], $post['wr_ip']);
             $out[] = $post;
         }
@@ -449,7 +504,7 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'POST') {
     $wrReply = '';
     if ($replyTo > 0) {
         $replyParent = DB::fetch(
-            "SELECT wr_id, wr_num, wr_reply, wr_subject, wr_option, mb_id FROM {$write_table} WHERE wr_id = ? AND wr_is_comment = 0",
+            "SELECT wr_id, wr_num, wr_reply, wr_subject, wr_option, wr_email, mb_id FROM {$write_table} WHERE wr_id = ? AND wr_is_comment = 0",
             [$replyTo]
         );
         if (!$replyParent) {
@@ -504,22 +559,12 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'POST') {
     $wr_link1     = isset($input['wr_link1']) ? api_safe_board_link($input['wr_link1']) : '';
     $wr_link2     = isset($input['wr_link2']) ? api_safe_board_link($input['wr_link2']) : '';
 
-    // Options (secret, html)
-    $options = [];
-    if (isset($input['wr_option'])) {
-        $allowedOptions = ['secret', 'html1', 'html2'];
-        if (is_array($input['wr_option'])) {
-            foreach ($input['wr_option'] as $option) {
-                if (in_array($option, $allowedOptions, true) && !in_array($option, $options, true)) {
-                    $options[] = $option;
-                }
-            }
-        } else {
-            // Validate single option value against allowed list
-            if (in_array($input['wr_option'], $allowedOptions, true)) {
-                $options[] = $input['wr_option'];
-            }
-        }
+    // 옵션(html1|html2 · secret · mail) — 그누보드 write_update.php 와 같이 폼 필드 html · secret · mail 로 받는다
+    // (예전 wr_option 필드도 받는다). 에디터로 쓴 글은 html=html1 이 와서 wr_option 에 html1 이 남는다.
+    $options = array_values(array_filter(explode(',', api_build_wr_option($input))));
+    if (!api_board_html_allowed($board, $member, $adminRole)) {
+        // HTML 권한(bo_html_level) 아래면 html 옵션을 받지 않는다 — 그누보드 글쓰기 폼이 이 사람에게는 html 을 내주지 않는다.
+        $options = array_values(array_diff($options, array('html1', 'html2')));
     }
     if ($adminRole === '' && (int) ($board['bo_use_secret'] ?? 0) === 0 && in_array('secret', $options, true)) {
         Response::error('Secret posts are not enabled in this board.', 403);
@@ -530,7 +575,7 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'POST') {
     if ($replyParent && api_is_secret_option($replyParent['wr_option']) && !in_array('secret', $options, true)) {
         $options[] = 'secret'; // 비밀글의 답글은 비밀글
     }
-    $wr_option = implode(',', $options);
+    $wr_option = api_build_wr_option(array('wr_option' => $options)); // 원본 순서(html, secret, mail)로
 
     // 그누보드 훅(bbs/write_update.php 와 같은 인자) — 새 글은 $w = '', 답글은 $w = 'r'($wr_id 는 원글).
     // $qstr(목록 쿼리)과 이동 주소는 API 에 없으므로 빈 값.
@@ -644,6 +689,16 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'POST') {
             error_log('[api/boards] reply notify failed: ' . $e->getMessage());
         }
     }
+
+    // 알림 메일(그누보드 write_update.php 의 "메일발송 사용") — cf_email_use · bo_use_email 이 켜졌을 때만.
+    api_send_board_write_mail(
+        $board,
+        $hookW,
+        $wr_id,
+        $replyParent ?: null,
+        array('name' => (string) $member['mb_nick'], 'email' => (string) $member['mb_email']),
+        array('subject' => (string) $wr_subject, 'content' => (string) $wr_content, 'wr_option' => $wr_option)
+    );
 
     // 그누보드 latest() 위젯 캐시를 비운다(원본과 같이 훅 앞에서). 안의 delete_cache_latest 훅도 보호해서 부른다.
     api_call_core('delete_cache_latest', array($bo_table), $member);

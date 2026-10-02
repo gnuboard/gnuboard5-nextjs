@@ -237,12 +237,17 @@ function shop_payment_confirm_verify_pg(string $pg_service, array &$input, array
         $enc_info = pg_mobile_request_value($input, ['enc_info', 'encInfo']);
         $enc_data = pg_mobile_request_value($input, ['enc_data', 'encData']);
         $tran_cd  = pg_mobile_request_value($input, ['tran_cd', 'tranCd']);
-        $site_cd  = pg_mobile_request_value($input, ['site_cd', 'siteCd']);
-        if ($site_cd === '') {
-            $site_cd = pg_kcp_site_cd($cfg, pg_detect_test_mode($cfg, 'kcp'));
+        // 사이트 코드는 서버의 결제 모드(관리자 '결제 테스트')로만 정한다. 요청 값을 쓰면 운영 쇼핑몰에
+        // 테스트 코드(T0000)를 보내 테스트 승인 서버의 승인으로 주문을 결제 완료시킬 수 있다.
+        // 요청에 코드가 있으면 서버 값과 같은지만 본다(앱 · 웹 결제창이 같은 값을 돌려준다).
+        $site_cd = pg_kcp_site_cd($cfg, pg_detect_test_mode($cfg, 'kcp'));
+        $requestSiteCd = pg_mobile_request_value($input, ['site_cd', 'siteCd']);
+        if ($requestSiteCd !== '' && preg_match('/^(T\d{4}|S\d{4}|SR)/', $requestSiteCd) !== 1) {
+            $requestSiteCd = 'SR' . $requestSiteCd;
         }
-        if ($site_cd !== '' && preg_match('/^(T\d{4}|S\d{4}|SR)/', $site_cd) !== 1 && !pg_detect_test_mode($cfg, 'kcp')) {
-            $site_cd = 'SR' . $site_cd;
+        if ($site_cd === '' || ($requestSiteCd !== '' && !hash_equals($site_cd, $requestSiteCd))) {
+            error_log('[shop/payment/confirm] KCP site_cd mismatch for order ' . $order_id);
+            Response::error('결제 정보가 쇼핑몰 설정과 맞지 않습니다.', 400, ['code' => 'kcp_site_mismatch']);
         }
         $tno      = pg_mobile_request_value($input, ['tno', 'TNO', 'tid', 'TID']);
 

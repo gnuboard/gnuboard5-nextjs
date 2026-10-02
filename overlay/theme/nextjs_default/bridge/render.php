@@ -162,6 +162,10 @@ function nextjs_default_render_app_shell()
     $html = nextjs_default_seo_apply_to_html($html, $index_path);
     $html = nextjs_default_seo_apply_site_name($html);
     $html = nextjs_default_inject_runtime_config($html);
+    // 쇼핑 홈 배너 · 분류 줄이 있는지 첫 페인트 전에 알린다(shop-layout-hint.ts). 예전 핵심 꾸러미에는 없는 함수다.
+    if (function_exists('g5_webapp_inject_shop_home_layout')) {
+        $html = g5_webapp_inject_shop_home_layout($html);
+    }
     $html = nextjs_default_add_script_nonce($html);
 
     // 없는 글·상품 주소는 404 — 화면은 앱의 "찾을 수 없습니다" 그대로. 권한 때문에 못 보는 글은 200.

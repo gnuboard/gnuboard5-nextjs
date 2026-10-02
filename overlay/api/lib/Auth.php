@@ -33,6 +33,12 @@ class Auth
         if (!$payload || empty($payload['mb_id'])) {
             return null;
         }
+        // 용도가 정해진 토큰(비밀번호 재설정 password_reset, 본인확인 identity_cert …)은 로그인 토큰이 아니다.
+        // 같은 키로 서명되므로 여기서 거르지 않으면 재설정 링크의 토큰으로 그 회원 행세를 할 수 있다.
+        // 로그인 토큰(generateToken)에는 purpose 가 없다.
+        if (isset($payload['purpose']) && $payload['purpose'] !== '') {
+            return null;
+        }
 
         $mb_id = $payload['mb_id'];
 

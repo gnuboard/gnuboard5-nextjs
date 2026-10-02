@@ -117,8 +117,18 @@ export default function WritePage({ boTable: fallbackBoTable }: WritePageProps) 
     wr_link2: "",
     wr_secret: false,
     html: "0",
+    mail: false,
   });
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [siteOptions, setSiteOptions] = useState({ editor: "", emailUse: false });
+
+  // 그누보드 bbs/write.php 와 같은 조건.
+  //  - HTML: 회원 레벨 >= bo_html_level ($is_html)
+  //  - 에디터: 사이트 에디터(cf_editor)가 있고 게시판이 에디터를 쓰고 HTML 을 쓸 수 있을 때 ($is_dhtml_editor)
+  //  - 답변메일받기: 메일 사용(cf_email_use)과 게시판 메일 발송(bo_use_email)이 모두 켜졌을 때 ($is_mail)
+  const canUseHtml = Boolean(board) && (user?.mb_level ?? 1) >= Number(board?.bo_html_level ?? 1);
+  const usesEditor = canUseHtml && Boolean(siteOptions.editor) && board?.bo_use_dhtml_editor === 1;
+  const canReceiveMail = siteOptions.emailUse && board?.bo_use_email === 1;
 
   // Redirect if not logged in (wait for auth initialization)
   useEffect(() => {
@@ -141,11 +151,17 @@ export default function WritePage({ boTable: fallbackBoTable }: WritePageProps) 
       setBoTable(routeBoTable);
 
       try {
-        const res = await apiClient.get<Board>(`/boards/${routeBoTable}`);
+        // 에디터 · 답변메일 조건에 사이트 설정(cf_editor · cf_email_use)이 들어가므로 게시판과 함께 읽는다 —
+        // 따로 읽으면 글자 상자가 먼저 그려졌다가 에디터로 바뀐다.
+        const [res, settings] = await Promise.all([
+          apiClient.get<Board>(`/boards/${routeBoTable}`),
+          getClientPublicSettings().catch(() => null),
+        ]);
+        setSiteOptions({
+          editor: String(settings?.cf_editor ?? ""),
+          emailUse: Number(settings?.cf_email_use ?? 0) === 1,
+        });
         setBoard(res.data ?? null);
-        if (res.data?.bo_use_dhtml_editor === 1) {
-          setFormData((prev) => ({ ...prev, html: "1" }));
-        }
       } catch {
         setError("게시판 정보를 불러올 수 없습니다.");
       }
@@ -189,6 +205,7 @@ export default function WritePage({ boTable: fallbackBoTable }: WritePageProps) 
               : post.wr_option?.includes("html2")
                 ? "2"
                 : "0",
+            mail: Boolean(post.wr_option?.includes("mail")),
           });
         } catch {
           setError("게시글 정보를 불러올 수 없습니다.");
@@ -267,7 +284,7 @@ export default function WritePage({ boTable: fallbackBoTable }: WritePageProps) 
       setError("제목을 입력해주세요.");
       return;
     }
-    const contentText = board?.bo_use_dhtml_editor === 1
+    const contentText = usesEditor
       ? htmlToPlainText(formData.wr_content)
       : formData.wr_content.trim();
     if (!contentText) {
@@ -285,7 +302,11 @@ export default function WritePage({ boTable: fallbackBoTable }: WritePageProps) 
         wr_link1: formData.wr_link1 || undefined,
         wr_link2: formData.wr_link2 || undefined,
         secret: formData.wr_secret ? "secret" : "",
-        html: formData.html,
+        // 그누보드 write_update.php 의 html 값(html1 | html2 | 빈 값) — wr_option 에 그대로 남는다.
+        // 에디터 게시판은 원본 스킨처럼 늘 html1(본문이 HTML). 수정 중인 글이 예전에 빈 값으로 저장됐어도 html1 로 고쳐진다.
+        html: usesEditor ? "html1" : !canUseHtml ? "" : formData.html === "1" ? "html1" : formData.html === "2" ? "html2" : "",
+        // 답변메일받기(그누보드 mail) — 쓸 수 없는 게시판이면 빈 값.
+        mail: canReceiveMail && formData.mail ? "mail" : "",
         reply_to: replyTo ? replyTo.wr_id : undefined,
       };
 
@@ -462,7 +483,7 @@ export default function WritePage({ boTable: fallbackBoTable }: WritePageProps) 
             {/* Content */}
             <div className="board-write-field board-write-content space-y-2">
               <Label htmlFor="wr_content">내용</Label>
-              {board?.bo_use_dhtml_editor === 1 ? (
+              {usesEditor ? (
                 <TiptapEditor
                   content={formData.wr_content}
                   onChange={(html) =>
@@ -536,7 +557,24 @@ export default function WritePage({ boTable: fallbackBoTable }: WritePageProps) 
                   비밀글
                 </Label>
               </div>
-              {board?.bo_use_dhtml_editor !== 1 && (
+              {canReceiveMail && (
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="mail"
+                    checked={formData.mail}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        mail: e.target.checked,
+                      }))
+                    }
+                  />
+                  <Label htmlFor="mail" className="text-sm font-normal">
+                    답변메일받기
+                  </Label>
+                </div>
+              )}
+              {!usesEditor && canUseHtml && (
                 <div className="flex items-center gap-2">
                   <Label className="text-sm font-normal">HTML</Label>
                   <Select

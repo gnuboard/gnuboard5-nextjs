@@ -7,6 +7,8 @@ export interface RecentQuery {
   view?: "" | "w" | "c";
   grId?: string;
   mbId?: string;
+  /** 작성자 공개 키(사이드뷰 "전체게시물" — 주소에 아이디를 남기지 않는다). */
+  mbKey?: string;
   page?: number;
   limit?: number;
 }
@@ -24,6 +26,7 @@ function recentParams(query: RecentQuery): URLSearchParams {
   if (query.view) params.set("view", query.view);
   if (query.grId) params.set("gr_id", query.grId);
   if (query.mbId) params.set("mb_id", query.mbId);
+  else if (query.mbKey) params.set("mb_key", query.mbKey);
   params.set("page", String(query.page ?? 1));
   params.set("limit", String(query.limit ?? 20));
   return params;

@@ -491,18 +491,15 @@ if (!$action && $apiMethod === 'PATCH') {
     if (isset($input['wr_link2'])) {
         $input['wr_link2'] = api_safe_board_link($input['wr_link2']);
     }
-    if (isset($input['wr_option'])) {
+    // 옵션(html1|html2 · secret · mail) — 그누보드 write_update.php 와 같이 폼 필드 html · secret · mail 로 받는다
+    // (예전 wr_option 필드도 받는다). 요청에 없는 항목은 지금 글의 값을 그대로 둔다.
+    $optionKeys = array('wr_option', 'html', 'secret', 'mail');
+    if (count(array_intersect($optionKeys, array_keys($input))) > 0) {
         $adminRole = Auth::adminRole($member, $bo_table);
-        $allowedOptions = array('secret', 'html1', 'html2');
-        $requestedOptions = is_array($input['wr_option'])
-            ? $input['wr_option']
-            : explode(',', (string) $input['wr_option']);
-        $options = array();
-        foreach ($requestedOptions as $option) {
-            $option = trim((string) $option);
-            if (in_array($option, $allowedOptions, true) && !in_array($option, $options, true)) {
-                $options[] = $option;
-            }
+        $options = array_values(array_filter(explode(',', api_build_wr_option($input, $post['wr_option'] ?? ''))));
+        if (!api_board_html_allowed($board, $member, $adminRole)) {
+            // HTML 권한(bo_html_level) 아래면 html 옵션을 받지 않는다(그누보드 write.php 의 $is_html).
+            $options = array_values(array_diff($options, array('html1', 'html2')));
         }
         if ($adminRole === '' && (int) ($board['bo_use_secret'] ?? 0) === 0 && in_array('secret', $options, true)) {
             Response::error('Secret posts are not enabled in this board.', 403);
@@ -510,7 +507,7 @@ if (!$action && $apiMethod === 'PATCH') {
         if ($adminRole === '' && (int) ($board['bo_use_secret'] ?? 0) === 2 && !in_array('secret', $options, true)) {
             $options[] = 'secret';
         }
-        $input['wr_option'] = implode(',', $options);
+        $input['wr_option'] = api_build_wr_option(array('wr_option' => $options)); // 원본 순서(html, secret, mail)로
     }
 
     // Build SET clause with only allowed fields using parameterized bindings

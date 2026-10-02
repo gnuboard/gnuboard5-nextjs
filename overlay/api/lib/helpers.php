@@ -31,12 +31,12 @@ function get_request_body()
     if (strpos($contentType, 'application/json') !== false) {
         $raw = file_get_contents('php://input');
         $data = json_decode($raw, true);
-        return is_array($data) ? $data : [];
+        return api_restore_request_editor_urls(is_array($data) ? $data : []);
     }
 
     // Form-encoded or multipart
     if (!empty($_POST)) {
-        return $_POST;
+        return api_restore_request_editor_urls($_POST);
     }
 
     // Last resort: try to parse raw input as JSON anyway
@@ -44,11 +44,25 @@ function get_request_body()
     if ($raw) {
         $data = json_decode($raw, true);
         if (is_array($data)) {
-            return $data;
+            return api_restore_request_editor_urls($data);
         }
     }
 
     return [];
+}
+
+/**
+ * 글 · 댓글 본문(wr_content)에 실려 온 이 API 의 에디터 사진 주소를 그누보드 저장 형식으로 되돌린다
+ * (lib/editor-images.php api_restore_editor_image_urls). 수정 화면이 읽기 응답의 API 주소를 그대로 보내므로,
+ * 쓰기 핸들러마다 하지 않고 입력을 읽는 이 입구에서 한 번 한다.
+ */
+function api_restore_request_editor_urls(array $body)
+{
+    if (isset($body['wr_content']) && is_string($body['wr_content']) && function_exists('api_restore_editor_image_urls')) {
+        $body['wr_content'] = api_restore_editor_image_urls($body['wr_content']);
+    }
+
+    return $body;
 }
 
 /**
@@ -281,6 +295,201 @@ function api_member_media_urls($mb_id, $fresh = false)
 function api_is_secret_option($wr_option)
 {
     return strpos((string) $wr_option, 'secret') !== false;
+}
+
+/**
+ * 글의 wr_option 을 그누보드 bbs/write_update.php 와 같게 만든다 — "html1|html2,secret,mail" (이 순서).
+ *
+ * - 그누보드 글쓰기 폼과 같은 필드 html · secret · mail 을 받는다. 원본처럼 값에서 html1|html2 · secret · mail 을
+ *   골라낸다(에디터 게시판의 스킨은 html=html1 을 숨겨 보낸다). html 의 1 · 2 도 html1 · html2 로 받는다.
+ *   secret · mail 은 true · 1 도 켬으로 본다.
+ * - 예전 API 필드 wr_option(쉼표 문자열 또는 배열)도 받는다 — 오면 셋을 모두 그것으로 정한다.
+ * - 요청에 없는 항목은 $current(수정 전 wr_option)를 그대로 둔다. 새 글이면 빈 값에서 시작한다.
+ */
+function api_build_wr_option(array $input, $current = '')
+{
+    $pickHtml = function ($value) {
+        $value = strtolower(trim((string) $value));
+        if ($value === '1' || $value === '2') {
+            $value = 'html' . $value;
+        }
+        return preg_match('#html(1|2)#', $value, $matches) ? $matches[0] : '';
+    };
+    $flag = function ($value, $word) {
+        if ($value === true || $value === 1 || $value === '1') {
+            return $word;
+        }
+        return (is_string($value) && stripos($value, $word) !== false) ? $word : '';
+    };
+
+    $current = strtolower((string) $current);
+    $parts = array(
+        'html'   => $pickHtml($current),
+        'secret' => $flag($current, 'secret'),
+        'mail'   => $flag($current, 'mail'),
+    );
+
+    if (array_key_exists('wr_option', $input)) {
+        $raw = is_array($input['wr_option'])
+            ? implode(',', array_map('strval', $input['wr_option']))
+            : (string) $input['wr_option'];
+        $parts = array(
+            'html'   => $pickHtml($raw),
+            'secret' => $flag($raw, 'secret'),
+            'mail'   => $flag($raw, 'mail'),
+        );
+    }
+    if (array_key_exists('html', $input)) {
+        $parts['html'] = $pickHtml($input['html']);
+    }
+    if (array_key_exists('secret', $input)) {
+        $parts['secret'] = $flag($input['secret'], 'secret');
+    }
+    if (array_key_exists('mail', $input)) {
+        $parts['mail'] = $flag($input['mail'], 'mail');
+    }
+
+    return implode(',', array_filter($parts));
+}
+
+/**
+ * 댓글의 비밀 여부 — 그누보드 write_comment_update.php 의 폼 필드 wr_secret(값 secret). secret · 예전 wr_option 도 받는다.
+ * 'secret' 또는 '' 를 돌려준다. 요청에 셋 다 없으면 null(수정에서 "바꾸지 않음").
+ */
+function api_comment_secret_option(array $input)
+{
+    foreach (array('wr_secret', 'secret', 'wr_option') as $key) {
+        if (array_key_exists($key, $input)) {
+            $value = is_array($input[$key]) ? implode(',', array_map('strval', $input[$key])) : $input[$key];
+            return api_build_wr_option(array('secret' => $value)) === 'secret' ? 'secret' : '';
+        }
+    }
+    return null;
+}
+
+/**
+ * 이 사람이 이 게시판에서 HTML(html1 · html2 · 에디터)을 쓸 수 있나 — 그누보드 write.php 의
+ * $is_html(mb_level >= bo_html_level). 관리자는 늘 된다. 비회원은 레벨 1.
+ */
+function api_board_html_allowed(array $board, $member, $adminRole = '')
+{
+    if ((string) $adminRole !== '') {
+        return true;
+    }
+    $level = is_array($member) && isset($member['mb_level']) ? (int) $member['mb_level'] : 1;
+    return $level >= (int) ($board['bo_html_level'] ?? 1);
+}
+
+/**
+ * 새 글 · 답글 · 댓글 알림 메일 — 그누보드 bbs/write_update.php · write_comment_update.php 의 "메일발송 사용" 과 같다.
+ * 환경설정 메일 사용(cf_email_use)과 게시판 메일 발송(bo_use_email)이 모두 켜져 있을 때만 보내고, 수정은 보내지 않는다.
+ *
+ * 받는 사람(환경설정 cf_email_wr_*): 게시판 · 그룹 · 최고관리자, 원글 작성자,
+ * 답글이면 원글이 "답변메일받기"(wr_option 의 mail)를 켰을 때 원글 작성자, 댓글이면 cf_email_wr_comment_all 로 댓글 쓴 사람 모두.
+ *
+ * @param array       $board   게시판 행
+ * @param string      $w       '' 새 글 · 'r' 답글 · 'c' 댓글
+ * @param int         $wrId    새 글 · 답글이면 그 글, 댓글이면 댓글이 달린 글
+ * @param array|null  $parent  답글이면 원글, 댓글이면 댓글이 달린 글(wr_subject · wr_email · wr_option), 새 글이면 null
+ * @param array       $writer  쓴 사람 ['name' => , 'email' => ]
+ * @param array       $item    ['subject' => 제목(댓글이면 빈 값), 'content' => 본문, 'wr_option' => , 'comment_id' => 댓글 번호]
+ *
+ * 메일이 실패해도 글쓰기는 막지 않는다(error_log 만).
+ */
+function api_send_board_write_mail(array $board, $w, $wrId, $parent, array $writer, array $item)
+{
+    global $config;
+
+    if (empty($config['cf_email_use']) || empty($board['bo_use_email'])) {
+        return;
+    }
+
+    $boTable = (string) ($board['bo_table'] ?? '');
+    try {
+        if (!function_exists('mailer') && defined('G5_LIB_PATH')) {
+            include_once G5_LIB_PATH . '/mailer.lib.php';
+        }
+        if (!function_exists('mailer')) {
+            return;
+        }
+
+        $memberEmail = static function ($mbId) {
+            $mbId = trim((string) $mbId);
+            if ($mbId === '') {
+                return '';
+            }
+            $row = DB::fetch('SELECT mb_email FROM ' . DB::table('member_table') . ' WHERE mb_id = ? LIMIT 1', array($mbId));
+            return $row ? trim((string) $row['mb_email']) : '';
+        };
+
+        $isComment = ($w === 'c');
+        $commentId = (int) ($item['comment_id'] ?? 0);
+        $labels = array('' => '입력', 'r' => '답변', 'c' => '댓글 ');
+        $subject = '[' . $config['cf_title'] . '] ' . $board['bo_subject'] . ' 게시판에 ' . ($labels[$w] ?? '입력') . '글이 올라왔습니다.';
+
+        // 메일 본문 틀(bbs/write_update_mail.php)이 읽는 변수들.
+        $wr_name = get_text((string) $writer['name']);
+        if ($isComment) {
+            // 댓글은 원본처럼 "원글 제목 + 댓글" 을 글자로. 댓글 에디터의 HTML 은 글자로 풀어 넣는다.
+            $commentText = preg_replace('#<br\s*/?>|</p>#i', "\n", (string) $item['content']);
+            $commentText = html_entity_decode(strip_tags($commentText), ENT_QUOTES, 'UTF-8');
+            $wr_subject = get_text((string) ($parent['wr_subject'] ?? ''));
+            $wr_content = nl2br(get_text("원글\n" . ($parent['wr_subject'] ?? '') . "\n\n\n댓글\n" . trim($commentText)));
+        } else {
+            $option = (string) ($item['wr_option'] ?? '');
+            $tmpHtml = strpos($option, 'html1') !== false ? 1 : (strpos($option, 'html2') !== false ? 2 : 0);
+            $wr_subject = get_text((string) $item['subject']);
+            $wr_content = conv_content((string) $item['content'], $tmpHtml);
+        }
+        $link_url = get_pretty_url($boTable, $wrId) . ($isComment && $commentId > 0 ? '#c_' . $commentId : '');
+
+        ob_start();
+        include G5_BBS_PATH . '/write_update_mail.php';
+        $content = ob_get_clean();
+
+        $emails = array();
+        if (!empty($config['cf_email_wr_board_admin'])) {
+            $emails[] = $memberEmail($board['bo_admin'] ?? '');
+        }
+        if (!empty($config['cf_email_wr_group_admin'])) {
+            $group = DB::fetch('SELECT gr_admin FROM ' . DB::table('group_table') . ' WHERE gr_id = ? LIMIT 1', array($board['gr_id'] ?? ''));
+            $emails[] = $memberEmail($group['gr_admin'] ?? '');
+        }
+        if (!empty($config['cf_email_wr_super_admin'])) {
+            $emails[] = $memberEmail($config['cf_admin'] ?? '');
+        }
+        // 원글 작성자 — 새 글이면 쓴 사람 자신, 답글 · 댓글이면 원글 작성자.
+        $originEmail = $w === '' ? (string) $writer['email'] : (string) ($parent['wr_email'] ?? '');
+        if (!empty($config['cf_email_wr_write'])) {
+            $emails[] = $originEmail;
+        }
+        // 답글: 원글이 "답변메일받기"(mail)를 켰으면 원글 작성자에게.
+        if ($w === 'r' && $parent && strpos((string) ($parent['wr_option'] ?? ''), 'mail') !== false) {
+            $emails[] = $originEmail;
+        }
+        // 댓글: 댓글 쓴 모든 사람에게(원글 작성자 · 지금 쓴 사람 빼고).
+        if ($isComment && !empty($config['cf_email_wr_comment_all'])) {
+            $rows = DB::fetchAll(
+                'SELECT DISTINCT wr_email FROM ' . DB::writeTable($boTable) . '
+                 WHERE wr_parent = ? AND wr_email NOT IN (?, ?, \'\')',
+                array($wrId, $originEmail, (string) $writer['email'])
+            );
+            foreach ($rows as $row) {
+                $emails[] = (string) $row['wr_email'];
+            }
+        }
+
+        $emails = array_values(array_unique(array_filter(array_map('trim', $emails))));
+        if (!$isComment) {
+            // 그누보드 훅(bbs/write_update.php) — api_run_replace 로 불러 플러그인의 출력 · alert 가 응답을 깨지 않게.
+            $emails = (array) api_run_replace('write_update_mail_list', $emails, array($board, $wrId));
+        }
+        foreach ($emails as $to) {
+            api_call_core('mailer', array($wr_name, (string) $writer['email'], $to, $subject, $content, 1));
+        }
+    } catch (\Throwable $e) {
+        error_log('[api/board-mail] ' . $boTable . ' ' . $w . ' ' . $wrId . ': ' . $e->getMessage());
+    }
 }
 
 /**

@@ -17,7 +17,7 @@ import { g5ShortHref } from "@/lib/g5-short-url";
 import {
   productPointLabel,
   type SelectedCartOption,
-} from "./productDetailHelpers";
+} from "@/components/shop/productDetailHelpers";
 import { ProductDetailHeadHtml, ProductDetailTailHtml } from "./ProductDetailHtmlBlocks";
 import {
   ProductDetailEmpty,
@@ -111,7 +111,6 @@ interface ProductDetailViewProps {
   onAddToCart: () => void;
   onBuyNow: () => void;
   onWishlist: () => void;
-  onOpenRecommendDialog: () => void;
   naverPayConfig: ShopNaverPayConfig | null;
   naverPaySubmitting: boolean;
   onNaverPayOrder: () => void;
@@ -192,7 +191,6 @@ export function ProductDetailView({
   onAddToCart,
   onBuyNow,
   onWishlist,
-  onOpenRecommendDialog,
   naverPayConfig,
   naverPaySubmitting,
   onNaverPayOrder,
@@ -316,7 +314,6 @@ export function ProductDetailView({
     onAddToCart,
     onBuyNow,
     onWishlist,
-    onOpenRecommendDialog,
     naverPayConfig,
     naverPaySubmitting,
     onNaverPayOrder,

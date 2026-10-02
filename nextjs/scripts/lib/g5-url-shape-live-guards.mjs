@@ -39,7 +39,8 @@ export function checkLiveAndApiGuards({
     'scripts/lib/live-deploy-root-commands-script.mjs',
     'scripts/lib/live-deploy-verify-script.mjs',
   ].map((file) => join(repoRoot, file));
-  const liveOpsWorkflowPath = join(repoRoot, '..', `.github/workflows/${THEME_NAME}-live-ops.yml`);
+  // 워크플로 파일 이름은 테마 이름(nextjs_default)이 아니라 브랜드 이름 nextjs25 그대로다(check-deploy-config 과 같은 파일).
+  const liveOpsWorkflowPath = join(repoRoot, '..', '.github/workflows/nextjs25-live-ops.yml');
   const packageJsonPath = join(repoRoot, 'package.json');
   const memberProfilePagePath = join(repoRoot, 'src/app/members/[mb_id]/page.tsx');
   const memberProfileClientPath = join(repoRoot, 'src/app/members/[mb_id]/ClientPage.tsx');
@@ -72,9 +73,10 @@ export function checkLiveAndApiGuards({
     return readFileSync(path, 'utf8');
   }
 
-const shopHomeMarketingSource = read(join(repoRoot, 'src/app/shop/ShopHomeMarketing.tsx'));
-if (!shopHomeMarketingSource.includes('/shop/bannerhit.php?bn_id=')) {
-  fail('ShopHomeMarketing.tsx must link banners through /shop/bannerhit.php');
+// 쇼핑 홈 배너는 ShopHomeBanners.tsx 에 있다(ShopHomeMarketing.tsx 에서 떼어 냄). 클릭 수 집계를 위해 bannerhit.php 로 건다.
+const shopHomeBannersSource = read(join(repoRoot, 'src/app/shop/ShopHomeBanners.tsx'));
+if (!shopHomeBannersSource.includes('/shop/bannerhit.php?bn_id=')) {
+  fail('ShopHomeBanners.tsx must link banners through /shop/bannerhit.php');
 }
 
 for (const token of [
@@ -124,10 +126,14 @@ const memberProfilePageSource = read(memberProfilePagePath);
   const memberProfileClientSource = read(memberProfileClientPath);
   const boardPostPageSource = read(boardPostPagePath);
   const memberServiceSource = read(memberServicePath);
-  const memberApiSource = read(memberApiPath);
+  // 자기소개 · 회원 공개 키 라우트는 members.php 가 불러 쓰는 members_profile_routes.php 에 있다.
+  const memberApiSource = `${read(memberApiPath)}
+${read(join(repoRoot, '..', 'api/v1/members_profile_routes.php'))}`;
   const apiBoardHelpersSource = `${read(apiHelpersPath)}\n${read(join(repoRoot, '..', 'api/lib/board_access_helpers.php'))}`;
   const boardsApiSource = read(boardsApiPath);
-const postsApiSource = read(postsApiPath);
+// 댓글 응답 모양(비밀댓글 가림 · 세션 열람)은 posts.php 가 불러 쓰는 post_comments_helpers.php 에 있다.
+const postsApiSource = `${read(postsApiPath)}
+${read(join(repoRoot, '..', 'api/v1/post_comments_helpers.php'))}`;
 const commentsApiSource = read(commentsApiPath);
 const searchApiSource = read(searchApiPath);
 const recentApiSource = read(recentApiPath);
@@ -161,7 +167,8 @@ for (const token of [
 
 for (const token of [
   'useRuntimeRouteParam("mb_id", "/members/:mb_id"',
-  'getMemberProfile(mbId)',
+  'getMemberProfile(profileRef)',
+  'getMemberKey(mbId)',
   'ApiError',
   'SafeHtml',
 ]) {
@@ -180,7 +187,7 @@ for (const token of [
 }
 
 for (const token of [
-  'GET /v1/members/{mb_id}/profile',
+  'GET /v1/members/{key}/profile',
   'Auth::requireAuth()',
   'mb_open',
   'api_member_profile_payload',
@@ -255,7 +262,7 @@ for (const token of [
   "ss_view_' . $bo_table . '_' . $wr_id",
   'You can recommend this post only after reading it.',
   "ss_secret_comment_' . $bo_table . '_' . $comment['wr_id']",
-  "$comment['can_read_secret'] = $canReadSecretComment",
+  "$comment['can_read_secret'] = $canRead;",
 ]) {
   if (!postsApiSource.includes(token)) {
     fail(`api/v1/posts.php is missing Gnuboard good/nogood visibility token ${token}`);
@@ -610,7 +617,7 @@ if (IS_DEFAULT_THEME || liveOpsWorkflowSource !== '') {
     'npm run check:live-ops -- "${args[@]}"',
   ]) {
     if (!liveOpsWorkflowSource.includes(token)) {
-      fail(`${THEME_NAME}-live-ops.yml is missing workflow guard ${token}`);
+      fail(`nextjs25-live-ops.yml is missing workflow guard ${token}`);
     }
   }
 }

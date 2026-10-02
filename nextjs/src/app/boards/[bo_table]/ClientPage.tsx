@@ -10,7 +10,7 @@ import { GALLERY_BOARDS, g5PathForRuntime } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { applyClientPageMetadata } from "@/lib/client-metadata";
 import { useRuntimeRouteParam, useRuntimeRouteReady } from "@/hooks/use-runtime-route-param";
-import { getBoard, getBoardPosts } from "@/services/boards";
+import { getBoard, getBoardCategoryCounts, getBoardPosts } from "@/services/boards";
 import { getClientPublicSettings } from "@/services/settings";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -115,7 +115,7 @@ export default function BoardPostListClient({ boTable, embedded = false, current
       const perPage = nextBoard.bo_page_rows || 15;
       const [settings, nextPosts] = await Promise.all([
         getClientPublicSettings().catch(() => null),
-        getBoardPosts({ boTable: bo_table, page, perPage, sfl, stx, sca }),
+        getBoardPosts({ boTable: bo_table, page, perPage, sfl, stx, sca, withExcerpt: GALLERY_BOARDS.includes(bo_table) }),
       ]);
 
       if (!alive) return;
@@ -138,6 +138,23 @@ export default function BoardPostListClient({ boTable, embedded = false, current
       alive = false;
     };
   }, [bo_table, page, queryKey, routeReady, sca, sfl, stx]);
+
+  // 분류 칩의 글 수. 목록을 막지 않게 따로 부르고, 서버가 세지 않으면(끔 · 큰 게시판) 숫자 없이 둔다.
+  // 쪽 · 분류 · 검색이 바뀌어도 숫자는 같으므로 게시판이 바뀔 때만 부른다.
+  const [categoryCounts, setCategoryCounts] = useState<{ boTable: string; counts: Record<string, number> } | null>(null);
+  const hasCategories = Boolean(board?.bo_category_list);
+  useEffect(() => {
+    if (!bo_table || !hasCategories) return;
+    let alive = true;
+    getBoardCategoryCounts(bo_table)
+      .then((result) => {
+        if (alive && result?.counts) setCategoryCounts({ boTable: bo_table, counts: result.counts });
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [bo_table, hasCategories]);
 
   useEffect(() => {
     if (!board || !bo_table || embedded) return;
@@ -267,10 +284,12 @@ export default function BoardPostListClient({ boTable, embedded = false, current
         <div className="board-list-categories surface-toolbar mb-5">
           <a href={g5ShortHref(`/boards/${bo_table}`)} className={cn("filter-chip", !sca && "filter-chip-active")}>
             전체
-            <span className="filter-chip-count">{totalCount.toLocaleString("ko-KR")}</span>
+            {/* 게시판 전체 글 수(그누보드가 늘 맞춰 두는 bo_count_write) — 지금 목록의 수(totalCount)를 쓰면
+                분류 · 검색을 고른 동안 "전체" 도 그 수로 바뀌었다. 따로 세지 않으므로 비용이 없다. */}
+            <span className="filter-chip-count">{Number(board.bo_count_write || 0).toLocaleString("ko-KR")}</span>
           </a>
           {categories.map((category) => {
-            const count = board.category_counts?.[category];
+            const count = categoryCounts?.boTable === bo_table ? categoryCounts.counts[category] : undefined;
             return (
               <a
                 key={category}

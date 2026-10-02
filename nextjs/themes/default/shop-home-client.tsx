@@ -28,7 +28,7 @@ import {
   SoluneShopCategoriesSkeleton,
   SoluneShopProductRowsSkeleton,
 } from "./shop-home-skeletons";
-import { SoluneReviewHead, SoluneShopRowHead, SoluneStaticTrack } from "./shop-section-heads";
+import { SoluneCatrowPagerReserve, SoluneReviewHead, SoluneShopRowHead, SoluneStaticTrack } from "./shop-section-heads";
 import { rememberShopLayout } from "./shop-layout-hint";
 import { soluneListDate } from "./home-meta";
 import { toSoluneCompany, type SoluneCompany } from "./site-company";
@@ -137,9 +137,12 @@ function SoluneCategorySwiper({ children }: { children: ReactNode }) {
   const { carousels } = useCarousels();
   if (carousels) return <carousels.SoluneCategorySwiper>{children}</carousels.SoluneCategorySwiper>;
   return (
-    <SoluneStaticTrack className="solune-catrow-swiper" wrapperClass="swiper-wrapper">
-      {Children.toArray(children)}
-    </SoluneStaticTrack>
+    <>
+      <SoluneStaticTrack className="solune-catrow-swiper" wrapperClass="swiper-wrapper">
+        {Children.toArray(children)}
+      </SoluneStaticTrack>
+      <SoluneCatrowPagerReserve />
+    </>
   );
 }
 

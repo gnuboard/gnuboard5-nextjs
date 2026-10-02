@@ -5,12 +5,11 @@ import {
   BellOff,
   CreditCard,
   Heart,
-  Mail,
   ShoppingCart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ShopNaverPayConfig, ShopProduct } from "@/lib/api";
-import { ProductOptionPicker, type ProductOptionPickerProps } from "./ProductOptionPicker";
+import { ProductOptionPicker, type ProductOptionPickerProps } from "@/components/shop/ProductOptionPicker";
 
 export type ProductPurchaseControlsProps = ProductOptionPickerProps & {
   product: ShopProduct;
@@ -22,7 +21,6 @@ export type ProductPurchaseControlsProps = ProductOptionPickerProps & {
   onAddToCart: () => void;
   onBuyNow: () => void;
   onWishlist: () => void;
-  onOpenRecommendDialog: () => void;
   naverPayConfig: ShopNaverPayConfig | null;
   naverPaySubmitting: boolean;
   onNaverPayOrder: () => void;
@@ -67,7 +65,6 @@ export function ProductPurchaseControls({
   onAddToCart,
   onBuyNow,
   onWishlist,
-  onOpenRecommendDialog,
   naverPayConfig,
   naverPaySubmitting,
   onNaverPayOrder,
@@ -143,16 +140,6 @@ export function ProductPurchaseControls({
         )}
         <Button className="product-action-wish" variant="outline" size="lg" aria-label="위시리스트에 추가" onClick={onWishlist}>
           <Heart className="h-4 w-4" />
-        </Button>
-        <Button
-          className="product-action-recommend"
-          variant="outline"
-          size="lg"
-          aria-label="지인에게 메일로 추천"
-          title="지인에게 메일로 추천"
-          onClick={onOpenRecommendDialog}
-        >
-          <Mail className="h-4 w-4" />
         </Button>
       </div>
 

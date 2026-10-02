@@ -260,3 +260,40 @@ if (!function_exists('api_call_core')) {
         return $result;
     }
 }
+
+if (!function_exists('api_run_before_replace')) {
+    /**
+     * 저장 전에 값을 거르는 훅(첨부 업로드 write_update_upload_file · _array 처럼 검사 플러그인이 붙는 자리).
+     * 막히거나(alert 등) 훅 함수가 실패하면 원래 값으로 계속하지 않고 요청을 멈춘다 — 원래 값으로 계속하면
+     * 바이러스 검사 · 용량 제한 같은 플러그인의 거부가 조용히 무시된다. 멈추기 전에 $onBlock(정리: 저장한 파일 지우기)을 부른다.
+     *
+     * @param array<int,mixed> $extra 원본 run_replace 의 셋째 인자부터
+     * @return mixed 걸러진 값
+     */
+    function api_run_before_replace(string $tag, $value, array $extra = array(), ?array $actor = null, ?callable $onBlock = null)
+    {
+        if (!function_exists('run_replace')) {
+            return $value;
+        }
+        list($result, $interrupted, $failed) = api_hooks_dispatch('run_replace', $tag, $actor, static function () use ($tag, $value, $extra) {
+            return call_user_func_array('run_replace', array_merge(array($tag, $value), $extra));
+        }, $value);
+        if ($interrupted === null && !$failed) {
+            return $result;
+        }
+        if ($onBlock !== null) {
+            try {
+                $onBlock();
+            } catch (\Throwable $e) {
+                error_log('[api hooks] ' . $tag . ' cleanup failed: ' . $e->getMessage());
+            }
+        }
+        if (class_exists('Response')) {
+            if ($interrupted !== null) {
+                Response::error($interrupted, 403);
+            }
+            Response::error('요청을 확인하는 플러그인에서 오류가 났습니다. 잠시 후 다시 시도해 주세요.', 500);
+        }
+        return $value;
+    }
+}

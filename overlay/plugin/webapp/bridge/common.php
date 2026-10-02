@@ -753,3 +753,6 @@ if (!function_exists('g5_nextjs_root_payload_shim_script')) {
             . 'return f.call(this,i,o);};}catch(e){}})(window[' . $key . ']);';
     }
 }
+
+// 쇼핑 홈 첫 화면에 배너 · 분류 줄이 있는지 HTML 에 미리 적는 도우미 — 테마 브리지의 render.php 가 부른다.
+require_once __DIR__ . '/shop-home-layout.php';

@@ -9,6 +9,7 @@ import type { Comment } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { formatDate } from "@/lib/utils";
 import { toastError } from "@/lib/toast";
 import { SafeHtml } from "@/components/SafeHtml";
@@ -35,8 +36,8 @@ interface CommentItemProps {
   boTable: string;
   onReply: (commentId: number) => void;
   replyTo: number | null;
-  onCommentSubmit: (content: string, parentId?: number) => Promise<void>;
-  onUpdate: (commentId: number, content: string) => Promise<void>;
+  onCommentSubmit: (content: string, parentId?: number, secret?: boolean) => Promise<void>;
+  onUpdate: (commentId: number, content: string, secret: boolean) => Promise<void>;
   onDelete: (commentId: number) => void;
   useEditor?: boolean;
   /** 주소의 #c_번호 로 찾아온 댓글 — 잠깐 강조한다. */
@@ -85,6 +86,24 @@ function isContentEmpty(content: string): boolean {
   return !htmlToPlainText(content);
 }
 
+/** 비밀 댓글 체크 — 그누보드 기본 스킨 댓글 폼의 "비밀글"(wr_secret=secret). 원본처럼 늘 보인다. */
+function SecretCommentCheck({
+  id,
+  checked,
+  onChange,
+}: {
+  id: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label htmlFor={id} className="comment-secret-check mr-auto inline-flex cursor-pointer items-center gap-1.5 text-sm text-muted-foreground">
+      <Checkbox id={id} checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      비밀글
+    </label>
+  );
+}
+
 const CommentItem = memo(function CommentItem({
   comment,
   boTable,
@@ -98,9 +117,11 @@ const CommentItem = memo(function CommentItem({
 }: CommentItemProps) {
   const { user } = useAuthStore();
   const [replyContent, setReplyContent] = useState("");
+  const [replySecret, setReplySecret] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.wr_content);
+  const [editSecret, setEditSecret] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const isOwner = user && (user.mb_id === comment.mb_id || user.mb_level >= 10);
@@ -111,8 +132,9 @@ const CommentItem = memo(function CommentItem({
     if (isContentEmpty(replyContent)) return;
     setSubmitting(true);
     try {
-      await onCommentSubmit(replyContent, comment.wr_id);
+      await onCommentSubmit(replyContent, comment.wr_id, replySecret);
       setReplyContent("");
+      setReplySecret(false);
       onReply(-1);
     } finally {
       setSubmitting(false);
@@ -121,6 +143,8 @@ const CommentItem = memo(function CommentItem({
 
   const startEdit = () => {
     setEditContent(comment.wr_content);
+    // 원본 기본 스킨처럼 수정 폼의 비밀글 체크를 지금 상태로 연다.
+    setEditSecret((comment.wr_option || "").includes("secret"));
     setEditing(true);
     onReply(-1);
   };
@@ -129,7 +153,7 @@ const CommentItem = memo(function CommentItem({
     if (isContentEmpty(editContent)) return;
     setSaving(true);
     try {
-      await onUpdate(comment.wr_id, editContent);
+      await onUpdate(comment.wr_id, editContent, editSecret);
       setEditing(false);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "댓글 수정에 실패했습니다.";
@@ -214,7 +238,12 @@ const CommentItem = memo(function CommentItem({
               autoFocus
             />
           )}
-          <div className="flex justify-end gap-2">
+          <div className="flex items-center justify-end gap-2">
+            <SecretCommentCheck
+              id={`wr_secret_edit_${comment.wr_id}`}
+              checked={editSecret}
+              onChange={setEditSecret}
+            />
             <Button variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={saving}>
               취소
             </Button>
@@ -253,7 +282,12 @@ const CommentItem = memo(function CommentItem({
               className="text-sm"
             />
           )}
-          <div className="flex justify-end gap-2">
+          <div className="flex items-center justify-end gap-2">
+            <SecretCommentCheck
+              id={`wr_secret_reply_${comment.wr_id}`}
+              checked={replySecret}
+              onChange={setReplySecret}
+            />
             <Button
               variant="ghost"
               size="sm"
@@ -324,6 +358,7 @@ export function CommentSection({ boTable, wrId, initialComments, useEditor }: Co
 
   // textarea용 상태 (useEditor가 false일 때만 사용)
   const [textareaValue, setTextareaValue] = useState("");
+  const [newSecret, setNewSecret] = useState(false);
 
   const handleEditorChange = useCallback((html: string) => {
     newCommentRef.current = html;
@@ -349,10 +384,12 @@ export function CommentSection({ boTable, wrId, initialComments, useEditor }: Co
     }
   }, [boTable, wrId]);
 
-  const handleSubmitComment = useCallback(async (content: string, parentId?: number) => {
+  const handleSubmitComment = useCallback(async (content: string, parentId?: number, secret = false) => {
     await apiClient.post(`/comments/${boTable}/${wrId}`, {
       wr_content: content,
       comment_id: parentId,
+      // 그누보드 write_comment_update.php 의 비밀 댓글 필드.
+      wr_secret: secret ? "secret" : "",
     });
     await fetchComments();
     // post 상세의 wr_comment 카운트 / 게시판 listing 의 댓글 수 동기화.
@@ -364,10 +401,11 @@ export function CommentSection({ boTable, wrId, initialComments, useEditor }: Co
     if (isContentEmpty(content)) return;
     setSubmitting(true);
     try {
-      await handleSubmitComment(content);
+      await handleSubmitComment(content, undefined, newSecret);
       newCommentRef.current = "";
       setCanSubmit(false);
       setTextareaValue("");
+      setNewSecret(false);
       // 에디터 리셋을 위해 강제 리마운트
       setEditorKey((k) => k + 1);
     } catch (err: unknown) {
@@ -376,11 +414,14 @@ export function CommentSection({ boTable, wrId, initialComments, useEditor }: Co
     } finally {
       setSubmitting(false);
     }
-  }, [handleSubmitComment]);
+  }, [handleSubmitComment, newSecret]);
 
   // 서버가 권한(본인 · 최고/그룹/게시판 관리자)을 다시 확인한다. 실패 메시지는 CommentItem 이 띄운다.
-  const handleUpdate = useCallback(async (commentId: number, content: string) => {
-    await apiClient.patch(`/comments/${boTable}/${commentId}`, { wr_content: content });
+  const handleUpdate = useCallback(async (commentId: number, content: string, secret: boolean) => {
+    await apiClient.patch(`/comments/${boTable}/${commentId}`, {
+      wr_content: content,
+      wr_secret: secret ? "secret" : "",
+    });
     await fetchComments();
   }, [boTable, fetchComments]);
 
@@ -444,7 +485,8 @@ export function CommentSection({ boTable, wrId, initialComments, useEditor }: Co
                 rows={3}
               />
             )}
-            <div className="flex justify-end">
+            <div className="flex items-center justify-end gap-2">
+              <SecretCommentCheck id="wr_secret_comment" checked={newSecret} onChange={setNewSecret} />
               <Button
                 onClick={handleNewComment}
                 disabled={submitting || (useEditor ? !canSubmit : !textareaValue.trim())}

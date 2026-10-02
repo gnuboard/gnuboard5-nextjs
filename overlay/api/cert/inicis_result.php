@@ -31,8 +31,14 @@ $post_data = json_encode($data);
 
 $authRequestUrl = isset($_POST['authRequestUrl']) ? is_inicis_url_return($_POST['authRequestUrl']) : '';
 
-// SaSample 가이드대로 응답 URL 을 검증.
-if (!(strpos($authRequestUrl, 'https://kssa.inicis.com') == 0 || strpos($authRequestUrl, 'https://fcsa.inicis.com') == 0)) {
+// 결과 조회 주소는 이니시스 결과 서버 두 곳(https)만 — 원본 SaSample 의 strpos(...) == 0 비교는 못 찾으면 false == 0 이
+// 참이라 아무 주소나 통과했고, http 나 다른 *.inicis.com 주소도 받았다. 이 응답의 이름 · 생일 · CI 를 그대로 믿으므로 엄격히 본다.
+$authUrlParts = $authRequestUrl !== '' ? parse_url($authRequestUrl) : false;
+if (!is_array($authUrlParts)
+    || strtolower((string) ($authUrlParts['scheme'] ?? '')) !== 'https'
+    || !in_array(strtolower((string) ($authUrlParts['host'] ?? '')), array('kssa.inicis.com', 'fcsa.inicis.com'), true)
+    || isset($authUrlParts['user']) || isset($authUrlParts['pass'])
+    || (isset($authUrlParts['port']) && (int) $authUrlParts['port'] !== 443)) {
     $authRequestUrl = '';
 }
 if (!$authRequestUrl) {
@@ -47,10 +53,21 @@ curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 curl_setopt($ch, CURLOPT_POSTFIELDS, $post_data);
 curl_setopt($ch, CURLOPT_POST, 1);
 curl_setopt($ch, CURLOPT_HTTPHEADER, array('Accept: application/json', 'Content-Type: application/json'));
-curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+// 인증서를 확인한다 — 끄면 중간에서 결과(이름 · 생일 · CI)를 바꿔치기할 수 있다.
+curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+curl_setopt($ch, CURLOPT_TIMEOUT, 20);
 $response = curl_exec($ch);
 curl_close($ch);
 $res_data = json_decode($response, true);
+
+if ($response === false || !is_array($res_data)) {
+    cert_emit_error_and_close('본인인증 결과를 확인하지 못했습니다. 다시 시도해 주세요.');
+}
+// 다른 거래의 결과를 받아 쓰지 않게 — 요청한 거래 번호와 같은지 본다.
+if ((string) ($res_data['txId'] ?? '') !== (string) $txId) {
+    cert_emit_error_and_close('잘못된 요청입니다.');
+}
 
 if (!isset($res_data['resultCode']) || $res_data['resultCode'] !== '0000') {
     cert_emit_error_and_close(

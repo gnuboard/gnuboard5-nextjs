@@ -23,6 +23,12 @@ if (!defined('G5_API_REQUEST')) {
     define('G5_API_REQUEST', true);
 }
 
+// User-Agent 를 보내지 않는 클라이언트(일부 HTTP 라이브러리 · 서버 간 호출) — 그누보드 ss_mb_key() 가 확인 없이 읽어
+// 경고가 나고, 아래 오류 처리기가 그것을 예외로 바꿔 로그인이 500 이 된다. 브라우저처럼 빈 값을 둔다.
+if (!isset($_SERVER['HTTP_USER_AGENT'])) {
+    $_SERVER['HTTP_USER_AGENT'] = '';
+}
+
 ob_start();
 require_once __DIR__ . '/../common.php';
 $g5_api_bootstrap_output = ob_get_clean(); // Keep JSON clean when bootstrap emits warnings/notices.

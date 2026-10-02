@@ -21,9 +21,9 @@ import { normalizeG5ImageSrc, shouldBypassImageOptimization } from "@/lib/image"
 import { toastError } from "@/lib/toast";
 import { formatPrice } from "@/lib/utils";
 import { getShopProductResult } from "@/services/shop";
-import { ProductOptionPicker } from "@/app/shop/products/[it_id]/ProductOptionPicker";
-import { productShippingPayment } from "@/app/shop/products/[it_id]/productDetailHelpers";
-import { useProductOptions } from "@/app/shop/products/[it_id]/useProductOptions";
+import { ProductOptionPicker } from "./ProductOptionPicker";
+import { productShippingPayment } from "./productDetailHelpers";
+import { useProductOptions } from "./useProductOptions";
 import { addProductToCart, toastAddedToCart } from "./addProductToCart";
 import { isTelInquiry, isProductSoldOut } from "@/lib/shop-product-state";
 

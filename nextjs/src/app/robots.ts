@@ -26,6 +26,8 @@ export default function robots(): MetadataRoute.Robots {
           '/register',
           '/forgot-password',
           '/mypage',
+          // 회원 자기소개 — 로그인해야 보이고 주소에 회원 키가 든다(예전 주소는 아이디).
+          '/members',
           '/admin',
           '/api',
           // 쇼핑 — 개인 장바구니/주문/결제 흐름은 인덱싱 불필요.

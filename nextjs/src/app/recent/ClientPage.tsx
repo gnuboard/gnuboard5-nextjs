@@ -24,6 +24,8 @@ export default function ClientPage() {
   const view: "" | "w" | "c" = rawView === "w" || rawView === "c" ? rawView : "";
   const grId = searchParams.get("gr_id") || "";
   const mbId = searchParams.get("mb_id") || "";
+  // 사이드뷰 "전체게시물"은 아이디 대신 회원 공개 키(?mb=)로 온다(services/member memberRecentPath).
+  const mbKey = mbId ? "" : searchParams.get("mb") || "";
   const page = Math.max(1, Number(searchParams.get("page") || "1") || 1);
   const { user } = useAuthStore();
   const [groups, setGroups] = useState<RecentGroup[]>([]);
@@ -37,7 +39,7 @@ export default function ClientPage() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    Promise.all([getRecentItems({ view, grId, mbId, page, limit: PAGE_SIZE }), getRecentGroups()])
+    Promise.all([getRecentItems({ view, grId, mbId, mbKey, page, limit: PAGE_SIZE }), getRecentGroups()])
       .then(([items, groupList]) => {
         if (cancelled) return;
         setResult(items);
@@ -54,7 +56,7 @@ export default function ClientPage() {
     return () => {
       cancelled = true;
     };
-  }, [view, grId, mbId, page, reloadKey]);
+  }, [view, grId, mbId, mbKey, page, reloadKey]);
 
   const items = result?.items ?? [];
   const displayError = error || result?.error || "";
@@ -99,7 +101,7 @@ export default function ClientPage() {
           items={items}
           isAdmin={!!user && user.mb_level >= 10}
           myMbId={user?.mb_id ?? ""}
-          filtered={Boolean(view || grId || mbId)}
+          filtered={Boolean(view || grId || mbId || mbKey)}
           onDeleted={reload}
           footer={
             lastPage > 1 ? (
@@ -108,7 +110,7 @@ export default function ClientPage() {
                   currentPage={Math.min(page, lastPage)}
                   totalPages={lastPage}
                   baseUrl={g5ShortHref("/recent")}
-                  searchParams={{ gr_id: grId || undefined, view: view || undefined, mb_id: mbId || undefined }}
+                  searchParams={{ gr_id: grId || undefined, view: view || undefined, mb_id: mbId || undefined, mb: mbKey || undefined }}
                 />
               </div>
             ) : null

@@ -69,6 +69,10 @@ $publicSettings = [
     'visit'             => $visit,
     'shop_enabled'      => defined('G5_USE_SHOP') ? G5_USE_SHOP : false,
     'comment_editor'    => defined('G5_COMMENT_EDITOR_USE') ? (bool) G5_COMMENT_EDITOR_USE : false,
+    // 글쓰기 화면이 그누보드 write.php 와 같은 조건을 쓰도록 — 에디터는 cf_editor 가 있을 때만,
+    // "답변메일받기" 는 cf_email_use(와 게시판 bo_use_email)가 켜졌을 때만.
+    'cf_editor'         => isset($config['cf_editor']) ? (string) $config['cf_editor'] : '',
+    'cf_email_use'      => isset($config['cf_email_use']) ? (int) $config['cf_email_use'] : 0,
     'infinite_scroll'   => defined('G5_INFINITE_SCROLL_USE') ? (bool) G5_INFINITE_SCROLL_USE : false,
     'pwa_enabled'       => defined('G5_PWA_USE') ? (bool) G5_PWA_USE : false,
 

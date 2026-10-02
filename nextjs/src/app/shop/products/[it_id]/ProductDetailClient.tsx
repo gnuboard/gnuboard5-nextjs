@@ -42,11 +42,11 @@ import {
   productDetailTabFromSearch,
   productDetailFormFromSearch,
   isLegacyShortProductPath,
-} from "./productDetailHelpers";
+} from "@/components/shop/productDetailHelpers";
 import { ProductDetailView } from "./ProductDetailView";
 import { useProductDetailMetadata } from "./useProductDetailMetadata";
 import { useProductMemberActions } from "./useProductMemberActions";
-import { useProductOptions } from "./useProductOptions";
+import { useProductOptions } from "@/components/shop/useProductOptions";
 import { isTelInquiry } from "@/lib/shop-product-state";
 
 interface ProductDetailClientProps {
@@ -667,7 +667,6 @@ export default function ProductDetailClient({
       onAddToCart={handleAddToCart}
       onBuyNow={handleBuyNow}
       onWishlist={handleWishlist}
-      onOpenRecommendDialog={openRecommendDialog}
       naverPayConfig={naverPayConfig}
       naverPaySubmitting={naverPaySubmitting}
       onNaverPayOrder={handleNaverPayOrder}

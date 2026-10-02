@@ -5,6 +5,8 @@ import ClientPage from "./ClientPage";
 export const metadata = buildPageMetadata({
   title: "새글",
   path: "/recent",
+  // 글 하나하나는 사이트맵으로 색인된다. 새글은 그 글들을 모은 목록이고, 작성자 필터(?mb_id=)는 주소에 아이디가 남으므로 색인하지 않는다.
+  noindex: true,
 });
 
 function PageFallback() {

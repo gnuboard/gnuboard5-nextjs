@@ -3,12 +3,13 @@ import { requestShare } from "@/lib/request-share";
 import { fetchApiData, fetchApiResult } from "@/lib/api-response";
 import type { ApiResult } from "@/lib/api-response";
 import {
+  boardCategoryCountsSchema,
   boardListSchema,
   boardSchema,
   postDetailSchema,
   writePostListSchema,
 } from "@/lib/schemas";
-import type { Board, Comment, PostFile, WritePost } from "@/lib/types";
+import type { Board, BoardCategoryCounts, Comment, PostFile, WritePost } from "@/lib/types";
 
 export interface PostNavItem {
   wr_id: number;
@@ -70,6 +71,26 @@ export function getBoard(boTable: string, revalidate = 30): Promise<Board | null
   );
 }
 
+/**
+ * 분류별 글 수 — 목록의 분류 칩에만 쓴다. 게시판 정보(getBoard)와 떼어 둔 것은 글 테이블 전체를 세는
+ * 일이라 글보기 · RSS 까지 함께 부르지 않게 하려는 것이다. 서버가 세지 않으면(끔 · 큰 게시판) counts 가 null.
+ */
+export function getBoardCategoryCounts(boTable: string): Promise<BoardCategoryCounts | null> {
+  return requestShare.get(
+    `board-category-counts:${boTable}`,
+    SHARED_BOARD_TTL_MS,
+    async () => {
+      const result = await fetchApiResult(
+        apiUrl(`/boards/${boTable}/category-counts`),
+        boardCategoryCountsSchema,
+        { next: { revalidate: 300 } }
+      );
+      return result.ok ? result.data : null;
+    },
+    (counts) => counts === null
+  );
+}
+
 export async function getBoardPosts({
   boTable,
   page,
@@ -77,6 +98,7 @@ export async function getBoardPosts({
   sfl,
   stx,
   sca,
+  withExcerpt = false,
   revalidate = 30,
 }: {
   boTable: string;
@@ -85,6 +107,8 @@ export async function getBoardPosts({
   sfl?: string;
   stx?: string;
   sca?: string;
+  /** 카드에 본문 발췌(wr_excerpt)를 보이는 목록(갤러리)만 켠다 — API ?with=excerpt. */
+  withExcerpt?: boolean;
   revalidate?: number;
 }): Promise<{ list: WritePost[]; total: number; totalPage: number; error?: string }> {
   const params = new URLSearchParams();
@@ -93,6 +117,7 @@ export async function getBoardPosts({
   if (sfl) params.set("sfl", sfl);
   if (stx) params.set("stx", stx);
   if (sca) params.set("sca", sca);
+  if (withExcerpt) params.set("with", "excerpt");
 
   const suffix = params.toString() ? `?${params.toString()}` : "";
   const result = await fetchApiResult(

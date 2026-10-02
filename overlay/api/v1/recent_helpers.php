@@ -12,7 +12,7 @@ if (!function_exists('api_recent_comment_excerpt')) {
      * 본문은 보는 사람이 그 게시판을 읽을 수 있고, 비밀댓글·비밀글의 댓글이 아닐 때만 싣는다.
      * 그 밖에는 null — 화면은 종전대로 글 제목을 보여 준다.
      */
-    function api_recent_comment_excerpt(array $comment, array $parent, int $boardReadLevel, $viewer): ?string
+    function api_recent_comment_excerpt(array $comment, array $parent, int $boardReadLevel, $viewer, string $boTable = ''): ?string
     {
         if (api_is_secret_option($comment['wr_option'] ?? '')
             || api_is_secret_option($parent['wr_option'] ?? '')) {
@@ -22,6 +22,17 @@ if (!function_exists('api_recent_comment_excerpt')) {
         $level = $viewer ? (int) ($viewer['mb_level'] ?? 1) : 1;
         if (!$isSuper && $level < max(1, $boardReadLevel)) {
             return null;
+        }
+        // 게시판을 알면 글 읽기와 같은 판정(그룹 접근 · 본인확인 · 읽기 레벨)까지 본다 — 레벨만 보면
+        // 그룹 회원 전용이나 본인확인 게시판의 댓글 내용이 최근 댓글로 새어 나간다.
+        if (!$isSuper && $boTable !== '' && function_exists('api_can_read_board')) {
+            static $boards = array();
+            if (!array_key_exists($boTable, $boards)) {
+                $boards[$boTable] = api_get_board($boTable) ?: null;
+            }
+            if ($boards[$boTable] === null || !api_can_read_board($viewer ?: null, $boTable, $boards[$boTable])) {
+                return null;
+            }
         }
 
         $text = str_ireplace(array('<br>', '<br />', '<br/>'), ' ', (string) ($comment['wr_content'] ?? ''));

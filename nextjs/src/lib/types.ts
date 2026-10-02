@@ -51,6 +51,15 @@ export interface MemberProfile {
   reg_days: number;
 }
 
+/**
+ * 분류별 글 수 (GET /boards/{bo_table}/category-counts). 목록의 분류 칩만 쓴다.
+ * 세지 않았으면 counts 가 null 이고 reason 에 까닭(no_category · disabled · too_many_posts)이 온다.
+ */
+export interface BoardCategoryCounts {
+  counts: Record<string, number> | null;
+  reason: string | null;
+}
+
 // 게시판 설정 (g5_board)
 export interface Board {
   bo_table: string;
@@ -60,8 +69,6 @@ export interface Board {
   bo_device: string;
   bo_admin: string;
   bo_category_list: string;
-  /** 분류별 글 수. 분류를 쓰는 게시판에만 온다. */
-  category_counts?: Record<string, number>;
   bo_list_level: number;
   bo_read_level: number;
   bo_write_level: number;

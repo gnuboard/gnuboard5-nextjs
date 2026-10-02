@@ -491,7 +491,7 @@ for (const token of [
   "Response::error('Forbidden origin.', 403)",
   "Response::error('Forbidden referer.', 403)",
   'g5_api_normalize_allowed_origins',
-  'g5_api_enforce_write_origin($DEFAULT_ALLOWED_ORIGINS);',
+  'g5_api_enforce_write_origin($DEFAULT_ALLOWED_ORIGINS, $route);',
 ]) {
   if (!phpApiIndexSource.includes(token)) {
     fail(`api/index.php is missing CSRF origin guard token ${token}`);
@@ -554,7 +554,7 @@ for (const token of [
   'function nextjs25_social_allowed_mobile_schemes',
   'function nextjs25_social_validate_mobile_redirect',
   'G5_SOCIAL_MOBILE_SCHEMES',
-  "array('dday-app')",
+  "array('sirsoft-g5', 'dday-app')",
   'nextjs25_social_validate_mobile_redirect($redirect)',
   'function nextjs25_social_issue_bridge_state',
   'function nextjs25_social_validate_bridge_state',

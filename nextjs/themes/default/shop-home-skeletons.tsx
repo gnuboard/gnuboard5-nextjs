@@ -1,4 +1,4 @@
-import { SoluneReviewHead, SoluneShopRowHead, SoluneStaticTrack } from "./shop-section-heads";
+import { SoluneCatrowPagerReserve, SoluneReviewHead, SoluneShopRowHead, SoluneStaticTrack } from "./shop-section-heads";
 import { shopTypeHref } from "./shop-links";
 import { SOLUNE_SHOP_HOME_SECTIONS } from "./shop-home-sections";
 
@@ -96,17 +96,26 @@ export function SoluneShopBannerSkeleton() {
   );
 }
 
+/* 분류 칩 자리 수 — 넓은 화면의 한 화면 칸 수(10)보다 많게 두어 넘김 막대 자리도 잡는다. 분류가 그보다 적은 사이트는
+   응답 뒤 막대 자리만큼(54px) 한 번 줄어든다. */
+const CATEGORY_SKELETON_CHIPS = 12;
+
+/* 진짜 분류 줄(shop-home-client.tsx 의 CategoryRow)과 같은 마크업 · 클래스 — 한 줄 칩 + 넘김 막대 자리.
+   예전 2열 격자는 휴대폰 폭에서 세 줄(466px)로 서 있다가 한 줄(128px)로 접히며 진열을 끌어올렸다. */
 export function SoluneShopCategoriesSkeleton() {
   return (
     <nav className="ondam-catrow solune-shop-cats-reserve" aria-hidden="true">
-      <div className="grid grid-cols-2 gap-[14px] sm:grid-cols-4 lg:grid-cols-6">
-        {Array.from({ length: 6 }, (_, index) => (
-          <div key={index} className="flex min-h-[146px] flex-col items-center gap-3 rounded-lg border border-base-300 bg-base-100 px-2 py-[18px]">
-            <div className="skeleton h-[58px] w-[58px] shrink-0 rounded-full" />
-            <div className={`skeleton h-3 ${index % 2 === 0 ? "w-3/5" : "w-2/5"}`} />
-          </div>
+      <SoluneStaticTrack className="solune-catrow-swiper" wrapperClass="swiper-wrapper">
+        {Array.from({ length: CATEGORY_SKELETON_CHIPS }, (_, index) => (
+          <a key={index}>
+            <span className="ondam-catrow-icon skeleton" />
+            <span className="ondam-catrow-label">
+              <span className={`skeleton inline-block h-3 align-middle ${index % 2 === 0 ? "w-12" : "w-9"}`} />
+            </span>
+          </a>
         ))}
-      </div>
+      </SoluneStaticTrack>
+      <SoluneCatrowPagerReserve />
     </nav>
   );
 }

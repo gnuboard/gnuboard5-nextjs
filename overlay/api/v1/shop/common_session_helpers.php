@@ -360,6 +360,26 @@ if (!function_exists('shop_api_new_cart_id')) {
     }
 }
 
+if (!function_exists('shop_api_new_guest_cart_id')) {
+    /**
+     * 새 장바구니 id — 16자리 무작위 숫자(1000000000000000 ~ 8999999999999999).
+     * 앱은 이 id 를 X-Cart-Id 로 들고 다니고 서버는 그 id 를 그대로 믿는다. 예전 get_uniqid()(날짜시각 + 1/100초)는
+     * 1초에 후보가 100개뿐이라 만든 시각을 짐작하면 남의 비회원 장바구니를 읽거나 비울 수 있었다.
+     * 길이 · 범위는 예전과 같은 16자리라 JS 숫자로 읽혀도 값이 틀어지지 않는다(Number.MAX_SAFE_INTEGER ≈ 9.007e15).
+     */
+    function shop_api_new_guest_cart_id(): string
+    {
+        $table = DB::table('g5_shop_cart_table');
+        for ($i = 0; $i < 5; $i++) {
+            $id = (string) random_int(1000000000000000, 8999999999999999);
+            if (!DB::fetch("SELECT ct_id FROM {$table} WHERE od_id = ? LIMIT 1", [$id])) {
+                return $id;
+            }
+        }
+        return (string) shop_api_new_cart_id();
+    }
+}
+
 if (!function_exists('shop_api_forget_cart_id')) {
     function shop_api_forget_cart_id(): void
     {
@@ -517,7 +537,7 @@ if (!function_exists('shop_api_cart_id')) {
         }
 
         if (!$cartId) {
-            $cartId = shop_api_new_cart_id();
+            $cartId = shop_api_new_guest_cart_id();
         }
 
         if (function_exists('set_session')) {

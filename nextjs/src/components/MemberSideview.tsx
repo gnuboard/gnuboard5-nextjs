@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { g5PathForRuntime } from "@/lib/config";
 import { shouldBypassImageOptimization } from "@/lib/image";
 import { useAuthStore } from "@/store/auth";
+import { useMemberKey } from "@/hooks/useMemberKey";
+import { memberProfilePath, memberRecentPath } from "@/services/member";
 
 export interface MemberSideviewProps {
   /** g5_member.mb_id. 비회원이면 비어 있거나 undefined 입니다. */
@@ -85,55 +87,102 @@ export function MemberSideview({
         </button>
       </PopoverTrigger>
       <PopoverContent className="member-sideview-menu w-44 p-1" align="start">
-        <ul className="text-sm">
-          <SideviewItem href={`/mypage/memos/new?recv=${encodeURIComponent(mbId)}`}>
-            쪽지보내기
-          </SideviewItem>
-
-          {email ? (
-            <SideviewItem href={`mailto:${email}`} external>
-              메일보내기
-            </SideviewItem>
-          ) : null}
-
-          {homepage ? (
-            <SideviewItem href={ensureHttp(homepage)} external>
-              홈페이지
-            </SideviewItem>
-          ) : null}
-
-          <SideviewItem href={`/members/${encodeURIComponent(mbId)}`}>
-            자기소개
-          </SideviewItem>
-
-          {boTable ? (
-            <SideviewItem
-              href={`/search?bo_table=${encodeURIComponent(boTable)}&sfl=mb_id&stx=${encodeURIComponent(mbId)}`}
-            >
-              아이디로 검색
-            </SideviewItem>
-          ) : null}
-
-          <SideviewItem href={`/recent?mb_id=${encodeURIComponent(mbId)}`}>
-            전체게시물
-          </SideviewItem>
-
-          {/* 그누보드 get_sideview 처럼 최고관리자에게만 관리자 화면의 회원 수정 · 포인트 내역을 새 탭으로 연다. */}
-          {isSuperAdmin ? (
-            <>
-              <SideviewItem href={g5PathForRuntime(`/adm/member_form.php?w=u&mb_id=${encodeURIComponent(mbId)}`)} external>
-                회원정보변경
-              </SideviewItem>
-              <SideviewItem href={g5PathForRuntime(`/adm/point_list.php?sfl=mb_id&stx=${encodeURIComponent(mbId)}`)} external>
-                포인트내역
-              </SideviewItem>
-            </>
-          ) : null}
-
-        </ul>
+        <SideviewMenu mbId={mbId} email={email} homepage={homepage} boTable={boTable} isSuperAdmin={isSuperAdmin} />
       </PopoverContent>
     </Popover>
   );
+}
+
+/**
+ * 펼친 메뉴. 메뉴가 열릴 때만 그려지므로 회원 공개 키도 그때 묻는다 — 자기소개 · 전체게시물 주소에는
+ * 아이디 대신 그 키를 쓴다(검색엔진 · 링크로 아이디가 퍼지지 않게). 없는 회원이면 두 항목을 숨긴다.
+ */
+function SideviewMenu({
+  mbId,
+  email,
+  homepage,
+  boTable,
+  isSuperAdmin,
+}: {
+  mbId: string;
+  email?: string | null;
+  homepage?: string | null;
+  boTable?: string | null;
+  isSuperAdmin: boolean;
+}) {
+  const memberKey = useMemberKey(mbId);
+
+  return (
+    <ul className="text-sm">
+      <SideviewItem href={`/mypage/memos/new?recv=${encodeURIComponent(mbId)}`}>
+        쪽지보내기
+      </SideviewItem>
+
+      {email ? (
+        <SideviewItem href={`mailto:${email}`} external>
+          메일보내기
+        </SideviewItem>
+      ) : null}
+
+      {homepage ? (
+        <SideviewItem href={ensureHttp(homepage)} external>
+          홈페이지
+        </SideviewItem>
+      ) : null}
+
+      <MemberKeyItem memberKey={memberKey} href={(key) => memberProfilePath(mbId, key)}>
+        자기소개
+      </MemberKeyItem>
+
+      {boTable ? (
+        <SideviewItem
+          href={`/search?bo_table=${encodeURIComponent(boTable)}&sfl=mb_id&stx=${encodeURIComponent(mbId)}`}
+        >
+          아이디로 검색
+        </SideviewItem>
+      ) : null}
+
+      <MemberKeyItem memberKey={memberKey} href={(key) => memberRecentPath(mbId, key)}>
+        전체게시물
+      </MemberKeyItem>
+
+      {/* 그누보드 get_sideview 처럼 최고관리자에게만 관리자 화면의 회원 수정 · 포인트 내역을 새 탭으로 연다. */}
+      {isSuperAdmin ? (
+        <>
+          <SideviewItem href={g5PathForRuntime(`/adm/member_form.php?w=u&mb_id=${encodeURIComponent(mbId)}`)} external>
+            회원정보변경
+          </SideviewItem>
+          <SideviewItem href={g5PathForRuntime(`/adm/point_list.php?sfl=mb_id&stx=${encodeURIComponent(mbId)}`)} external>
+            포인트내역
+          </SideviewItem>
+        </>
+      ) : null}
+
+    </ul>
+  );
+}
+
+/** 회원 공개 키로 주소를 만드는 항목. 키를 묻는 중에는 누를 수 없게, 없는 회원이면 숨긴다. */
+function MemberKeyItem({
+  memberKey,
+  href,
+  children,
+}: {
+  memberKey: string | null | undefined;
+  href: (key: string) => string;
+  children: React.ReactNode;
+}) {
+  if (memberKey === null) return null;
+  if (memberKey === undefined) {
+    return (
+      <li>
+        <span aria-disabled="true" className="block cursor-progress rounded px-2 py-1.5 text-muted-foreground">
+          {children}
+        </span>
+      </li>
+    );
+  }
+  return <SideviewItem href={href(memberKey)}>{children}</SideviewItem>;
 }
 
 function SideviewItem({

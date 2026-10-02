@@ -216,7 +216,8 @@ foreach ($targetBoards as $board) {
     foreach ($rows as $post) {
         // Truncate content for search preview
         $isSecret = api_is_secret_option($post['wr_option'] ?? '');
-        if ($viewerLevel < (int) ($board['bo_read_level'] ?? 1)) {
+        // 본문 요약은 글을 읽을 수 있을 때만 — 읽기 레벨뿐 아니라 그룹 접근 · 본인확인 제한까지(api_can_read_board).
+        if (!api_can_read_board($viewer ?: null, (string) $board['bo_table'], $board)) {
             $content = '';
         } elseif ($isSecret) {
             $content = json_decode('"\uBE44\uBC00\uAE00\uC785\uB2C8\uB2E4."');

@@ -78,6 +78,23 @@ function api_auth_register_cert_from_session(array $input): array
         ]);
     }
 
+    // 본인인증한 이름 · 휴대폰으로 가입하는지 — 그누보드 bbs/register_form_update.php 와 같은 해시 대조.
+    // 인증 결과 페이지(api/cert/*_result.php)가 md5(이름.종류.생일.휴대폰.인증번호)를 ss_cert_hash 에 남긴다(아이핀은 휴대폰 빼고).
+    $hashType = $sessionCertType !== '' ? $sessionCertType : $certType;
+    $inputName = isset($input['mb_name']) ? trim((string) $input['mb_name']) : '';
+    $inputHp = isset($input['mb_hp']) ? trim((string) $input['mb_hp']) : '';
+    if (function_exists('hyphen_hp_number')) {
+        $inputHp = hyphen_hp_number($inputHp);
+    }
+    $expectedHash = md5($inputName . $hashType . (string) get_session('ss_cert_birth')
+        . ($hashType === 'ipin' ? '' : $inputHp) . $sessionCertNo);
+    $sessionHash = (string) get_session('ss_cert_hash');
+    if ($sessionHash === '' || !hash_equals($sessionHash, $expectedHash)) {
+        Response::error('본인인증된 정보와 입력한 회원정보가 일치하지 않습니다. 다시 시도해 주세요.', 422, [
+            'mb_name' => '본인인증한 이름 · 휴대폰 번호로 가입해 주세요.',
+        ]);
+    }
+
     return [
         'certified' => $sessionCertType !== '' ? $sessionCertType : ($certType !== '' ? $certType : 'hp'),
         'name'      => null,

@@ -234,6 +234,46 @@ function api_is_board_read_point_exempt(?array $viewer, array $board, array $pos
 }
 
 /**
+ * 목록 카드에 본문 발췌(wr_excerpt)를 내도 되는 글 번호 — 글을 읽을 수 있는 사람에게만(api_can_read_board).
+ * 읽을 때 포인트를 깎는 게시판(bo_read_point < 0, 포인트 사용 중)은 발췌로 본문을 공짜로 보이지 않게,
+ * 읽어도 깎이지 않는 글(내 글 · 같은 IP 비회원 — api_is_board_read_point_exempt, 이미 포인트를 내고 읽은 글)만 낸다.
+ * 비밀글은 부르는 쪽에서 따로 뺀다.
+ *
+ * @return array<int, true> wr_id => true
+ */
+function api_board_excerpt_allowed_ids(?array $viewer, string $bo_table, array $board, array $posts): array
+{
+    if (!$posts || !api_can_read_board($viewer, $bo_table, $board)) {
+        return [];
+    }
+
+    $config = api_get_config();
+    $charged = (int) ($board['bo_read_point'] ?? 0) < 0 && !empty($config['cf_use_point']);
+    $paid = [];
+    if ($charged && $viewer && !empty($viewer['mb_id'])) {
+        $ids = array_map(static fn($p) => (string) $p['wr_id'], $posts);
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $rows = DB::readFetchAll(
+            'SELECT po_rel_id FROM ' . DB::table('point_table')
+            . " WHERE mb_id = ? AND po_rel_table = ? AND po_rel_action = '읽기' AND po_rel_id IN ({$ph})",
+            array_merge([(string) $viewer['mb_id'], $bo_table], $ids)
+        );
+        foreach ($rows as $row) {
+            $paid[(string) $row['po_rel_id']] = true;
+        }
+    }
+
+    $allowed = [];
+    foreach ($posts as $post) {
+        $wrId = (int) $post['wr_id'];
+        if (!$charged || isset($paid[(string) $wrId]) || api_is_board_read_point_exempt($viewer, $board, $post)) {
+            $allowed[$wrId] = true;
+        }
+    }
+    return $allowed;
+}
+
+/**
  * 회원이 작성한 글/댓글을 모든 게시판에서 수집해 반환 (GDPR export 용).
  *
  * @param string $mb_id

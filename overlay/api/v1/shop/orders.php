@@ -256,6 +256,14 @@ if ($apiMethod === 'POST' && $od_id === 'lookup') {
         Response::error('Order id and password are required.', 422);
     }
 
+    // 비밀번호 대입 막기 — 비회원 주문 비밀번호는 3자부터 허용되고 주문번호도 시각으로 짐작할 수 있다.
+    // IP 당 조회 횟수, 그리고 (주문번호 · IP) 마다 5번 틀리면 15분 잠금(로그인과 같은 장치).
+    $lookupIp = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+    $lookupKey = '__order__' . substr($lookupOrderId, 0, 40); // 기록 칸(mb_id)은 64자
+    if (Throttle::checkEnumProbe($lookupIp) !== null || Throttle::checkLoginAttempt($lookupKey, $lookupIp) !== null) {
+        Response::error('주문 조회 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.', 429);
+    }
+
     $order = DB::fetch(
         "SELECT * FROM " . DB::table('g5_shop_order_table') . "
          WHERE od_id = ? AND mb_id = '' LIMIT 1",
@@ -263,12 +271,14 @@ if ($apiMethod === 'POST' && $od_id === 'lookup') {
     );
 
     if (!$order || !shop_api_guest_order_password_matches($lookupPassword, $order['od_pwd'] ?? '')) {
+        Throttle::recordLoginFailure($lookupKey, $lookupIp);
         if (function_exists('run_event')) {
             api_run_event('password_is_wrong', array('shop', $order ?: ['od_id' => $lookupOrderId]));
         }
         Response::error('Order not found.', 404);
     }
 
+    Throttle::resetLoginAttempts($lookupKey, $lookupIp);
     $uid = shop_api_set_guest_order_cookie($order);
     Response::success([
         'od_id' => (string) $order['od_id'],

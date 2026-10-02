@@ -27,6 +27,7 @@
  */
 
 if (!defined('_GNUBOARD_')) exit;
+require_once __DIR__ . '/../lib/attachment-rules.php'; // 첨부 허용 규칙(1:1 문의 첨부와 같이 쓴다)
 if (!isset($bo_table, $wr_id)) {
     Response::error('Internal: post-files mounted without bo_table/wr_id.', 500);
 }
@@ -192,7 +193,10 @@ try {
     foreach ($uploaded as $i => $u) {
         $saved = post_files_save_disk($u, $boardDir);
         $savedDisk[] = $saved['path'];
-        $newRows[] = post_files_run_upload_hooks($saved, $board, $wr_id, $member);
+        // 검사 플러그인이 거부하면 이번 요청에서 저장한 파일을 모두 지우고 멈춘다.
+        $newRows[] = post_files_run_upload_hooks($saved, $board, $wr_id, $member, static function () use (&$savedDisk) {
+            foreach ($savedDisk as $p) @unlink($p);
+        });
     }
 } catch (Throwable $e) {
     foreach ($savedDisk as $p) @unlink($p);
@@ -312,141 +316,6 @@ function post_files_normalize_files($entry)
     return $out;
 }
 
-function post_files_allowed_extension($extension)
-{
-    $extension = strtolower(trim((string) $extension));
-    if ($extension === '' || !preg_match('/^[a-z0-9]+$/', $extension)) {
-        return false;
-    }
-
-    global $config;
-    $imageExt = isset($config['cf_image_extension']) ? (string) $config['cf_image_extension'] : 'gif|jpg|jpeg|png|webp';
-    $imageExtensions = array_diff(
-        array_filter(array_map('strtolower', preg_split('/[|, ]+/', $imageExt))),
-        array('svg', 'svgz')
-    );
-    $documentExtensions = array(
-        'pdf', 'txt', 'csv',
-        'hwp', 'hwpx',
-        'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
-        // 압축 — 앱 첨부 "파일(문서·압축)"과 같은 목록(앱 entities/postFile/attachmentRules.ts, 2026-09-30).
-        'zip', '7z', 'rar', 'alz', 'egg', 'tar', 'gz', 'tgz',
-    );
-
-    return in_array($extension, array_merge($imageExtensions, $documentExtensions), true);
-}
-
-function post_files_image_extensions(): array
-{
-    global $config;
-    $imageExt = isset($config['cf_image_extension']) ? (string) $config['cf_image_extension'] : 'gif|jpg|jpeg|png|webp';
-    return array_diff(
-        array_filter(array_map('strtolower', preg_split('/[|, ]+/', $imageExt))),
-        array('svg', 'svgz')
-    );
-}
-
-function post_files_detect_mime($path): string
-{
-    if (function_exists('finfo_open')) {
-        $finfo = @finfo_open(FILEINFO_MIME_TYPE);
-        if ($finfo) {
-            $mime = @finfo_file($finfo, $path);
-            @finfo_close($finfo);
-            if (is_string($mime) && $mime !== '') {
-                return strtolower(trim($mime));
-            }
-        }
-    }
-    if (function_exists('mime_content_type')) {
-        $mime = @mime_content_type($path);
-        if (is_string($mime) && $mime !== '') {
-            return strtolower(trim($mime));
-        }
-    }
-    return '';
-}
-
-function post_files_allowed_mime(string $extension, string $mime, $imgInfo): bool
-{
-    $extension = strtolower(trim($extension));
-    $mime = strtolower(trim(strtok($mime, ';') ?: $mime));
-    if ($mime === '') {
-        return true;
-    }
-
-    $blockedMimes = array(
-        'application/javascript',
-        'application/json',
-        'application/xhtml+xml',
-        'application/xml',
-        'application/x-httpd-php',
-        'application/x-javascript',
-        'application/x-php',
-        'image/svg+xml',
-        'text/html',
-        'text/javascript',
-        'text/xml',
-        'text/x-php',
-    );
-    if (in_array($mime, $blockedMimes, true)) {
-        return false;
-    }
-
-    if (in_array($extension, post_files_image_extensions(), true)) {
-        if (!$imgInfo || $imgInfo[2] < 1 || $imgInfo[2] > 18) {
-            return false;
-        }
-        $imageMimes = array(
-            'gif' => array('image/gif'),
-            'jpg' => array('image/jpeg', 'image/pjpeg'),
-            'jpeg' => array('image/jpeg', 'image/pjpeg'),
-            'png' => array('image/png', 'image/x-png'),
-            'webp' => array('image/webp'),
-            'bmp' => array('image/bmp', 'image/x-ms-bmp'),
-        );
-        return in_array($mime, $imageMimes[$extension] ?? array(), true);
-    }
-
-    $documentMimes = array(
-        'pdf'  => array('application/pdf'),
-        'txt'  => array('text/plain', 'text/x-plain'),
-        'csv'  => array('application/csv', 'application/vnd.ms-excel', 'text/csv', 'text/plain'),
-        'zip'  => array('application/octet-stream', 'application/x-zip-compressed', 'application/zip', 'multipart/x-zip'),
-        'hwp'  => array('application/haansofthwp', 'application/octet-stream', 'application/x-hwp'),
-        'hwpx' => array('application/octet-stream', 'application/vnd.hancom.hwpx', 'application/zip'),
-        'doc'  => array('application/msword', 'application/octet-stream'),
-        'docx' => array(
-            'application/octet-stream',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'application/zip',
-        ),
-        'xls'  => array('application/octet-stream', 'application/vnd.ms-excel'),
-        'xlsx' => array(
-            'application/octet-stream',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'application/zip',
-        ),
-        'ppt'  => array('application/octet-stream', 'application/vnd.ms-powerpoint'),
-        'pptx' => array(
-            'application/octet-stream',
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            'application/zip',
-        ),
-        // 압축(2026-09-30) — finfo 가 알아보는 형식과, 알아보지 못할 때의 octet-stream.
-        '7z'   => array('application/octet-stream', 'application/x-7z-compressed'),
-        'rar'  => array('application/octet-stream', 'application/vnd.rar', 'application/x-rar', 'application/x-rar-compressed'),
-        'alz'  => array('application/octet-stream'),
-        'egg'  => array('application/octet-stream'),
-        'tar'  => array('application/octet-stream', 'application/x-tar'),
-        'gz'   => array('application/octet-stream', 'application/gzip', 'application/x-gzip'),
-        'tgz'  => array('application/octet-stream', 'application/gzip', 'application/x-gzip'),
-    );
-
-    return isset($documentMimes[$extension])
-        && in_array($mime, $documentMimes[$extension], true);
-}
-
 /**
  * Save one uploaded file to $boardDir using gnuboard's filename convention
  * (unpredictable, prevents direct URL guessing). Returns ['path' => ..., 'meta' => row].
@@ -523,7 +392,7 @@ function post_files_save_disk(array $u, $boardDir)
  * 그 모양으로 건네고, 돌려받은 값을 첨부 행으로 옮긴다. 행을 넣은 뒤 부를 write_update_file_insert 용으로
  * 그 배열을 '_upload' 에 같이 둔다(INSERT 는 열을 하나씩 고르므로 이 키는 저장되지 않는다).
  */
-function post_files_run_upload_hooks(array $saved, array $board, $wr_id, array $member): array
+function post_files_run_upload_hooks(array $saved, array $board, $wr_id, array $member, ?callable $onBlock = null): array
 {
     $meta = $saved['meta'];
     $upload = [
@@ -536,8 +405,9 @@ function post_files_run_upload_hooks(array $saved, array $board, $wr_id, array $
         'storage'  => '',
     ];
 
-    $destFile = api_run_replace('write_update_upload_file', $saved['path'], [$board, $wr_id, 'u'], $member);
-    $hooked = api_run_replace('write_update_upload_array', $upload, [$destFile, $board, $wr_id, 'u'], $member);
+    // 저장 전 검사 자리라 거부 · 실패를 무시하지 않는다(api_run_before_replace) — 원래 값으로 계속하면 플러그인의 거부가 사라진다.
+    $destFile = api_run_before_replace('write_update_upload_file', $saved['path'], [$board, $wr_id, 'u'], $member, $onBlock);
+    $hooked = api_run_before_replace('write_update_upload_array', $upload, [$destFile, $board, $wr_id, 'u'], $member, $onBlock);
     if (is_array($hooked)) {
         $upload = array_merge($upload, $hooked);
     }

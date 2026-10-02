@@ -149,6 +149,14 @@ if (!$id && $apiMethod === 'POST') {
 
     $isAdmin = Auth::adminRole($me) === 'super';
 
+    // 보내기 횟수 한도 — 원본 쪽지 화면의 캡차 대신. 관리자는 공지 쪽지를 보내므로 빼 준다.
+    if (!$isAdmin) {
+        $memoLimit = Throttle::checkMemoSend((string) $me['mb_id']);
+        if ($memoLimit !== null) {
+            Response::error($memoLimit, 429);
+        }
+    }
+
     // 그누보드 훅(bbs/memo_form_update.php 와 같은 인자) — 받는 사람 목록. API 는 한 명씩 보낸다.
     api_run_before_event('memo_form_update_before', array(array($recvMbId)), $me);
 

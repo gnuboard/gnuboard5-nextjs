@@ -107,6 +107,44 @@ export function deleteMyImage() {
   return apiClient.delete("/members/me/image");
 }
 
+const memberKeyRequests = new Map<string, Promise<string | null>>();
+
+/**
+ * 주소에 쓸 회원 공개 키(GET /members/{mb_id}/key) — /members/{키}, /recent?mb={키} 처럼 주소에 아이디를 남기지 않는다.
+ * 없는 회원이거나 묻지 못하면 null, 키를 만들 수 없는 설치본(확장 미설치)이면 "" — 부르는 쪽이 예전 주소로 물러선다.
+ * 같은 회원은 한 번만 묻는다(실패는 다음에 다시 묻는다).
+ */
+export function getMemberKey(mbId: string): Promise<string | null> {
+  const cached = memberKeyRequests.get(mbId);
+  if (cached) return cached;
+
+  const request = apiClient
+    .get<{ mb_key?: unknown }>(`/members/${encodeURIComponent(mbId)}/key`)
+    .then((response) => (typeof response.data?.mb_key === "string" ? response.data.mb_key : ""))
+    .catch(() => {
+      memberKeyRequests.delete(mbId);
+      return null;
+    });
+  memberKeyRequests.set(mbId, request);
+  return request;
+}
+
+/** 회원 공개 키 모양(7자-7자). 아이디에는 하이픈이 올 수 없어 예전 주소(/members/아이디)와 섞이지 않는다. */
+export function isMemberKey(value: string): boolean {
+  return /^[A-Za-z0-9]{7}-[A-Za-z0-9]{7}$/.test(value);
+}
+
+/**
+ * 자기소개 · 전체게시물 주소. 키가 있으면 키로, 키를 만들 수 없는 설치본("")이면 예전처럼 아이디로.
+ */
+export function memberProfilePath(mbId: string, key: string): string {
+  return `/members/${encodeURIComponent(key || mbId)}`;
+}
+
+export function memberRecentPath(mbId: string, key: string): string {
+  return key ? `/recent?mb=${encodeURIComponent(key)}` : `/recent?mb_id=${encodeURIComponent(mbId)}`;
+}
+
 export async function getMemberProfile(mbId: string): Promise<MemberProfile> {
   const response = await apiClient.get<{ member?: unknown }>(
     `/members/${encodeURIComponent(mbId)}/profile`

@@ -8,7 +8,7 @@ import { g5ShortHref } from "@/lib/g5-short-url";
 import { runtimeRouterPush } from "@/lib/runtime-router";
 import { toastSuccess } from "@/lib/toast";
 import { addCartItem, addCartItems } from "@/services/cart";
-import type { SelectedCartOption } from "@/app/shop/products/[it_id]/productDetailHelpers";
+import type { SelectedCartOption } from "./productDetailHelpers";
 
 type RouterLike = Parameters<typeof runtimeRouterPush>[0];
 

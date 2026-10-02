@@ -54,6 +54,17 @@ if ($seg0 === 'sign' && $apiMethod === 'POST') {
             }
         }
 
+        // 이미 등록된 기기 ID 는 다시 서명해 주지 않는다 — 서명은 ID 의 HMAC 이라 누구에게 다시 내주든 같은 값이고,
+        // 남의 기기 ID 만 알면 그 기기의 알림을 읽고 지우거나 자기 계정으로 가져갈 수 있다.
+        // 앱은 처음 한 번 받아 기기 저장소에 보관한다. 저장이 실패해 곧바로 다시 묻는 경우만 10분 동안 허용한다.
+        $existingDevice = DB::fetch(
+            "SELECT first_signed_at FROM {$deviceTable} WHERE device_id = ? LIMIT 1",
+            [$device_id]
+        );
+        if ($existingDevice && strtotime((string) $existingDevice['first_signed_at']) < time() - 600) {
+            Response::error('This device is already registered.', 409, ['code' => 'device_already_registered']);
+        }
+
         DB::execute(
             "INSERT INTO {$deviceTable} (device_id, first_signed_at, last_seen_at, first_ip, last_ip, user_agent)
              VALUES (?, ?, ?, ?, ?, ?)

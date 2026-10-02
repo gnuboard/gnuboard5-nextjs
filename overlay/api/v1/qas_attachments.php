@@ -4,6 +4,7 @@
  */
 
 if (!defined('_GNUBOARD_')) exit;
+require_once __DIR__ . '/../lib/attachment-rules.php'; // 게시판 첨부와 같은 허용 규칙
 
 function api_qa_file_url($file)
 {
@@ -123,6 +124,17 @@ function api_qa_save_uploaded_file($file, $qaConfig, $isAdmin)
     $maxSize = (int) ($qaConfig['qa_upload_size'] ?? 0);
     if (!$isAdmin && $maxSize > 0 && (int) $file['size'] > $maxSize) {
         Response::error('Attachment exceeds the configured Q&A upload size.', 422);
+    }
+
+    // 게시판 첨부와 같은 허용 목록(확장자 + 실제 내용). 원본 bbs/qawrite_update.php 는 이미지만 검사해서
+    // .xhtml · .xht · .xml 같은 문서가 data/qa 에 저장되고, 열면 사이트 주소로 스크립트가 돈다.
+    $extension = strtolower(pathinfo((string) $filename, PATHINFO_EXTENSION));
+    if (!post_files_allowed_extension($extension)) {
+        Response::error('허용되지 않는 첨부 파일 형식입니다.', 422);
+    }
+    $detectedMime = post_files_detect_mime($file['tmp_name']);
+    if (!post_files_allowed_mime($extension, $detectedMime, @getimagesize($file['tmp_name']))) {
+        Response::error('첨부 파일의 내용이 형식과 맞지 않습니다.', 422);
     }
 
     $imageExt = isset($config['cf_image_extension']) ? (string) $config['cf_image_extension'] : 'gif|jpg|jpeg|png|webp';

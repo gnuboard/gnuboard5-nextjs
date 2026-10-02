@@ -216,6 +216,74 @@ class Throttle
         return null;
     }
 
+    /** 쪽지 보내기 — 인접 간격(초) · 1분 · 1시간 한도. 원본 쪽지 화면은 캡차로 막지만 API 에는 캡차가 없다. */
+    public const MEMO_COOLDOWN_SECONDS = 3;
+    public const MEMO_PER_MINUTE = 5;
+    public const MEMO_PER_HOUR = 60;
+
+    /**
+     * 쪽지 보내기 가능 여부. 보낸 쪽지(me_type='send')를 센다 — 막힐 사유가 있으면 메시지, 통과면 null.
+     */
+    public static function checkMemoSend(string $mb_id): ?string
+    {
+        if ($mb_id === '') return null;
+        $table = DB::table('memo_table');
+
+        $last = DB::fetch(
+            "SELECT me_send_datetime FROM {$table}
+              WHERE me_send_mb_id = ? AND me_type = 'send'
+              ORDER BY me_id DESC LIMIT 1",
+            [$mb_id]
+        );
+        if ($last && !empty($last['me_send_datetime'])) {
+            $ago = time() - strtotime((string) $last['me_send_datetime']);
+            if ($ago >= 0 && $ago < self::MEMO_COOLDOWN_SECONDS) {
+                return '잠시 후 다시 보내 주세요.';
+            }
+        }
+        foreach (array(array('1 MINUTE', self::MEMO_PER_MINUTE, '분당'), array('1 HOUR', self::MEMO_PER_HOUR, '시간당')) as $window) {
+            $count = DB::count(
+                "SELECT COUNT(*) FROM {$table}
+                  WHERE me_send_mb_id = ? AND me_type = 'send'
+                    AND me_send_datetime > DATE_SUB(NOW(), INTERVAL {$window[0]})",
+                [$mb_id]
+            );
+            if ($count >= $window[1]) {
+                return "{$window[2]} 쪽지 보내기 한도({$window[1]}통)를 넘었어요.";
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 회원별 동작 횟수 한도(메일 보내기 등 셀 테이블이 따로 없는 동작). 통과하면 이번 한 번을 센다.
+     * PHP 세션이 아니라 회원 id 로 세므로, 세션 쿠키 없이 Bearer 토큰으로 보내도 같은 한도를 쓴다.
+     * 셀 테이블(login_attempt)이 없는 설치본에서는 막지 않는다.
+     */
+    public static function checkMemberQuota(string $bucket, string $mb_id, int $perMinute, int $perHour): ?string
+    {
+        if ($mb_id === '') return null;
+        $table = self::loginAttemptTable();
+        if ($table === null) return null;
+
+        $key = '__q_' . substr(preg_replace('/[^a-z0-9]/i', '', $bucket), 0, 16) . '_' . substr(hash('sha256', $mb_id), 0, 16);
+        foreach (array(array('1 MINUTE', $perMinute), array('1 HOUR', $perHour)) as $window) {
+            $count = DB::count(
+                "SELECT COUNT(*) FROM `{$table}`
+                  WHERE mb_id = ? AND last_attempt_at > DATE_SUB(NOW(), INTERVAL {$window[0]})",
+                [$key]
+            );
+            if ($count >= $window[1]) {
+                return '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.';
+            }
+        }
+        DB::execute(
+            "INSERT INTO `{$table}` (mb_id, ip, fail_count, last_attempt_at) VALUES (?, '', 0, NOW())",
+            [$key]
+        );
+        return null;
+    }
+
     private static function loginAttemptTable(): ?string
     {
         if (self::$loginAttemptTableChecked) {

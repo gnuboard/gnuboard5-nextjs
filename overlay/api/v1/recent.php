@@ -10,6 +10,7 @@
  *       view  = 'w' (글만) | 'c' (댓글만) | '' (둘다)
  *       gr_id = 그룹 id로 필터
  *       mb_id = 작성자로 필터
+ *       mb_key = 작성자 공개 키로 필터(사이드뷰 "최근 글" — 주소에 아이디를 남기지 않는다)
  *       page  = 1-based page (default 1)
  *       limit = 1..100 (default 20)
  *
@@ -42,6 +43,11 @@ if ($action === 'groups') {
 $view  = isset($_GET['view']) && in_array($_GET['view'], ['w', 'c'], true) ? $_GET['view'] : '';
 $gr_id = isset($_GET['gr_id']) ? preg_replace('/[^a-z0-9_]/i', '', substr((string) $_GET['gr_id'], 0, 10)) : '';
 $mb_id = isset($_GET['mb_id']) ? preg_replace('/[^a-z0-9_]/i', '', substr((string) $_GET['mb_id'], 0, 20)) : '';
+if ($mb_id === '' && isset($_GET['mb_key']) && (string) $_GET['mb_key'] !== '') {
+    require_once __DIR__ . '/../lib/member_key_helpers.php';
+    // 모르는 키면 전체 목록이 아니라 빈 목록이어야 한다 — 아이디에 올 수 없는 '-' 로 걸러 아무 줄도 맞지 않게 한다.
+    $mb_id = api_member_id_from_key((string) $_GET['mb_key']) ?: '-';
+}
 [$page, $limit, $offset] = api_page_params(20, 100, 'limit');
 
 $boardNewTable = DB::table('board_new_table');
@@ -60,11 +66,9 @@ if (!function_exists('api_recent_fallback_from_write_tables')) {
 
         $boardTable = DB::table('board_table');
         $groupTable = DB::table('group_table');
-        // Normal /bbs/new.php behavior depends on g5_board_new and bo_use_search.
-        // This fallback is only used when g5_board_new is empty, so include boards
-        // that visibly contain posts/comments even if bo_use_search is disabled.
-        $boardWhere = "WHERE b.gr_id = g.gr_id
-            AND (b.bo_use_search = 1 OR b.bo_count_write > 0 OR b.bo_count_comment > 0)";
+        // g5_board_new 가 비었을 때만 쓰는 대체 경로 — 그래도 원본 bbs/new.php 처럼 검색 사용 게시판(bo_use_search = 1)만.
+        // 검색을 끈 게시판(운영자가 목록 · 검색에서 숨긴 게시판)까지 넣으면 최근 글로 새어 나간다.
+        $boardWhere = "WHERE b.gr_id = g.gr_id AND b.bo_use_search = 1";
         $boardParams = array();
 
         if ($gr_id !== '') {
@@ -167,7 +171,8 @@ if (!function_exists('api_recent_fallback_from_write_tables')) {
                             $row,
                             array('wr_option' => $row['parent_option'] ?? ''),
                             (int) ($board['bo_read_level'] ?? 1),
-                            $viewer
+                            $viewer,
+                            (string) $board['bo_table']
                         )
                         : null,
                     'mb_id'        => $row['mb_id'],
@@ -351,7 +356,7 @@ foreach ($newRows as $row) {
         'is_comment'  => $isComment,
         // 댓글 본문 요약(읽을 수 있고 비밀이 아닐 때만). 글이면 null.
         'comment_excerpt' => $isComment
-            ? api_recent_comment_excerpt($author, $parent, (int) ($row['bo_read_level'] ?? 1), $viewer)
+            ? api_recent_comment_excerpt($author, $parent, (int) ($row['bo_read_level'] ?? 1), $viewer, (string) $row['bo_table'])
             : null,
         'mb_id'       => $author['mb_id'],
         'wr_name'     => $author['wr_name'],

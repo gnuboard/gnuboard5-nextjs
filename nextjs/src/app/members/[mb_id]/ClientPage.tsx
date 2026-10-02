@@ -12,8 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useRuntimeRouteParam } from "@/hooks/use-runtime-route-param";
 import { ApiError } from "@/lib/api";
-import { runtimeRouterPush } from "@/lib/runtime-router";
-import { getMemberProfile } from "@/services/member";
+import { runtimeRouterPush, runtimeRouterReplace } from "@/lib/runtime-router";
+import { getMemberKey, getMemberProfile, isMemberKey } from "@/services/member";
 import { useAuthStore } from "@/store/auth";
 import type { MemberProfile } from "@/lib/types";
 import { memberAvatarUrl, memberInitial } from "@/lib/member-avatar";
@@ -25,6 +25,35 @@ export default function ClientPage({ mbId: fallbackMbId }: { mbId: string }) {
   const [profile, setProfile] = useState<MemberProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // 프로필을 물을 값 — 회원 공개 키. 예전 주소(/members/아이디)는 키 주소로 바꾼 뒤에 정해진다.
+  const [profileRef, setProfileRef] = useState("");
+
+  useEffect(() => {
+    if (!mbId) return;
+    if (isMemberKey(mbId)) {
+      setProfileRef(mbId);
+      return;
+    }
+
+    // 예전 주소는 키 주소로 바꾼다 — 주소창 · 로그인 뒤 돌아올 주소에 아이디가 남지 않게.
+    // 키를 만들 수 없는 설치본("")은 예전 주소 그대로 연다.
+    let ignore = false;
+    setProfileRef("");
+    getMemberKey(mbId).then((key) => {
+      if (ignore) return;
+      if (key) {
+        runtimeRouterReplace(router, `/members/${encodeURIComponent(key)}`);
+      } else if (key === "") {
+        setProfileRef(mbId);
+      } else {
+        setLoading(false);
+        setError("회원을 찾을 수 없습니다.");
+      }
+    });
+    return () => {
+      ignore = true;
+    };
+  }, [mbId, router]);
 
   useEffect(() => {
     if (!isInitialized) return;
@@ -33,9 +62,10 @@ export default function ClientPage({ mbId: fallbackMbId }: { mbId: string }) {
       setError("회원 ID가 지정되지 않았습니다.");
       return;
     }
+    if (!profileRef) return;
 
     if (!user) {
-      runtimeRouterPush(router, `/login?redirect=${encodeURIComponent(`/members/${mbId}`)}`);
+      runtimeRouterPush(router, `/login?redirect=${encodeURIComponent(`/members/${profileRef}`)}`);
       return;
     }
 
@@ -43,7 +73,7 @@ export default function ClientPage({ mbId: fallbackMbId }: { mbId: string }) {
     setLoading(true);
     setError("");
 
-    getMemberProfile(mbId)
+    getMemberProfile(profileRef)
       .then((item) => {
         if (!ignore) setProfile(item);
       })
@@ -51,7 +81,7 @@ export default function ClientPage({ mbId: fallbackMbId }: { mbId: string }) {
         if (ignore) return;
 
         if (err instanceof ApiError && err.status === 401) {
-          runtimeRouterPush(router, `/login?redirect=${encodeURIComponent(`/members/${mbId}`)}`);
+          runtimeRouterPush(router, `/login?redirect=${encodeURIComponent(`/members/${profileRef}`)}`);
           return;
         }
 
@@ -65,7 +95,7 @@ export default function ClientPage({ mbId: fallbackMbId }: { mbId: string }) {
     return () => {
       ignore = true;
     };
-  }, [isInitialized, mbId, router, user]);
+  }, [isInitialized, mbId, profileRef, router, user]);
 
   const profileHtml = useMemo(() => {
     const raw = profile?.mb_profile?.trim();
@@ -112,9 +142,12 @@ export default function ClientPage({ mbId: fallbackMbId }: { mbId: string }) {
                   <div className="min-w-0">
                     <h1 className="break-words text-2xl font-bold">
                       {profile.mb_nick}
-                      <span className="ml-2 text-sm font-normal text-muted-foreground">
-                        ({profile.mb_id})
-                      </span>
+                      {/* 아이디는 본인 · 최고관리자에게만 온다(API 가 다른 회원에게는 비워 보낸다). */}
+                      {profile.mb_id ? (
+                        <span className="ml-2 text-sm font-normal text-muted-foreground">
+                          ({profile.mb_id})
+                        </span>
+                      ) : null}
                     </h1>
                     <p className="mt-1 text-sm text-muted-foreground">
                       가입 후 {profile.reg_days.toLocaleString()}일째

@@ -84,6 +84,12 @@ if ($apiMethod === 'POST' && $od_id === '') {
     });
 
     $existingClientOrder = shop_orders_find_by_client_uid($clientUid, $mb_id);
+    // 비회원 재시도는 그 주문의 비밀번호를 다시 낸 사람에게만 돌려준다 — 재시도 키만으로는 남의 주문을 받지 못하게.
+    if ($existingClientOrder && !$member
+        && !shop_api_guest_order_password_matches($guestOrderPassword, (string) ($existingClientOrder['od_pwd'] ?? ''))) {
+        shop_orders_release_create_lock($createLockName);
+        Response::error('이미 접수된 주문 요청입니다. 주문 조회에서 확인해 주세요.', 409, ['code' => 'duplicate_client_uid']);
+    }
     if ($existingClientOrder) {
         $guestUid = '';
         if (!$member) {
@@ -94,7 +100,7 @@ if ($apiMethod === 'POST' && $od_id === '') {
         shop_orders_release_create_lock($createLockName);
         Response::success([
             'cart_id' => (string) $cart_id,
-            'order' => $existingClientOrder,
+            'order' => shop_orders_client_row($existingClientOrder),
             'od_id' => (string) $existingClientOrder['od_id'],
             'uid' => $guestUid,
             'items' => [],
@@ -506,7 +512,7 @@ if ($apiMethod === 'POST' && $od_id === '') {
 
     Response::success([
         'cart_id'     => (string) $cart_id,
-        'order'       => $newOrder,
+        'order'       => $newOrder ? shop_orders_client_row($newOrder) : $newOrder,
         'od_id'       => (string) $od_id_new,
         'uid'         => $guestUid,
         'items'       => $cartItems,

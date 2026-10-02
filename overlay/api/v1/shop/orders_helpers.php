@@ -102,16 +102,26 @@ if (!function_exists('shop_orders_find_by_client_uid')) {
             return null;
         }
 
+        // 요청한 사람의 주문 안에서만 찾는다 — 비회원은 비회원 주문(mb_id = '')만. 범위를 열어 두면
+        // 재시도 키(client_uid)만 아는 비회원이 회원 주문 행을 받아 간다.
         $sql = "SELECT * FROM " . DB::table('g5_shop_order_table') . "
-                WHERE od_shop_memo LIKE ?";
-        $params = ['%' . $marker . '%'];
-        if ($mbId !== '') {
-            $sql .= " AND mb_id = ?";
-            $params[] = $mbId;
-        }
+                WHERE od_shop_memo LIKE ? AND mb_id = ?";
+        $params = ['%' . $marker . '%', $mbId];
         $sql .= " ORDER BY od_id DESC LIMIT 1";
 
         return DB::fetch($sql, $params) ?: null;
+    }
+}
+
+if (!function_exists('shop_orders_client_row')) {
+    /**
+     * 주문 생성 응답에 실을 주문 행 — 비밀번호 해시(od_pwd, 회원 주문은 회원 로그인 비밀번호 해시),
+     * 접속 IP, 관리자 메모 · 변경 이력(재시도 키 표식 포함)은 빼고 보낸다.
+     */
+    function shop_orders_client_row(array $order): array
+    {
+        unset($order['od_pwd'], $order['od_ip'], $order['od_shop_memo'], $order['od_mod_history']);
+        return $order;
     }
 }
 

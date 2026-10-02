@@ -6,7 +6,8 @@
  *   GET    /v1/members/me       - Get current member profile (auth required)
  *   PATCH  /v1/members/me       - Update profile (auth required)
  *   DELETE /v1/members/me       - Withdraw current member account
- *   GET    /v1/members/{mb_id}/profile - Get Gnuboard profile popup payload
+ *   GET    /v1/members/{mb_id}/key     - 주소에 쓸 회원 공개 키 (api/lib/member_key_helpers.php)
+ *   GET    /v1/members/{key}/profile - Get Gnuboard profile popup payload (예전 주소의 아이디도 받는다)
  *   GET    /v1/members/{mb_id}  - Get public member profile
  */
 
@@ -14,6 +15,7 @@ if (!defined('_GNUBOARD_')) exit;
 
 require_once __DIR__ . '/auth_helpers.php';
 require_once __DIR__ . '/members_helpers.php';
+require_once __DIR__ . '/../lib/member_key_helpers.php';
 // 탈퇴 재인증의 소셜 ticket PKCE 검증 함수(nextjs25_social_*). auth.php 와 같은 방식.
 require_once __DIR__ . '/../social/_bridge_common.php';
 
@@ -320,6 +322,18 @@ if ($seg0 === 'me' && $apiMethod === 'PATCH') {
         Response::error('No valid fields provided for update.', 422);
     }
 
+    // 본인인증한 이름 · 휴대폰을 새 인증 없이 바꾸면 인증 상태를 지운다 — 그누보드 bbs/register_form_update.php 와 같다.
+    // 그대로 두면 '본인인증된 회원'인데 저장된 이름 · 번호는 인증받지 않은 값이 된다(성인 · 인증 게시판 판정이 그 상태를 믿는다).
+    $nameChanged = isset($input['mb_name']) && (string) $input['mb_name'] !== (string) ($member['mb_name'] ?? '');
+    $hpChanged = isset($input['mb_hp'])
+        && preg_replace('/\D/', '', (string) $input['mb_hp']) !== preg_replace('/\D/', '', (string) ($member['mb_hp'] ?? ''));
+    if (($nameChanged || $hpChanged) && (string) ($member['mb_certify'] ?? '') !== '') {
+        foreach (array('mb_certify' => '', 'mb_adult' => 0, 'mb_birth' => '', 'mb_sex' => '') as $certField => $certReset) {
+            $setClauses[] = "{$certField} = ?";
+            $params[] = $certReset;
+        }
+    }
+
     // 검사를 모두 통과했다 — 저장 직전(원본의 register_form_update_valid 자리). 바꾸지 않은 값은 지금 값.
     api_run_before_event('register_form_update_valid', array(
         'u',
@@ -598,48 +612,8 @@ if ($seg0 === 'me' && isset($apiSegments[1]) && $apiSegments[1] === 'icon' && $a
     ]);
 }
 
-// -------------------------------------------------------------------------
-// GET /v1/members/{mb_id}/profile - Gnuboard profile popup parity
-// -------------------------------------------------------------------------
-if ($seg0 && isset($apiSegments[1]) && $apiSegments[1] === 'profile' && $apiMethod === 'GET') {
-
-    if (!preg_match('/^[a-z0-9_]+$/i', $seg0)) {
-        Response::error('Invalid member ID format.', 400);
-    }
-
-    $viewer = Auth::requireAuth();
-    $isSuperAdmin = Auth::adminRole($viewer) === 'super';
-    $isSelf = isset($viewer['mb_id']) && $viewer['mb_id'] === $seg0;
-
-    if ((int) ($viewer['mb_open'] ?? 0) !== 1 && !$isSuperAdmin && !$isSelf) {
-        Response::error('You must make your own profile public before viewing other member profiles.', 403);
-    }
-
-    $memberTable = DB::table('member_table');
-    $target = DB::fetch(
-        "SELECT mb_id, mb_nick, mb_level, mb_point, mb_open, mb_datetime,
-                mb_homepage, mb_profile, mb_leave_date, mb_intercept_date
-           FROM {$memberTable}
-          WHERE mb_id = ?
-            AND mb_leave_date = ''
-            AND mb_intercept_date = ''
-          LIMIT 1",
-        [$seg0]
-    );
-
-    if (!$target || empty($target['mb_id'])) {
-        Response::error('Member not found.', 404);
-    }
-
-    $isSelf = isset($viewer['mb_id']) && $viewer['mb_id'] === $target['mb_id'];
-    if ((int) ($target['mb_open'] ?? 0) !== 1 && !$isSuperAdmin && !$isSelf) {
-        Response::error('This member profile is not public.', 403);
-    }
-
-    Response::success([
-        'member' => api_member_profile_payload($target),
-    ]);
-}
+// GET /v1/members/{mb_id}/key · GET /v1/members/{key}/profile — 회원 공개 키와 자기소개
+require __DIR__ . '/members_profile_routes.php';
 
 // -------------------------------------------------------------------------
 // PATCH /v1/members/{mb_id}/sanction - Ban/unban a member (super admin)

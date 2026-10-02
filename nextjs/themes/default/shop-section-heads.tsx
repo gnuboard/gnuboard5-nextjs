@@ -83,3 +83,18 @@ export function SoluneStaticTrack({
     </div>
   );
 }
+
+/**
+ * Swiper 가 서기 전 분류 줄 아래의 넘김 막대 자리(단추 둘 + 막대, 높이가 진짜 막대와 같다).
+ * 진짜 막대는 Swiper 가 선 뒤에야 생겨, 자리가 없으면 그때 아래 진열이 54px 밀린다. 분류가 한 화면에 다
+ * 들어가 Swiper 가 막대를 감출 때는 이 자리도 감춘다(theme.shop.carousel.css 의 화면 폭별 칸 수 규칙).
+ */
+export function SoluneCatrowPagerReserve() {
+  return (
+    <div className="solune-catrow-pager solune-catrow-pager-reserve" aria-hidden="true">
+      <span className="solune-catrow-nav" />
+      <span className="solune-catrow-scrollbar" />
+      <span className="solune-catrow-nav" />
+    </div>
+  );
+}

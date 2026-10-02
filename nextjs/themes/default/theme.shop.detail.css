@@ -104,7 +104,7 @@ body[data-g5-theme-source="default"] .solune-shop-page {
   .product-action-cart svg { display: none; }
   .product-action-buy { background: var(--solune-primary); color: var(--color-primary-content, #fff); }
   .product-action-buy:hover { background: var(--solune-primary-hover, var(--solune-primary)); filter: brightness(0.94); }
-  .product-action-wish, .product-action-recommend { width: 52px; flex: none; padding: 0; border-color: var(--solune-border); }
+  .product-action-wish { width: 52px; flex: none; padding: 0; border-color: var(--solune-border); }
   .product-naverpay { order: 15; margin-top: 12px; border-radius: 10px; }
   /* 이전·다음 상품: 레퍼런스는 테두리 없는 글자 줄(위에 옅은 선, 13px 600). 상자 모양을 벗긴다. */
   .product-siblings { order: 16; margin-top: 32px; border-top: 1px solid var(--solune-border); padding-top: 18px; }
@@ -141,8 +141,8 @@ body[data-g5-theme-source="default"] .solune-shop-page {
   .solune-pdp-aside .product-total-value { font-size: 20px; }
   .solune-pdp-aside .product-actions { margin-top: 18px; }
   .solune-pdp-aside .product-actions button { height: 46px; }
-  /* 찜·추천·N Pay 는 위 패널에만. 상자는 담기와 사기만 둔다(레퍼런스 #sit_buy). */
-  .solune-pdp-aside .product-action-wish, .solune-pdp-aside .product-action-recommend, .solune-pdp-aside .product-naverpay { display: none; }
+  /* 찜·N Pay 는 위 패널에만. 상자는 담기와 사기만 둔다(레퍼런스 #sit_buy). */
+  .solune-pdp-aside .product-action-wish, .solune-pdp-aside .product-naverpay { display: none; }
 
   /* 관련 · 최근 본 상품. 홈의 진열 줄과 같은 카드 폭(다섯 장).
      위 본문(상품정보 표 등)과 붙어 보이지 않게 가는 선 하나와 넉넉한 여백으로 뗀다 — 두 줄이 이어지면 줄마다 선이 선다. */

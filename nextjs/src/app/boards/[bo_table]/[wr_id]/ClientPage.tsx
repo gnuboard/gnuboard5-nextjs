@@ -449,8 +449,15 @@ export default function PostViewClient({
                     {/* 원래 크기로 두고 본문보다 클 때만 줄인다(max-width: 100%). width: 100% 는 작은 첨부
                         (아이콘 · 32px 이미지)까지 본문 폭으로 늘려 뭉개 보였다.
                         테두리 상자 · 가운데 정렬 없이 본문처럼 왼쪽에 이미지만 둔다. */}
+                    {/* 링크는 이미지 크기만큼만(inline-block). img 가 block 이라 inline <a> 가 본문 폭 전체로
+                        늘어나, 이미지 옆 빈 곳을 눌러도 원본이 새 창으로 열렸다. align-top 은 아래 글자 기준선 틈을 없앤다. */}
                     {file.bf_view_url && file.bf_url ? (
-                      <a href={file.bf_url} target="_blank" rel="noopener noreferrer" className="view_image">
+                      <a
+                        href={file.bf_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="view_image inline-block max-w-full align-top"
+                      >
                         {image}
                       </a>
                     ) : (

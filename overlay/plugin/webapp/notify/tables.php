@@ -20,6 +20,7 @@ $g5['member_pref_table']          = G5_TABLE_PREFIX.'member_pref';          // �
 $g5['member_legal_consent_table'] = G5_TABLE_PREFIX.'member_legal_consent'; // 약관·개인정보 동의 이력 (앱 POST /members/me/legal-consent)
 $g5['web_ticket_table']           = G5_TABLE_PREFIX.'web_ticket';           // 앱 → 레거시 웹 페이지 1회용 입장권 (POST /auth/web-ticket)
 $g5['social_apple_token_table']   = G5_TABLE_PREFIX.'social_apple_token';   // Sign in with Apple refresh_token(암호화) — 탈퇴 시 revoke (SC-11)
+$g5['member_public_key_table']    = G5_TABLE_PREFIX.'member_public_key';    // 회원 공개 키 — 주소에 아이디 대신 쓰는 무작위 값 (api/lib/member_key_helpers.php)
 
 // ---------------------------------------------------------------------------
 // 모바일 앱 버전 정책 — /v1/settings 에서 노출되어 클라이언트가 강제 업데이트 판정.
@@ -658,6 +659,22 @@ if (!function_exists('webapp_admin_dbupgrade')) {
                 `created_at`        DATETIME NOT NULL,
                 `updated_at`        DATETIME NOT NULL,
                 PRIMARY KEY (`sub_hash`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci", false);
+            $changed = true;
+        }
+
+        // =====================================================================
+        // 4.4) g5_member_public_key — 회원 공개 키(api/lib/member_key_helpers.php).
+        //      주소(/members/{키}, /recent?mb={키})에 아이디 대신 쓰는 무작위 값. 회원마다 처음 필요할 때 한 줄 만든다.
+        // =====================================================================
+        $member_key = isset($g5['member_public_key_table']) ? $g5['member_public_key_table'] : '';
+        if ($member_key !== '' && !webapp_table_exists($member_key)) {
+            sql_query("CREATE TABLE `{$member_key}` (
+                `mb_id`      VARCHAR(20) NOT NULL,
+                `mk_key`     VARCHAR(20) NOT NULL,
+                `created_at` DATETIME NOT NULL,
+                PRIMARY KEY (`mb_id`),
+                UNIQUE KEY `uniq_mk_key` (`mk_key`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci", false);
             $changed = true;
         }

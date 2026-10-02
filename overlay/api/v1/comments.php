@@ -166,11 +166,8 @@ if ($apiMethod === 'POST') {
         }
     }
 
-    // Option (secret comment)
-    $wr_option = '';
-    if (isset($input['wr_option']) && api_is_secret_option($input['wr_option'])) {
-        $wr_option = 'secret';
-    }
+    // 비밀 댓글 — 그누보드 write_comment_update.php 처럼 폼 필드 wr_secret(=secret)으로 받는다(secret · 예전 wr_option 도).
+    $wr_option = (string) api_comment_secret_option($input);
 
     $now = date('Y-m-d H:i:s');
     $ip  = $_SERVER['REMOTE_ADDR'];
@@ -320,6 +317,16 @@ if ($apiMethod === 'POST') {
     $replyArray = $replyTo > 0
         ? (DB::fetch("SELECT * FROM {$write_table} WHERE wr_id = ? LIMIT 1", [$replyTo]) ?: array())
         : array();
+    // 알림 메일(그누보드 write_comment_update.php 의 "메일발송 사용") — cf_email_use · bo_use_email 이 켜졌을 때만.
+    api_send_board_write_mail(
+        $board,
+        'c',
+        $wr_id,
+        $parentPost,
+        array('name' => (string) $member['mb_nick'], 'email' => (string) $member['mb_email']),
+        array('subject' => '', 'content' => (string) $wr_content, 'comment_id' => $commentId)
+    );
+
     // 그누보드 latest() 위젯 캐시를 비운다(원본과 같이 훅 앞에서). 안의 delete_cache_latest 훅도 보호해서 부른다.
     api_call_core('delete_cache_latest', array($bo_table), $member);
     api_run_event('comment_update_after', array($board, $wr_id, 'c', '', '', $commentId, $replyArray), $member);
@@ -379,9 +386,10 @@ if ($apiMethod === 'PATCH') {
     $wr_content = $input['wr_content'];
     $now = date('Y-m-d H:i:s');
 
-    // Option update
-    if (isset($input['wr_option'])) {
-        $wr_option = api_is_secret_option($input['wr_option']) ? 'secret' : '';
+    // Option update — 요청에 비밀 여부(wr_secret · secret · wr_option)가 있을 때만 바꾼다.
+    $secretOption = api_comment_secret_option($input);
+    if ($secretOption !== null) {
+        $wr_option = $secretOption;
         DB::execute(
             "UPDATE {$write_table}
              SET wr_content = ?, wr_last = ?, wr_option = ?

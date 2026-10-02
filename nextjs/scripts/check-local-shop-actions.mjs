@@ -260,7 +260,8 @@ async function verifyProductDetailActionDialogs(page, product) {
     siblingNavigation = true;
   }
 
-  await page.locator('button[title="지인에게 메일로 추천"]').click();
+  // 상세의 메일 추천 단추는 없앴다. 대화상자는 그누보드 itemrecommend 링크와 같은 ?modal=recommend 로 연다.
+  await page.goto(`${appUrl}/shop/${encodeURIComponent(product.it_id)}?modal=recommend`, { waitUntil: 'networkidle' });
   await page.getByRole('heading', { name: '상품 추천 메일 보내기' }).waitFor({
     state: 'visible',
     timeout: 10000,

@@ -9,11 +9,6 @@
     "targetLines": 650,
     "nextStep": "Extract form state, validation, social signup, and profile sections into focused components/hooks."
   },
-  "../overlay/api/v1/shop/common.php": {
-    "priority": "medium",
-    "targetLines": 650,
-    "nextStep": "Move pricing, image, cart, and order normalization helpers into separate shop common files."
-  },
   "src/app/shop/orders/[od_id]/ClientPage.tsx": {
     "priority": "medium",
     "targetLines": 650,
@@ -72,7 +67,7 @@
   "../overlay/api/v1/posts.php": {
     "priority": "medium",
     "targetLines": 650,
-    "nextStep": "Split board list, post detail, write, update, and comment handling."
+    "nextStep": "Move the DELETE and good/nogood route blocks into post_delete_route.php and post_vote_route.php once the core-parity hook work settles."
   },
   "../overlay/theme/nextjs_default/bridge/seo.php": {
     "priority": "low",
@@ -83,5 +78,45 @@
     "priority": "low",
     "targetLines": 650,
     "nextStep": "Separate per-route metadata resolvers from the shared title/description helpers."
+  },
+  "../overlay/api/lib/helpers.php": {
+    "priority": "high",
+    "targetLines": 700,
+    "nextStep": "Move paging, member media/icon URLs, board file URLs, and board post change-guard helpers into focused api/lib/*_helpers.php files like board_access_helpers.php."
+  },
+  "../overlay/api/v1/shop/common_session_helpers.php": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Separate cart-id cookie helpers, guest order password/cookie helpers, and LG/cash receipt URL builders into their own shop helper files."
+  },
+  "../overlay/api/v1/members.php": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Move the PATCH /me profile update, DELETE /me withdrawal, and POST /me/icon upload blocks into members_*_route.php files."
+  },
+  "../overlay/api/v1/boards.php": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Move the POST /boards/{bo_table}/posts create block and the category-count helpers into separate route/helper files once the core-parity hook work settles."
+  },
+  "../overlay/api/index.php": {
+    "priority": "medium",
+    "targetLines": 650,
+    "nextStep": "Move env loading, origin allowlist, and write-origin enforcement helpers into api/lib/origin_helpers.php, leaving index.php as bootstrap and routing."
+  },
+  "themes/default/theme.shell.css": {
+    "priority": "low",
+    "targetLines": 600,
+    "nextStep": "Split service switch strip, sticky header, mega menu, and search dock rules into theme.shell.*.css partials."
+  },
+  "themes/default/layout-shell.tsx": {
+    "priority": "low",
+    "targetLines": 600,
+    "nextStep": "Extract DrawerNav/DrawerActions, ServiceSwitch, MegaNav, and ShellFooter into sibling component files."
+  },
+  "themes/default/theme.shop.home.css": {
+    "priority": "low",
+    "targetLines": 600,
+    "nextStep": "Move the banner slider rules and the category chip carousel rules into their own shop-home partial stylesheets."
   }
 }

@@ -177,6 +177,35 @@ function api_view_thumbnail_html($html, $thumb_width)
     );
 }
 
+/**
+ * 이 API 가 내준 에디터 사진 주소(…/api/v1/editor-images/{년월}/{파일}?v=…)를 그누보드 원래 저장 형식
+ * (G5_DATA_URL/editor/{년월}/{파일})으로 되돌린다 — 글 · 댓글을 저장하기 전에.
+ *
+ * 읽을 때는 api_rewrite_editor_image_urls 가 저장값을 API 주소로 바꿔 내준다. 수정 화면은 그 응답으로 에디터를 채워
+ * 그대로 보내므로, 되돌리지 않으면 API 주소(호스트 포함)가 DB 에 굳는다 — 도메인 · https 를 바꾸면 깨지고,
+ * 그누보드 PHP 화면 · RSS · 코어의 썸네일 삭제(delete_editor_thumbnail)가 그 사진을 알아보지 못한다.
+ * 이 사이트에 실제로 있는 에디터 파일만 바꾼다(다른 사이트의 주소를 붙여 넣은 것은 그대로).
+ */
+function api_restore_editor_image_urls($html)
+{
+    $html = (string) $html;
+    if ($html === '' || stripos($html, '/api/v1/editor-images/') === false || !defined('G5_DATA_URL')) {
+        return $html;
+    }
+    $base = rtrim((string) G5_DATA_URL, '/') . '/' . (defined('G5_EDITOR_DIR') ? G5_EDITOR_DIR : 'editor');
+
+    return preg_replace_callback(
+        '~(?:https?:)?(?://[^/"\'\s]+)?[^"\'\s,]*?/api/v1/editor-images/([0-9A-Za-z_]+)/([^/"\'\s?#,]+\.(?:gif|jpe?g|png|webp|bmp))(?:\?[^"\'\s,]*)?~i',
+        function ($m) use ($base) {
+            if (api_editor_image_path($m[1], rawurldecode($m[2])) === '') {
+                return $m[0];
+            }
+            return $base . '/' . $m[1] . '/' . $m[2];
+        },
+        $html
+    );
+}
+
 function api_rewrite_editor_image_urls($html)
 {
     $html = (string) $html;
