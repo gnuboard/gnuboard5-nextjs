@@ -23,7 +23,7 @@ if ($apiMethod === 'GET' && $action === '') {
     }
 
     $limit = isset($_GET['per_page']) ? min(100, max(1, (int) $_GET['per_page'])) : 20;
-    $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
+    $page = api_page_number();
     $offset = ($page - 1) * $limit;
 
     $where = '';

@@ -16,6 +16,7 @@ import { shopTypeHref } from "./shop-links";
 import { SoluneShopCategoryPanel, useCategoryHover } from "./shop-category-panel";
 import { SoluneShopDrawer, type ShopTypeLink } from "./shop-drawer";
 import { soluneThemeBootScript } from "./theme-swap";
+import { soluneShopLayoutHintScript } from "./shop-layout-hint";
 import { useLoginHref } from "./use-runtime-pathname";
 
 /* 레퍼런스 shop.head.php 의 유형 내비. 마지막(할인)은 CSS 가 테라코타로 세운다. */
@@ -230,7 +231,8 @@ export function SoluneShopLayoutShell({ children, config, shopCategories: builtC
 
   return (
     <div className={`solune-shop-page solune-page${searchOpen ? " solune-search-active" : ""}`}>
-      <script dangerouslySetInnerHTML={{ __html: soluneThemeBootScript }} />
+      {/* 첫 페인트 전에 — 화면 테마, 그리고 쇼핑 홈 배너 · 분류 자리를 잡을지(shop-layout-hint.ts). */}
+      <script dangerouslySetInnerHTML={{ __html: soluneThemeBootScript + soluneShopLayoutHintScript }} />
 
       {/* 고정 헤더 밖에 둔다 — 서랍은 position:fixed 라 transform 이 걸린 조상 안이면 화면이 아니라 그 상자에 갇힌다. */}
       <SoluneShopDrawer

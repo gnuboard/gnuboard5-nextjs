@@ -16,6 +16,7 @@ import { installRouteDataPrefetch } from "@/lib/route-data-prefetch";
 import { preloadRouteCode, scheduleIdleRouteCodePreload } from "@/lib/route-code-preload";
 import { requestShare } from "@/lib/request-share";
 import { useAuthStore } from "@/store/auth";
+import { useRouteScrollReset } from "@/hooks/use-route-scroll-reset";
 
 function isPlainClick(event: MouseEvent): boolean {
   return (
@@ -56,6 +57,8 @@ type RuntimeTarget = {
 export function RuntimeNavigationBridge() {
   const router = useRouter();
   const pathname = usePathname();
+  // 셸을 나눠 쓰는 화면끼리 옮겨 가면 Next 가 스크롤을 올리지 않는다 — 대신 올린다.
+  useRouteScrollReset(pathname);
 
   useEffect(() => {
     const basePath = g5BasePathForRuntime();

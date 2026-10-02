@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { storageGet, storageSet } from "@/lib/safe-storage";
 
 const STORAGE_KEY = "g5:error-reload";
 /** 같은 주소에서 이 시간 안에 다시 오류가 나면 새로고침하지 않고 오류 화면을 보인다(무한 새로고침 방지). */
@@ -9,7 +10,7 @@ const RELOAD_WINDOW_MS = 60_000;
 type LastReload = { path: string; at: number };
 
 function readLastReload(): LastReload | null {
-  const raw = window.sessionStorage.getItem(STORAGE_KEY);
+  const raw = storageGet(STORAGE_KEY, "session");
   if (!raw) return null;
   const parsed: unknown = JSON.parse(raw);
   if (
@@ -44,7 +45,8 @@ export function useReloadOnceOnError(): boolean {
     try {
       const last = readLastReload();
       if (last && last.path === path && now - last.at < RELOAD_WINDOW_MS) return;
-      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ path, at: now }));
+      // 기록을 남기지 못하면(저장소가 막힘) 새로고침한 다음 문서가 "이미 한 번 했다"를 몰라 끝없이 반복한다.
+      if (!storageSet(STORAGE_KEY, JSON.stringify({ path, at: now }), "session")) return;
     } catch {
       return;
     }

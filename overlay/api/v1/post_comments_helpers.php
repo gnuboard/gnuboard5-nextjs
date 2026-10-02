@@ -35,7 +35,7 @@ if (!function_exists('api_post_present_comment')) {
     /** 댓글 한 행을 응답 모양으로 — 비밀댓글 가림, 닉네임·아이콘, 에디터 이미지 URL. */
     function api_post_present_comment(array $comment, array $post, string $bo_table, $viewer): array
     {
-        $comment['is_secret'] = strpos((string) ($comment['wr_option'] ?? ''), 'secret') !== false;
+        $comment['is_secret'] = api_is_secret_option($comment['wr_option'] ?? '');
         $canRead = !$comment['is_secret'];
         if ($comment['is_secret']) {
             $viewerId = $viewer && !empty($viewer['mb_id']) ? (string) $viewer['mb_id'] : '';
@@ -58,11 +58,11 @@ if (!function_exists('api_post_present_comment')) {
                 [$comment['mb_id']]
             );
             $comment['mb_nick'] = isset($mbRow['mb_nick']) ? $mbRow['mb_nick'] : $comment['wr_name'];
-            $comment['mb_icon_path'] = get_member_icon_url($comment['mb_id']);
         } else {
             $comment['mb_nick'] = $comment['wr_name'];
-            $comment['mb_icon_path'] = null;
         }
+        // 글쓴이 그림(api/lib/helpers.php 공용) — 같은 글쓴이의 댓글이 여러 개여도 파일은 한 번만 확인한다.
+        $comment = array_merge($comment, api_member_media_urls($comment['mb_id']));
         $comment['wr_content'] = api_rewrite_editor_image_urls($comment['wr_content'] ?? '');
         return $comment;
     }

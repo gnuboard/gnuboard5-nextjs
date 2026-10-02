@@ -6,6 +6,7 @@ import type { WritePost } from "@/lib/types";
 import type { G5ThemeComponentProps } from "@/lib/theme-types";
 import { SolunePostRowsSkeleton } from "./home-skeletons";
 import { SoluneAuthor, soluneListDate } from "./home-meta";
+import { isSecretPost } from "@/lib/post-flags";
 
 type SoluneCommunityHome = NonNullable<G5ThemeComponentProps["communityHome"]>;
 export type SolunePost = SoluneCommunityHome["latestPosts"][number];
@@ -29,7 +30,7 @@ type PostRowPost = Pick<
 
 function PostRow({ href, post }: { href: string; post: PostRowPost }) {
   const comments = Number(post.wr_comment) || 0;
-  const isSecret = (post.wr_option || "").includes("secret");
+  const isSecret = isSecretPost(post);
 
   return (
     <li className="solune-latest-row">

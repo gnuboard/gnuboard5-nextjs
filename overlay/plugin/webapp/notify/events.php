@@ -8,12 +8,21 @@
  * 어느 화면에서 해도 같은 알림이 같은 알림함·같은 기기에 간다.
  *
  * 훅 이름과 인자는 그누보드 5.6 의 bbs/write_comment_update.php, bbs/write_update.php,
- * bbs/memo_form_update.php 에 있는 run_event() 그대로다. API 요청에서는 이 이벤트가
- * 발생하지 않으므로 두 번 가는 일은 없다.
+ * bbs/memo_form_update.php 에 있는 run_event() 그대로다. API 도 같은 동작에서 이 훅을 부르지만
+ * (api/lib/hooks.php — 다른 플러그인이 새 화면 · 앱에서도 돌게), 알림은 API 핸들러가 이미 보냈으므로
+ * API 요청(G5_API_REQUEST)에서는 여기서 건너뛴다 — 두 번 가지 않게.
  */
 if (!defined('_GNUBOARD_')) exit;
 
 require_once __DIR__ . '/Notify.php';
+
+if (!function_exists('g5_webapp_notify_is_api_request')) {
+    /** API 요청이면 true — 그 알림은 API 핸들러가 직접 보낸다. */
+    function g5_webapp_notify_is_api_request()
+    {
+        return defined('G5_API_REQUEST') && G5_API_REQUEST;
+    }
+}
 
 if (!function_exists('g5_webapp_notify_on_comment')) {
     /** bbs/write_comment_update.php: run_event('comment_update_after', $board, $wr_id, $w, $qstr, $redirect_url, $comment_id, $reply_array) */
@@ -21,6 +30,9 @@ if (!function_exists('g5_webapp_notify_on_comment')) {
     {
         global $g5, $member;
 
+        if (g5_webapp_notify_is_api_request()) {
+            return;
+        }
         if ($w !== '' && $w !== 'c') {
             return; // 수정(cu)·삭제는 알림 없음. '' 은 새 댓글, 'c' 는 댓글의 댓글.
         }
@@ -58,7 +70,7 @@ if (!function_exists('g5_webapp_notify_on_write')) {
     {
         global $g5, $member;
 
-        if ($w !== 'r') {
+        if (g5_webapp_notify_is_api_request() || $w !== 'r') {
             return;
         }
         // write_update.php 는 답글을 달기 전에 원글을 $wr 에 실어 둔다.
@@ -93,6 +105,9 @@ if (!function_exists('g5_webapp_notify_on_memo')) {
     {
         global $member;
 
+        if (g5_webapp_notify_is_api_request()) {
+            return;
+        }
         if (empty($member_list['id']) || !is_array($member_list['id'])) {
             return;
         }

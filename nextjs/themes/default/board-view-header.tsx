@@ -1,5 +1,6 @@
 "use client";
 
+import { MemberAvatar } from "@/components/MemberAvatar";
 import { G5Link as Link } from "@/components/ui/g5-link";
 import type { G5ThemeBoardViewHeaderProps } from "@/lib/theme-types";
 import { formatNumber } from "@/lib/utils";
@@ -40,9 +41,8 @@ export function SoluneBoardViewHeader({ post, boTable, boardName, listHref, auth
       </header>
       <div className="solune-view-info">
         <div className="solune-view-author">
-          <span className="solune-avatar solune-view-avatar" aria-hidden>
-            {name.slice(0, 1)}
-          </span>
+          {/* 회원이미지(프로필 사진) → 회원아이콘 → 이니셜 — 앱 공용 아바타. 레퍼런스 view.skin 의 solune_member_avatar. */}
+          <MemberAvatar name={name} member={post} className="solune-avatar solune-view-avatar" size={40} />
           <div className="solune-view-author-body">
             <strong>{author}</strong>
             <time dateTime={post.wr_datetime}>{formatViewDateTime(post.wr_datetime)}</time>

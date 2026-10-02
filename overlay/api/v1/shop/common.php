@@ -19,6 +19,12 @@ if (!function_exists('shop_api_clean_id')) {
 if (!function_exists('shop_api_url_base')) {
     function shop_api_url_base(): string
     {
+        // 앱 공용 기준 주소(api/lib/helpers.php)를 쓴다 — 요청 origin 만 쓰면 하위 폴더 설치(/gnuboard5_3)에서
+        // 경로가 빠져 후기 · 이벤트 · 배너 · 쿠폰 이미지 주소가 틀어졌다. 루트 설치에서는 결과가 같다.
+        if (function_exists('api_public_app_base_url')) {
+            return rtrim((string) api_public_app_base_url(), '/');
+        }
+
         if (defined('G5_WEBAPP_APP_URL') && G5_WEBAPP_APP_URL) {
             return rtrim((string) G5_WEBAPP_APP_URL, '/');
         }
@@ -94,32 +100,10 @@ if (!function_exists('shop_api_data_image_path')) {
 }
 
 if (!function_exists('shop_api_item_image_url')) {
+    /** 상품 이미지 주소 — 정본 api_shop_item_image_url()(api/lib/helpers.php)과 같은 값. 예전 이름을 쓰는 곳을 위해 둔다. */
     function shop_api_item_image_url($it_id, $imageField)
     {
-        $imageField = trim((string) $imageField);
-        if ($imageField === '') {
-            return '';
-        }
-
-        if (preg_match('#^https?://#i', $imageField)) {
-            return $imageField;
-        }
-
-        $imageField = ltrim(str_replace('\\', '/', $imageField), '/');
-        $candidates = array($imageField);
-        if ($it_id && strpos($imageField, '/') === false) {
-            $candidates[] = $it_id . '/' . $imageField;
-        }
-
-        foreach ($candidates as $candidate) {
-            $path = shop_api_data_image_path('item', $candidate);
-            if ($path !== '') {
-                $stamp = filemtime($path) ?: 0;
-                return shop_api_image_url('item', $candidate) . ($stamp ? '?v=' . $stamp : '');
-            }
-        }
-
-        return '';
+        return api_shop_item_image_url($it_id, trim((string) $imageField));
     }
 }
 
@@ -136,7 +120,7 @@ if (!function_exists('shop_api_product_list_extras')) {
      */
     function shop_api_product_list_extras(array $rows)
     {
-        $extras = array('categories' => array(), 'reviews' => array(), 'options' => array());
+        $extras = array('categories' => array(), 'reviews' => array(), 'options' => array(), 'soldout' => array());
         if (!$rows) {
             return $extras;
         }
@@ -181,12 +165,55 @@ if (!function_exists('shop_api_product_list_extras')) {
 
             // 쓰는 중인 선택옵션(io_type 0)이 하나라도 있으면 옵션 없이는 담을 수 없다(장바구니 API 가 거부한다).
             // 추가옵션(io_type 1)만 있는 상품은 본품만 담을 수 있으므로 셈하지 않는다.
+            $baseOptions = array();
             foreach (DB::fetchAll(
-                "SELECT DISTINCT it_id FROM " . DB::table('g5_shop_item_option_table') . "
+                "SELECT it_id, io_id, io_stock_qty FROM " . DB::table('g5_shop_item_option_table') . "
                   WHERE it_id IN ({$marks}) AND io_use = 1 AND io_type = 0",
                 $ids
             ) as $opt) {
                 $extras['options'][(string) $opt['it_id']] = true;
+                $baseOptions[(string) $opt['it_id']][(string) $opt['io_id']] = (int) $opt['io_stock_qty'];
+            }
+
+            // 품절 — 그누보드 원본 is_soldout() 과 같은 규칙을 한 페이지 분량으로 한꺼번에 센다
+            // (상품마다 is_soldout() 을 부르면 옵션 수만큼 쿼리가 늘어 목록 한 쪽에 수백 번이 된다).
+            //   선택옵션 상품: 쓰는 중인 선택옵션이 모두 (옵션 재고 - 주문 대기) <= 0 이면 품절
+            //   옵션 없는 상품: (상품 재고 - 주문 대기) <= 0 이면 품절
+            // 주문 대기 = 재고에서 아직 빼지 않은 주문 · 입금 · 준비 줄(get_it_stock_qty · get_option_stock_qty 와 같다).
+            $pending = array();
+            foreach (DB::fetchAll(
+                "SELECT it_id, io_id, io_type, SUM(ct_qty) AS qty FROM " . DB::table('g5_shop_cart_table') . "
+                  WHERE it_id IN ({$marks}) AND ct_stock_use = 0 AND ct_status IN ('주문', '입금', '준비')
+                  GROUP BY it_id, io_id, io_type",
+                $ids
+            ) as $row) {
+                $pending[(string) $row['it_id']][(string) $row['io_id'] . '|' . (int) $row['io_type']] = (int) $row['qty'];
+                if ((string) $row['io_id'] === '') {
+                    // 옵션 없는 본품 줄 — get_it_stock_qty() 는 io_type 을 가리지 않고 io_id = '' 줄을 센다
+                    $pending[(string) $row['it_id']]['item'] = ($pending[(string) $row['it_id']]['item'] ?? 0) + (int) $row['qty'];
+                }
+            }
+            foreach ($rows as $row) {
+                $itId = (string) ($row['it_id'] ?? '');
+                if ($itId === '') {
+                    continue;
+                }
+                if ((int) ($row['it_soldout'] ?? 0) === 1) {
+                    $extras['soldout'][$itId] = true;
+                    continue;
+                }
+                if (isset($baseOptions[$itId])) {
+                    $anyInStock = false;
+                    foreach ($baseOptions[$itId] as $ioId => $stock) {
+                        if ($stock - ($pending[$itId][$ioId . '|0'] ?? 0) > 0) {
+                            $anyInStock = true;
+                            break;
+                        }
+                    }
+                    $extras['soldout'][$itId] = !$anyInStock;
+                } else {
+                    $extras['soldout'][$itId] = (int) ($row['it_stock_qty'] ?? 0) - ($pending[$itId]['item'] ?? 0) <= 0;
+                }
             }
         }
 

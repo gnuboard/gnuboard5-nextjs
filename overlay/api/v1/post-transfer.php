@@ -61,8 +61,8 @@ if (!$threads) {
 
 $result = api_post_transfer_run($member, $board, $mode, $threads, $targets);
 
-delete_cache_latest($bo_table);
-run_event('bbs_move_update', $bo_table, array_column($targets, 'bo_table'), implode(',', $wrIds), '');
+api_call_core('delete_cache_latest', array($bo_table), $member);
+api_run_event('bbs_move_update', array($bo_table, array_column($targets, 'bo_table'), implode(',', $wrIds), ''), $member);
 
 Response::success([
     'mode' => $mode,
@@ -118,7 +118,7 @@ function api_post_transfer_run(array $member, array $board, string $mode, array 
     }
 
     if ($mode === 'move') {
-        api_post_transfer_remove_sources($board['bo_table'], $moved);
+        api_post_transfer_remove_sources($board['bo_table'], $moved, $member);
     }
 
     return ['posts' => $posts, 'comments' => $comments];
@@ -205,7 +205,7 @@ function api_post_transfer_copy_thread(array $member, array $board, array $targe
 
         if (!$row['wr_is_comment']) {
             $save_parent = $insert_id;
-            api_post_transfer_copy_files($src_table, $dst_table, (int) $row['wr_id'], $insert_id);
+            api_post_transfer_copy_files($src_table, $dst_table, (int) $row['wr_id'], $insert_id, $member);
             $posts++;
 
             if ($mode === 'move' && $isFirstTarget) {
@@ -231,20 +231,20 @@ function api_post_transfer_copy_thread(array $member, array $board, array $targe
         }
 
         DB::execute("UPDATE {$dst_write} SET wr_parent = ? WHERE wr_id = ?", [$save_parent, $insert_id]);
-        run_event('bbs_move_copy', $row, $dst_table, $insert_id, $next_wr_num, $mode);
+        api_run_event('bbs_move_copy', array($row, $dst_table, $insert_id, $next_wr_num, $mode), $member);
     }
 
     DB::execute(
         'UPDATE ' . DB::table('board_table') . ' SET bo_count_write = bo_count_write + ?, bo_count_comment = bo_count_comment + ? WHERE bo_table = ?',
         [$posts, $comments, $dst_table]
     );
-    delete_cache_latest($dst_table);
+    api_call_core('delete_cache_latest', array($dst_table), $member);
 
     return ['posts' => $posts, 'comments' => $comments];
 }
 
 /** 첨부파일 행과 실제 파일을 대상 게시판으로 복사한다(같은 게시판이면 파일 이름을 바꾼다). */
-function api_post_transfer_copy_files(string $src_table, string $dst_table, int $src_wr_id, int $insert_id): void
+function api_post_transfer_copy_files(string $src_table, string $dst_table, int $src_wr_id, int $insert_id, array $member): void
 {
     $fileTable = DB::table('board_file_table');
     $src_dir = G5_DATA_PATH . '/file/' . $src_table;
@@ -271,7 +271,7 @@ function api_post_transfer_copy_files(string $src_table, string $dst_table, int 
                 @copy($src_dir . '/' . $file['bf_file'], $dst_dir . '/' . $copy_name);
                 @chmod($dst_dir . '/' . $copy_name, G5_FILE_PERMISSION);
             }
-            $file = run_replace('bbs_move_update_file', $file, $copy_name, $src_table, $dst_table, $insert_id);
+            $file = api_run_replace('bbs_move_update_file', $file, array($copy_name, $src_table, $dst_table, $insert_id), $member);
         }
 
         DB::execute(
@@ -288,7 +288,7 @@ function api_post_transfer_copy_files(string $src_table, string $dst_table, int 
 }
 
 /** 이동: 원본 글 · 댓글 · 첨부 · 최신글을 지우고, 공지 목록과 글 수를 정리한다. */
-function api_post_transfer_remove_sources(string $src_table, array $threads): void
+function api_post_transfer_remove_sources(string $src_table, array $threads, array $member): void
 {
     $write_table = DB::writeTable($src_table);
     $fileTable = DB::table('board_file_table');
@@ -300,7 +300,7 @@ function api_post_transfer_remove_sources(string $src_table, array $threads): vo
 
     foreach ($threads as $rows) {
         foreach ($rows as $row) {
-            delete_editor_thumbnail((string) $row['wr_content']);
+            api_call_core('delete_editor_thumbnail', array((string) $row['wr_content']), $member);
             if ($row['wr_is_comment']) {
                 $removedComments++;
                 continue;
@@ -309,7 +309,7 @@ function api_post_transfer_remove_sources(string $src_table, array $threads): vo
             $files = DB::fetchAll("SELECT bf_file FROM {$fileTable} WHERE bo_table = ? AND wr_id = ?", [$src_table, $row['wr_id']]);
             foreach ($files as $file) {
                 if (!$file['bf_file']) continue;
-                $path = run_replace('delete_file_path', clean_relative_paths($src_dir . '/' . $file['bf_file']), $row);
+                $path = api_run_replace('delete_file_path', clean_relative_paths($src_dir . '/' . $file['bf_file']), array($row), $member);
                 if (is_file($path)) {
                     @unlink($path);
                 }

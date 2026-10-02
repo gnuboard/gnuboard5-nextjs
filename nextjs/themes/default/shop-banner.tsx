@@ -83,6 +83,9 @@ function BannerSlide({
       /* 겹쳐 녹이는(fade) 효과라 여섯 장이 한자리에 쌓여 loading="lazy" 가 듣지 않는다.
          그래서 load 가 켜진 장만 받는다 — 첫 장, 그리고 지금 장의 앞뒤. */
       src={load ? normalizeG5ImageSrc(banner.image_url) : undefined}
+      /* 1440(레퍼런스 배너와 같은 폭) · 1920 — 배너는 화면 폭을 다 쓰므로 큰 화면에서만 1920 을 받는다. */
+      srcSet={load && banner.image_srcset ? banner.image_srcset : undefined}
+      sizes={banner.image_srcset ? "100vw" : undefined}
       onLoad={onSettled}
       onError={onSettled}
       alt={banner.bn_alt}

@@ -446,6 +446,7 @@ require_once __DIR__ . '/lib/Response.php';
 require_once __DIR__ . '/lib/Auth.php';
 require_once __DIR__ . '/lib/Validator.php';
 require_once __DIR__ . '/lib/helpers.php';
+require_once __DIR__ . '/lib/hooks.php'; // 그누보드 원본과 같은 훅(run_event / run_replace)을 API 동작에서도 부른다
 require_once __DIR__ . '/lib/image-variants.php';
 require_once __DIR__ . '/lib/editor-images.php';
 require_once __DIR__ . '/lib/PushQueue.php';

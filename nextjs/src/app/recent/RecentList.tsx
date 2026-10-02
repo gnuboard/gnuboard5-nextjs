@@ -5,6 +5,7 @@ import { Trash2 } from "lucide-react";
 import { MemberSideview } from "@/components/MemberSideview";
 import { apiClient } from "@/lib/api";
 import { g5ShortHref } from "@/lib/g5-short-url";
+import { formatListDate } from "@/lib/utils";
 import { toastError, toastSuccess } from "@/lib/toast";
 import type { RecentItem } from "@/lib/types";
 
@@ -19,13 +20,6 @@ interface RecentListProps {
   onDeleted: () => void;
   /** 카드 맨 아래(페이지 넘김) */
   footer?: React.ReactNode;
-}
-
-function formatRecentDate(datetime: string): string {
-  if (!datetime) return "";
-  const date = datetime.substring(0, 10);
-  const today = new Date().toISOString().substring(0, 10);
-  return date === today ? datetime.substring(11, 16) : datetime.substring(5, 10);
 }
 
 function initialOf(name: string): string {
@@ -166,7 +160,7 @@ export function RecentList({ items, isAdmin, myMbId, filtered, onDeleted, footer
                 </td>
                 <td className="recent-td-date">
                   <time dateTime={item.wr_datetime} title={item.wr_datetime}>
-                    {formatRecentDate(item.wr_datetime)}
+                    {formatListDate(item.wr_datetime)}
                   </time>
                 </td>
               </tr>

@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { shouldBypassImageOptimization } from "@/lib/image";
 import { boardPostHref, type BbsRewriteMode } from "@/lib/board-url";
 import { formatDate, truncate } from "@/lib/utils";
+import { isPublicHomePost } from "@/lib/community-home";
 import { getBoards, getBoardPosts } from "@/services/boards";
 import { getClientPublicSettings } from "@/services/settings";
 import type { Board, WritePost } from "@/lib/types";
@@ -58,10 +59,6 @@ function formatMetric(value: number | string) {
 
 function postAuthor(post: HomePost | WritePost) {
   return post.mb_nick || post.wr_name || "작성자";
-}
-
-function isPublicHomePost(post: WritePost) {
-  return !post.is_secret && !String(post.wr_option || "").split(",").includes("secret");
 }
 
 const HTML_ENTITIES: Record<string, string> = {

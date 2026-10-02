@@ -10,6 +10,7 @@ import { shopProductHref } from "@/lib/product-url";
 import { htmlToPlainText } from "@/lib/sanitize";
 import { cn, formatPrice } from "@/lib/utils";
 import { ProductPurchaseControls, type ProductPurchaseControlsProps } from "./ProductPurchaseControls";
+import { formatProductPrice } from "@/lib/shop-product-state";
 
 type ShippingPaymentDisplay = {
   label: string;
@@ -168,7 +169,7 @@ export function ProductPurchasePanel({
           </div>
         )}
         <p className="product-price-now text-3xl font-bold">
-          {isTelInquiry ? "전화문의" : formatPrice(product.it_price)}
+          {formatProductPrice(product)}
         </p>
         {!isTelInquiry && pointLabel && (
           <p className="product-price-point text-sm text-muted-foreground">적립 포인트: {pointLabel}</p>

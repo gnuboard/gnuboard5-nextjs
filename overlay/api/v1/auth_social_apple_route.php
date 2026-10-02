@@ -119,6 +119,9 @@ if (!function_exists('api_apple_provider_enabled')) {
         if (!empty($member['mb_intercept_date'])) {
             Response::error('차단된 회원입니다.', 403);
         }
+        // 그누보드 훅 — 소셜 로그인도 원본 login_check.php 처럼 $is_social_login = true 로. 막히면 발급 전에 멈춘다.
+        api_run_before_event('login_session_before', array($member, true), $member);
+
         $label = 'social:apple';
         if (isset($input['device_label']) && is_string($input['device_label']) && trim($input['device_label']) !== '') {
             $label .= ' ' . mb_substr(trim(strip_tags($input['device_label'])), 0, 64, 'UTF-8');
@@ -133,6 +136,7 @@ if (!function_exists('api_apple_provider_enabled')) {
         $token = Auth::generateToken($member, $sessionId);
         api_auth_set_session_cookies($token, $refresh, false);
         api_auth_open_php_session($member, $sessionId);
+        api_run_event('member_login_check', array($member, '', true), $member);
         Response::success(api_auth_with_merged_cart([
             'token'         => $token,
             'refresh_token' => $refresh,

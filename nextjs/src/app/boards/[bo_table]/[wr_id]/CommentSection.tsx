@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, memo } from "react";
+import { useState, useCallback, useEffect, useRef, memo } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { apiClient } from "@/lib/api";
@@ -39,6 +39,46 @@ interface CommentItemProps {
   onUpdate: (commentId: number, content: string) => Promise<void>;
   onDelete: (commentId: number) => void;
   useEditor?: boolean;
+  /** 주소의 #c_번호 로 찾아온 댓글 — 잠깐 강조한다. */
+  highlighted?: boolean;
+}
+
+/** 강조를 유지하는 시간(ms). 눈이 그 자리를 찾을 만큼만 둔다. */
+const COMMENT_HIGHLIGHT_MS = 2500;
+/** 찾아간 댓글을 붙잡아 두는 최대 시간(ms). 본문 이미지가 늦게 읽혀 페이지가 길어지면 댓글이 밀려나므로 다시 맞춘다. */
+const COMMENT_PIN_MS = 8000;
+/** 이 입력이 오면 붙잡기를 그만둔다 — 사용자가 직접 움직이는 화면을 끌어가지 않는다. */
+const COMMENT_PIN_STOP_EVENTS = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+
+/**
+ * 댓글을 가운데에 두고, 페이지 높이가 바뀌면(이미지 로드 등) 다시 가운데로 맞춘다. 그만두는 함수를 돌려준다.
+ * 시간이 다 되거나 사용자가 스크롤·클릭·키 입력을 하면 그만둔다.
+ */
+function pinCommentInView(target: HTMLElement): () => void {
+  let stopped = false;
+  const recenter = () => {
+    if (!stopped && target.isConnected) target.scrollIntoView({ block: "center" });
+  };
+  // 높이 변화는 ResizeObserver 로, 늦게 읽히는 본문 이미지는 load 이벤트(캡처 — img 의 load 는 버블되지 않는다)로도
+  // 잡는다. 화면 그리기가 쉬는 탭에서는 ResizeObserver 가 늦게 오므로 이미지 쪽이 확실한 신호다.
+  const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(recenter);
+  const onMediaLoad = (event: Event) => {
+    if (event.target instanceof HTMLImageElement || event.target instanceof HTMLIFrameElement) recenter();
+  };
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    observer?.disconnect();
+    window.clearTimeout(timer);
+    document.removeEventListener("load", onMediaLoad, true);
+    COMMENT_PIN_STOP_EVENTS.forEach((type) => window.removeEventListener(type, stop));
+  };
+  const timer = window.setTimeout(stop, COMMENT_PIN_MS);
+  observer?.observe(document.body);
+  document.addEventListener("load", onMediaLoad, true);
+  COMMENT_PIN_STOP_EVENTS.forEach((type) => window.addEventListener(type, stop, { passive: true }));
+  recenter();
+  return stop;
 }
 
 function isContentEmpty(content: string): boolean {
@@ -54,6 +94,7 @@ const CommentItem = memo(function CommentItem({
   onUpdate,
   onDelete,
   useEditor,
+  highlighted = false,
 }: CommentItemProps) {
   const { user } = useAuthStore();
   const [replyContent, setReplyContent] = useState("");
@@ -99,7 +140,15 @@ const CommentItem = memo(function CommentItem({
   };
 
   return (
-    <div style={{ marginLeft: `${indent}px` }} className="py-3 border-b last:border-b-0">
+    // id 는 그누보드 댓글(view_comment 의 c_번호)과 같은 주소 — 최근 댓글 링크의 #c_번호 가 여기로 온다.
+    <div
+      id={`c_${comment.wr_id}`}
+      tabIndex={-1}
+      style={{ marginLeft: `${indent}px` }}
+      className={`py-3 border-b last:border-b-0 scroll-mt-24 outline-none transition-colors duration-500 ${
+        highlighted ? "rounded-md bg-primary/5 ring-1 ring-primary/30" : ""
+      }`}
+    >
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2 text-sm">
           <MemberSideview
@@ -232,6 +281,42 @@ export function CommentSection({ boTable, wrId, initialComments, useEditor }: Co
   const [comments, setComments] = useState<Comment[]>(initialComments);
   const [submitting, setSubmitting] = useState(false);
   const [replyTo, setReplyTo] = useState<number | null>(null);
+  const [highlightedId, setHighlightedId] = useState<number | null>(null);
+  const handledHashRef = useRef("");
+  const pinStopRef = useRef<(() => void) | null>(null);
+
+  // 화면을 떠나면 붙잡기도 그만둔다.
+  useEffect(() => () => pinStopRef.current?.(), []);
+
+  // 최근 댓글 등에서 #c_번호 로 들어오면 그 댓글로 옮겨 가 포커스한다. 댓글은 글을 읽은 뒤 그려지므로
+  // 브라우저의 기본 앵커 이동이 닿지 않는다 — 그려진 뒤 직접 찾는다. 같은 해시는 한 번만(댓글을 달거나
+  // 지워 목록이 바뀔 때 다시 끌어가지 않게), 주소의 해시가 바뀌면 다시.
+  useEffect(() => {
+    const focusFromHash = (force: boolean) => {
+      const hash = window.location.hash;
+      const match = hash.match(/^#c_(\d+)$/);
+      if (!match || (!force && handledHashRef.current === hash)) return;
+      const target = document.getElementById(`c_${match[1]}`);
+      if (!target) return;
+      handledHashRef.current = hash;
+      // 그누보드 앵커처럼 바로 옮긴다(부드러운 스크롤은 첫 로드 중 이 화면에서 끝까지 가지 않았다). 강조가 자리를 알려 준다.
+      // 본문 이미지가 뒤늦게 읽혀 댓글이 밀려나지 않게 잠깐 붙잡아 둔다.
+      pinStopRef.current?.();
+      pinStopRef.current = pinCommentInView(target);
+      target.focus({ preventScroll: true });
+      setHighlightedId(Number(match[1]));
+    };
+    focusFromHash(false);
+    const onHashChange = () => focusFromHash(true);
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, [comments]);
+
+  useEffect(() => {
+    if (highlightedId === null) return;
+    const timer = window.setTimeout(() => setHighlightedId(null), COMMENT_HIGHLIGHT_MS);
+    return () => window.clearTimeout(timer);
+  }, [highlightedId]);
 
   // 에디터 내용은 ref로 관리하여 타이핑 시 리렌더 방지
   const newCommentRef = useRef("");
@@ -335,6 +420,7 @@ export function CommentSection({ boTable, wrId, initialComments, useEditor }: Co
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}
                 useEditor={useEditor}
+                highlighted={highlightedId === comment.wr_id}
               />
             ))}
           </div>

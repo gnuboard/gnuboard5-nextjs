@@ -29,6 +29,7 @@ import {
 } from "@/services/shop";
 import { getClientPublicSettings } from "@/services/settings";
 import { getShopCartShippingPaymentLabel } from "@/lib/shop-shipping-label";
+import { isTelInquiry } from "@/lib/shop-product-state";
 
 interface ApplicableCoupon {
   cp_id: string;
@@ -56,7 +57,7 @@ function naverPayCartBlockReason(item: ShopCartItem): string {
   if (String(item.it_soldout ?? "0") === "1") {
     return `${itemName}은(는) 품절 상품이라 네이버페이로 구매할 수 없습니다.`;
   }
-  if (String(item.it_tel_inq ?? "0") === "1") {
+  if (isTelInquiry(item)) {
     return `${itemName}은(는) 전화문의 상품이라 네이버페이로 구매할 수 없습니다.`;
   }
   if (Number(item.io_type ?? 0) === 1 && Number(item.io_price ?? 0) < 0) {

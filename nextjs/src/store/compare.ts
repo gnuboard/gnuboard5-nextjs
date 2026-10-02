@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
+import { safeLocalStateStorage } from "@/lib/safe-storage";
 
 export interface CompareItem {
   it_id: string;
@@ -43,6 +44,7 @@ export const useCompareStore = create<CompareState>()(
       clear: () => set({ items: [] }),
       isCompared: (it_id) => !!get().items.find((i) => i.it_id === it_id),
     }),
-    { name: "shop-compare" }
+    // 저장소가 막히거나 가득 차도 담기가 예외로 끝나지 않게(lib/safe-storage.ts).
+    { name: "shop-compare", storage: createJSONStorage(() => safeLocalStateStorage) }
   )
 );

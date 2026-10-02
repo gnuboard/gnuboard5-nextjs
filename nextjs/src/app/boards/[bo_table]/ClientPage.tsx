@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import type { Board, WritePost } from "@/lib/types";
 import { canWriteToBoard } from "@/lib/board-permissions";
 import { useAuthStore } from "@/store/auth";
-import { GALLERY_BOARDS } from "@/lib/config";
+import { GALLERY_BOARDS, g5PathForRuntime } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import { applyClientPageMetadata } from "@/lib/client-metadata";
 import { useRuntimeRouteParam, useRuntimeRouteReady } from "@/hooks/use-runtime-route-param";
@@ -212,6 +212,9 @@ export default function BoardPostListClient({ boTable, embedded = false, current
   const listNumStart = totalCount - (page - 1) * perPage - noticeCount;
   const isGallery = GALLERY_BOARDS.includes(bo_table);
   const galleryCols = board.bo_gallery_cols || 4;
+  // 그누보드 bbs/rss.php 와 같은 조건: "RSS 보이기"를 켰고 비회원도 읽을 수 있는 게시판(읽기 레벨 1)만 RSS 를 낸다.
+  // 그 밖에는 단추를 눌러도 "RSS 보기가 금지되어 있습니다" 만 나오므로 단추를 그리지 않는다(원본 list.skin 과 같다).
+  const canViewRss = Number(board.bo_use_rss_view) === 1 && Number(board.bo_read_level) < 2;
 
   return (
     <div className={cn("board-list-page", embedded ? "board-list-embedded mt-8" : "site-container px-4 py-8")}>
@@ -245,16 +248,19 @@ export default function BoardPostListClient({ boTable, embedded = false, current
         <p className="board-list-summary-text">
           <b className="text-foreground">{totalCount.toLocaleString("ko-KR")}</b> 개의 글 · {page}페이지
         </p>
-        <a
-          href={`/rss/${bo_table}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="RSS feed"
-          aria-label="RSS 피드"
-          className="board-list-rss inline-flex h-8 w-8 items-center justify-center rounded-[4px] border text-[#b45309] transition-colors hover:bg-[#fff7e6]"
-        >
-          <RssIcon className="h-4 w-4" />
-        </a>
+        {canViewRss && (
+          <a
+            /* 새 창으로 여는 피드 주소라 G5Link(앱 안 이동)가 아닌 <a> — 설치 경로(하위 폴더)는 직접 붙인다. */
+            href={g5PathForRuntime(`/rss/${bo_table}`)}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="RSS feed"
+            aria-label="RSS 피드"
+            className="board-list-rss inline-flex h-8 w-8 items-center justify-center rounded-[4px] border text-[#b45309] transition-colors hover:bg-[#fff7e6]"
+          >
+            <RssIcon className="h-4 w-4" />
+          </a>
+        )}
       </div>
 
       {categories.length > 0 && (

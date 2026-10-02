@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
+import { storageGet, storageSet } from "@/lib/safe-storage";
 
 const STORAGE_KEY = "solune-theme";
 
@@ -15,14 +16,17 @@ const STORAGE_KEY = "solune-theme";
  */
 function readStoredTheme(): "light" | "dark" | null {
   try {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
+    const saved = storageGet(STORAGE_KEY);
     return saved === "dark" || saved === "light" ? saved : null;
   } catch {
     return null;
   }
 }
 
-/** 첫 페인트 전에 저장된 테마를 적용한다. 셸 최상단에서 한 번 렌더한다. */
+/**
+ * 첫 페인트 전에 저장된 테마를 적용한다. 셸 최상단에서 한 번 렌더한다.
+ * HTML 에 그대로 실리는 문자열이라 모듈 함수(storageGet 등)를 부를 수 없다 — 저장소는 직접 읽고 try 로 감싼다.
+ */
 export const soluneThemeBootScript = `(function(){try{var k='${STORAGE_KEY}';var s=window.localStorage.getItem(k);var t=(s==='dark'||s==='light')?s:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-solune-theme',t);}catch(e){}})();`;
 
 export function SoluneThemeSwap() {
@@ -43,7 +47,7 @@ export function SoluneThemeSwap() {
     setTheme(next);
     document.documentElement.setAttribute("data-solune-theme", next);
     try {
-      window.localStorage.setItem(STORAGE_KEY, next);
+      storageSet(STORAGE_KEY, next);
     } catch {
       /* 저장이 막힌 브라우저에서도 화면 전환은 그대로 동작한다. */
     }

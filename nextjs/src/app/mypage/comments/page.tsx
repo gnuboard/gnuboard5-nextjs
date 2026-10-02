@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SafeHtml } from "@/components/SafeHtml";
+import { htmlToText } from "@/lib/html-text";
 import { getMyComments } from "@/services/member";
 import type { MyComment } from "@/lib/schemas";
 import { g5ShortHref } from "@/lib/g5-short-url";
@@ -12,6 +12,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
+
+/** 댓글 목록 한 줄 — 글이 없고 사진만 있으면 그렇다고 적는다. */
+function commentExcerpt(html: string): string {
+  const text = htmlToText(html);
+  if (text) return text;
+  return /<img\b/i.test(html) ? "사진 댓글" : "내용 없음";
+}
 
 export default function MyCommentsPage() {
   const [comments, setComments] = useState<MyComment[]>([]);
@@ -49,23 +56,23 @@ export default function MyCommentsPage() {
         ) : (
           <ul className="divide-y">
             {comments.map((comment) => (
-              <li
-                key={`${comment.bo_table}-${comment.wr_id}`}
-                className="py-3"
-              >
+              <li key={`${comment.bo_table}-${comment.wr_id}`}>
+                {/* 댓글 원문(사진 포함)을 그대로 그리면 목록이 사진으로 덮인다 — 글만 요약하고, #c_번호 로 그 댓글에 바로 간다. */}
                 <a
-                  href={g5ShortHref(`/boards/${comment.bo_table}/${comment.wr_parent}`)}
-                  className="transition-colors hover:text-primary"
+                  href={g5ShortHref(`/boards/${comment.bo_table}/${comment.wr_parent}#c_${comment.wr_id}`)}
+                  className="group flex items-center justify-between gap-4 py-3"
                 >
-                  <SafeHtml
-                    className="line-clamp-2 text-sm"
-                    html={comment.wr_content}
-                    policy="user"
-                  />
-                  <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{comment.bo_subject || comment.bo_table}</span>
-                    <span>{formatDate(comment.wr_datetime)}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="line-clamp-2 break-words text-sm transition-colors group-hover:text-primary">
+                      {commentExcerpt(comment.wr_content)}
+                    </p>
+                    <span className="text-xs text-muted-foreground">
+                      {comment.bo_subject || comment.bo_table}
+                    </span>
                   </div>
+                  <span className="whitespace-nowrap text-xs text-muted-foreground">
+                    {formatDate(comment.wr_datetime)}
+                  </span>
                 </a>
               </li>
             ))}

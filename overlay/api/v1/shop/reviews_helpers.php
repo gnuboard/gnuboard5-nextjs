@@ -25,7 +25,7 @@ if (!function_exists('shop_api_format_my_review_row')) {
             'is_confirm'        => (string) ($row['is_confirm'] ?? '0'),
             'is_time'           => $row['is_time'],
             'mb_nick'           => $row['is_name'],
-            'product_image_url' => shop_api_item_image_url($row['it_id'] ?? '', $row['it_img1'] ?? ''),
+            'product_image_url' => api_image_url_with_width(shop_api_item_image_url($row['it_id'] ?? '', $row['it_img1'] ?? ''), 400),
         ];
     }
 }
@@ -56,7 +56,7 @@ if (!function_exists('shop_api_format_my_qna_row')) {
             'iq_name'           => $row['iq_name'],
             'iq_time'           => $row['iq_time'],
             'mb_nick'           => $row['iq_name'],
-            'product_image_url' => shop_api_item_image_url($row['it_id'] ?? '', $row['it_img1'] ?? ''),
+            'product_image_url' => api_image_url_with_width(shop_api_item_image_url($row['it_id'] ?? '', $row['it_img1'] ?? ''), 400),
         ];
     }
 }

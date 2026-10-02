@@ -36,6 +36,8 @@ type LegacyReview = {
   is_content?: string;
   is_time?: string;
   product_image_url?: string;
+  /** 후기 본문의 첫 사진, 없으면 상품 사진(그누보드 get_itemuselist_thumbnail). */
+  thumbnail_url?: string;
 };
 
 type LegacyQa = {
@@ -243,7 +245,7 @@ function renderReviews(items: LegacyReview[]) {
     const href = `/shop/${encodeURIComponent(itId)}?tab=reviews`;
     const score = Math.max(0, Math.min(5, Number(item.is_score || 0) || 0));
     return `<li class="legacy-item" data-is-id="${escapeHtml(stringValue(item.is_id))}">
-  ${renderThumb(item.product_image_url, name, href)}
+  ${renderThumb(item.thumbnail_url || item.product_image_url, name, href)}
   <div>
     <p class="legacy-meta">
       <a href="${escapeHtml(href)}">${escapeHtml(name || itId)}</a>

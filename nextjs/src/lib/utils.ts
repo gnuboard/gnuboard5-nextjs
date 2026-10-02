@@ -5,6 +5,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * 목록 줄 날짜(그누보드 datetime2): 오늘 쓴 글은 "시:분", 그 밖에는 "월-일". 입력은 "YYYY-MM-DD HH:MM:SS".
+ * "오늘"은 보는 사람의 현지 날짜로 잰다 — toISOString() 은 UTC 라 한국 0~9시에 오늘 글이 날짜로 나온다.
+ * 새글 목록과 테마 홈 위젯(soluneListDate)이 같이 쓴다. now 는 테스트에서 "지금"을 정할 때만 넘긴다.
+ */
+export function formatListDate(datetime?: string | null, now: Date = new Date()): string {
+  if (!datetime) return "";
+  const day = datetime.slice(0, 10);
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  return day === today ? datetime.slice(11, 16) : datetime.slice(5, 10);
+}
+
 export function formatDate(date?: string | null) {
   if (!date || /^0{4}-0{2}-0{2}/.test(date)) return "";
 

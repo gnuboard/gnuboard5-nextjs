@@ -138,6 +138,11 @@ export interface Post {
   wr_option: string;
   wr_subject: string;
   wr_content: string;
+  /**
+   * 글 보기용 본문 — 게시판 이미지 폭보다 넓은 본문 사진을 썸네일로 바꾼 것(그누보드 get_view_thumbnail).
+   * 바뀐 사진이 있을 때만 온다. 수정 화면은 쓰지 말 것(썸네일 주소가 본문에 저장된다).
+   */
+  wr_content_view?: string;
   wr_seo_title: string;
   wr_link1: string;
   wr_link2: string;
@@ -174,6 +179,8 @@ export interface Post {
   is_secret?: boolean;
   mb_nick?: string;
   mb_icon_path?: string;
+  /** 회원이미지(프로필 사진) — 글 상세 · 게시판 목록 API 가 낸다 */
+  mb_image_path?: string;
   bo_table?: string;
   bo_subject?: string;
   bo_use_good?: number;
@@ -207,6 +214,11 @@ export interface PostFile {
   bf_datetime: string;
   /** API가 합성해 내려주는 다운로드/표시용 URL. 우선 사용. */
   bf_url?: string;
+  /** 글 보기에 그릴 사진 — 게시판 이미지 폭보다 넓은 첨부 사진만 그 폭의 썸네일로 온다. 원본은 bf_url. */
+  bf_view_url?: string;
+  /** bf_view_url 로 그릴 크기(게시판 이미지 폭 기준). 사진을 받기 전에 자리를 잡는 데 쓴다. */
+  bf_view_width?: number;
+  bf_view_height?: number;
   bf_download_url?: string;
 }
 
@@ -635,6 +647,8 @@ export interface RecentItem {
   wr_subject: string;
   wr_seo_title?: string;
   is_comment: boolean;
+  /** 댓글 본문 요약(60자). 비밀댓글·비밀글이거나 읽을 수 없는 게시판이면 null — 그때는 wr_subject 를 보여 준다. */
+  comment_excerpt?: string | null;
   mb_id: string;
   wr_name: string;
   wr_email: string;

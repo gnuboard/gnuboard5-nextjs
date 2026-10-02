@@ -10,8 +10,8 @@ import type { QaItem } from "@/lib/types";
 import { cn, formatDate, truncate } from "@/lib/utils";
 import { getQas } from "@/services/qas";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toastError } from "@/lib/toast";
+import { MypagePanel } from "../MypagePanel";
 
 function statusLabel(status: number) {
   return status === 1 ? "답변완료" : "답변대기";
@@ -81,22 +81,18 @@ export default function MyQasPage() {
   const lastPage = meta?.last_page ?? 1;
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold">1:1 문의</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            문의를 남기고 답변 상태를 확인합니다.
-          </p>
-        </div>
+    <MypagePanel
+      title="1:1 문의"
+      description="문의를 남기고 답변 상태를 확인합니다."
+      actions={
         <Button asChild>
           <Link href="/mypage/qas/new">
             <PenSquare className="mr-2 size-4" />
             문의하기
           </Link>
         </Button>
-      </div>
-
+      }
+    >
       <div className="g5-tabs flex gap-2 border-b">
         {[
           { value: "all" as const, label: "전체" },
@@ -118,15 +114,14 @@ export default function MyQasPage() {
             {item.label}
           </button>
         ))}
+        {meta && (
+          <span className="ml-auto self-center text-xs text-muted-foreground">
+            총 {meta.total.toLocaleString()}건
+          </span>
+        )}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">
-            문의 내역 {meta ? `(${meta.total.toLocaleString()}건)` : ""}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div>
           {loading ? (
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, index) => (
@@ -176,8 +171,7 @@ export default function MyQasPage() {
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+      </div>
 
       {lastPage > 1 && (
         <div className="flex items-center justify-center gap-2">
@@ -202,6 +196,6 @@ export default function MyQasPage() {
           </Button>
         </div>
       )}
-    </div>
+    </MypagePanel>
   );
 }

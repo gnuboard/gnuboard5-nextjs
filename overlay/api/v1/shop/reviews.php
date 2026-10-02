@@ -135,7 +135,7 @@ if ($subAction !== '' && preg_match('/^\d+$/', (string) $subAction)) {
             [$reviewId, $member['mb_id']]
         );
         if (function_exists('run_event')) {
-            run_event('shop_item_use_deleted', $reviewId, (string) ($review['it_id'] ?? ''));
+            api_run_event('shop_item_use_deleted', array($reviewId, (string) ($review['it_id'] ?? '')), $member);
         }
         if ($wasConfirmed) {
             shop_api_refresh_review_stats((string) $review['it_id']);
@@ -175,7 +175,7 @@ if ($subAction !== '' && preg_match('/^\d+$/', (string) $subAction)) {
         [$is_subject, $is_content, $is_score, $reviewId, $member['mb_id']]
     );
     if (function_exists('run_event')) {
-        run_event('shop_item_use_updated', $reviewId, (string) ($review['it_id'] ?? ''));
+        api_run_event('shop_item_use_updated', array($reviewId, (string) ($review['it_id'] ?? '')), $member);
     }
 
     if ($wasConfirmed) {
@@ -199,9 +199,7 @@ if ($subAction !== '' && preg_match('/^\d+$/', (string) $subAction)) {
 if ($apiMethod === 'GET' && $subAction === 'mine') {
     $member = Auth::requireAuth();
 
-    $page    = max(1, (int) ($_GET['page'] ?? 1));
-    $perPage = max(1, min(100, (int) ($_GET['per_page'] ?? 10)));
-    $offset  = ($page - 1) * $perPage;
+    [$page, $perPage, $offset] = api_page_params(10, 100);
     $status  = trim((string) ($_GET['status'] ?? ''));
     $q       = trim((string) ($_GET['q'] ?? ''));
 
@@ -255,9 +253,7 @@ if ($apiMethod === 'GET' && $subAction === 'mine') {
 if ($apiMethod === 'GET' && $subAction === '') {
 
     $it_id = isset($_GET['it_id']) ? trim($_GET['it_id']) : '';
-    $page    = max(1, (int) ($_GET['page'] ?? 1));
-    $perPage = max(1, min(100, (int) ($_GET['per_page'] ?? 20)));
-    $offset  = ($page - 1) * $perPage;
+    [$page, $perPage, $offset] = api_page_params(20, 100);
     $q       = trim((string) ($_GET['q'] ?? ($_GET['stx'] ?? '')));
     $sfl     = trim((string) ($_GET['sfl'] ?? ''));
     $sst     = trim((string) ($_GET['sst'] ?? 'r.is_id'));
@@ -330,6 +326,7 @@ if ($apiMethod === 'GET' && $subAction === '') {
 
     $reviews = [];
     foreach ($rows as $row) {
+        $productImage = api_image_url_with_width(shop_api_item_image_url($row['it_id'] ?? '', $row['it_img1'] ?? ''), 400);
         $reviews[] = [
             'is_id'      => $row['is_id'],
             'it_id'      => $row['it_id'],
@@ -345,7 +342,9 @@ if ($apiMethod === 'GET' && $subAction === '') {
             'is_time'    => $row['is_time'],
             'is_confirm' => $row['is_confirm'],
             'mb_nick'    => $row['is_name'],
-            'product_image_url' => shop_api_item_image_url($row['it_id'] ?? '', $row['it_img1'] ?? ''),
+            'product_image_url' => $productImage,
+            // 후기 카드 사진 — 후기 본문의 첫 사진, 없으면 상품 사진(그누보드 get_itemuselist_thumbnail 과 같다).
+            'thumbnail_url' => api_editor_first_image_url($row['is_content'] ?? '', 400) ?: $productImage,
         ];
     }
 
@@ -439,7 +438,7 @@ if ($apiMethod === 'POST' && $subAction === '') {
 
     $newId = DB::lastInsertId();
     if (function_exists('run_event')) {
-        run_event('shop_item_use_created', $newId, $it_id);
+        api_run_event('shop_item_use_created', array($newId, $it_id), $member);
     }
 
     if ($isConfirm === '1') {

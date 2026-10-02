@@ -498,7 +498,6 @@ if (!function_exists('webapp_admin_dbupgrade')) {
                 `notify_reply`   TINYINT(1) NOT NULL DEFAULT 1,
                 `notify_message` TINYINT(1) NOT NULL DEFAULT 1,
                 `notify_inquiry` TINYINT(1) NOT NULL DEFAULT 1,
-                `notify_dday`    TINYINT(1) NOT NULL DEFAULT 1,
                 `notify_system`  TINYINT(1) NOT NULL DEFAULT 1,
                 `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 PRIMARY KEY (`mb_id`)
@@ -506,8 +505,9 @@ if (!function_exists('webapp_admin_dbupgrade')) {
             $changed = true;
         }
         // 알림 수신 설정 — 이벤트별 푸시 on/off (plugin/webapp/notify/Prefs.php 가 읽고 쓴다). 기본 1 = 받음.
+        // core 다섯 칸만. 제품 플러그인의 칸(notify_dday 등)은 그 플러그인의 admin_dbupgrade 가 더한다.
         $after = 'tz';
-        foreach (array('notify_comment', 'notify_reply', 'notify_message', 'notify_inquiry', 'notify_dday', 'notify_system') as $flag) {
+        foreach (array('notify_comment', 'notify_reply', 'notify_message', 'notify_inquiry', 'notify_system') as $flag) {
             if (webapp_table_exists($member_pref) && !webapp_column_exists($member_pref, $flag)) {
                 sql_query("ALTER TABLE `{$member_pref}` ADD COLUMN `{$flag}` TINYINT(1) NOT NULL DEFAULT 1 AFTER `{$after}`", false);
                 $changed = true;

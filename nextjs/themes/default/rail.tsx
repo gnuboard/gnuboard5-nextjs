@@ -52,6 +52,9 @@ function whenIdle(callback: () => void): () => void {
 export function SoluneRail() {
   const [comments, setComments] = useState<RecentItem[]>([]);
   const [keywords, setKeywords] = useState<PopularKeyword[]>([]);
+  // 위젯은 조금 늦게 부르므로, 그 사이 "아직 등록된 댓글이 없습니다"가 아니라 자리 표시를 보인다.
+  const [commentsLoaded, setCommentsLoaded] = useState(false);
+  const [keywordsLoaded, setKeywordsLoaded] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -61,13 +64,19 @@ export function SoluneRail() {
         .then((result) => {
           if (alive) setComments(result.items);
         })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => {
+          if (alive) setCommentsLoaded(true);
+        });
 
       void getPopularKeywords(KEYWORD_LIMIT)
         .then((result) => {
           if (alive) setKeywords(result);
         })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => {
+          if (alive) setKeywordsLoaded(true);
+        });
     });
 
     return () => {
@@ -79,8 +88,8 @@ export function SoluneRail() {
   return (
     <aside className="solune-sidebar" aria-label="사이드바">
       <SoluneLoginCard />
-      <SoluneCommentWidget comments={comments} />
-      <SolunePopularKeywordWidget keywords={keywords} />
+      <SoluneCommentWidget comments={comments} loading={!commentsLoaded} />
+      <SolunePopularKeywordWidget keywords={keywords} loading={!keywordsLoaded} />
     </aside>
   );
 }

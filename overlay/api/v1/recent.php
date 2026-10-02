@@ -42,14 +42,14 @@ if ($action === 'groups') {
 $view  = isset($_GET['view']) && in_array($_GET['view'], ['w', 'c'], true) ? $_GET['view'] : '';
 $gr_id = isset($_GET['gr_id']) ? preg_replace('/[^a-z0-9_]/i', '', substr((string) $_GET['gr_id'], 0, 10)) : '';
 $mb_id = isset($_GET['mb_id']) ? preg_replace('/[^a-z0-9_]/i', '', substr((string) $_GET['mb_id'], 0, 20)) : '';
-$page  = max(1, (int) ($_GET['page'] ?? 1));
-$limit = min(100, max(1, (int) ($_GET['limit'] ?? 20)));
-$offset = ($page - 1) * $limit;
+[$page, $limit, $offset] = api_page_params(20, 100, 'limit');
 
 $boardNewTable = DB::table('board_new_table');
 $boardTable    = DB::table('board_table');
 $groupTable    = DB::table('group_table');
 $viewer         = Auth::getUser();
+
+require_once __DIR__ . '/recent_helpers.php'; // api_recent_comment_excerpt()
 
 // gnuboard new.php와 동일하게 bo_use_search=1인 게시판만 포함
 if (!function_exists('api_recent_fallback_from_write_tables')) {
@@ -73,7 +73,7 @@ if (!function_exists('api_recent_fallback_from_write_tables')) {
         }
 
         $boards = DB::fetchAll(
-            "SELECT b.bo_table, b.bo_subject, b.bo_use_search,
+            "SELECT b.bo_table, b.bo_subject, b.bo_use_search, b.bo_read_level,
                     b.bo_count_write, b.bo_count_comment, g.gr_id, g.gr_subject
              FROM {$boardTable} b, {$groupTable} g
              {$boardWhere}
@@ -131,6 +131,9 @@ if (!function_exists('api_recent_fallback_from_write_tables')) {
                     w.mb_id,
                     w.wr_name,
                     w.wr_datetime,
+                    w.wr_option,
+                    IF(w.wr_is_comment = 1, w.wr_content, '') AS wr_content,
+                    p.wr_option AS parent_option,
                     p.wr_subject AS parent_subject,
                     p.wr_seo_title AS parent_seo_title
                  FROM {$writeTable} w
@@ -159,6 +162,14 @@ if (!function_exists('api_recent_fallback_from_write_tables')) {
                     'wr_subject'   => $parentSubject,
                     'wr_seo_title' => isset($row['parent_seo_title']) ? (string) $row['parent_seo_title'] : '',
                     'is_comment'   => $isComment,
+                    'comment_excerpt' => $isComment
+                        ? api_recent_comment_excerpt(
+                            $row,
+                            array('wr_option' => $row['parent_option'] ?? ''),
+                            (int) ($board['bo_read_level'] ?? 1),
+                            $viewer
+                        )
+                        : null,
                     'mb_id'        => $row['mb_id'],
                     'wr_name'      => $row['wr_name'],
                     'wr_email'     => '',
@@ -222,7 +233,7 @@ $total = (int) DB::count(
 // Page rows
 $newRows = DB::fetchAll(
     "SELECT a.bn_id, a.bo_table, a.wr_id, a.wr_parent, a.mb_id AS bn_mb_id, a.bn_datetime,
-            b.bo_subject, c.gr_id, c.gr_subject
+            b.bo_subject, b.bo_read_level, c.gr_id, c.gr_subject
      FROM {$boardNewTable} a, {$boardTable} b, {$groupTable} c
      {$where}
      ORDER BY a.bn_id DESC
@@ -266,7 +277,8 @@ foreach ($needsByTable as $tbl => $idsMap) {
     $writeTable   = api_write_table($tbl);
     // wr_email / wr_homepage 는 비회원 작성 글 작성자 입력 필드 — PII 라 응답 미포함.
     $rows = DB::fetchAll(
-        "SELECT wr_id, wr_subject, wr_seo_title, mb_id, wr_name, wr_datetime, wr_10
+        "SELECT wr_id, wr_subject, wr_seo_title, mb_id, wr_name, wr_datetime, wr_10, wr_option,
+                IF(wr_is_comment = 1, wr_content, '') AS wr_content
          FROM {$writeTable}
          WHERE wr_id IN ({$placeholders})",
         $ids
@@ -337,6 +349,10 @@ foreach ($newRows as $row) {
         'wr_subject'  => $parent['wr_subject'],
         'wr_seo_title'=> isset($parent['wr_seo_title']) ? (string) $parent['wr_seo_title'] : '',
         'is_comment'  => $isComment,
+        // 댓글 본문 요약(읽을 수 있고 비밀이 아닐 때만). 글이면 null.
+        'comment_excerpt' => $isComment
+            ? api_recent_comment_excerpt($author, $parent, (int) ($row['bo_read_level'] ?? 1), $viewer)
+            : null,
         'mb_id'       => $author['mb_id'],
         'wr_name'     => $author['wr_name'],
         'wr_email'    => '',

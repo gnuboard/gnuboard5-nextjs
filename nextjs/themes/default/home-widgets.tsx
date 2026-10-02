@@ -13,7 +13,11 @@ import { SoluneAuthor, soluneListDate } from "./home-meta";
 
 /* FAQ 답은 HTML 정화기(sanitize-html, 약 180KB)를 거친다. 이 파일은 사이드 레일을 거쳐 모든 화면에
    들어가므로 FAQ 를 그릴 때 받는다 — 답은 접혀 있어 처음부터 보이지 않는다. */
-const SafeHtml = dynamic(() => import("@/components/SafeHtml").then((m) => m.SafeHtml));
+// loading 을 꼭 준다 — next/dynamic 은 SSR 을 켜 두고 loading 이 없으면 제 Suspense 경계를 만들지 않아,
+// 이 조각을 받는 동안 페이지 전체(게시판 · 갤러리까지)가 함께 기다렸다(정화기만 5초 늦추자 홈이 5.6초에 떴다).
+const SafeHtml = dynamic(() => import("@/components/SafeHtml").then((m) => m.SafeHtml), {
+  loading: () => null,
+});
 
 const GALLERY_PANEL_LIMIT = 8;
 /*
@@ -79,8 +83,10 @@ export function SoluneCommentWidget({
               <li key={comment.bn_id || `${comment.bo_table}-${comment.wr_id}`}>
                 {/* 작성자는 댓글 링크 밖 — 누르면 회원 사이드뷰가 열린다. */}
                 <div className="solune-comment-link">
+                  {/* 레퍼런스처럼 댓글 본문을 보인다. 비밀댓글·읽을 수 없는 게시판이면 API 가 요약을 주지 않아
+                      글 제목으로 대신한다. 링크의 #c_번호 로 글 보기 화면이 그 댓글로 옮겨 간다. */}
                   <Link href={comment.href} className="solune-comment-excerpt">
-                    {truncate(comment.wr_subject || "내용 없음", 46)}
+                    {truncate(comment.comment_excerpt || comment.wr_subject || "내용 없음", 46)}
                   </Link>
                   <span className="solune-comment-meta">
                     <span className="solune-comment-board">{comment.bo_subject}</span>

@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { NotificationSettings } from "@/components/notifications/NotificationSettings";
 import { toastError, toastSuccess } from "@/lib/toast";
+import { MypagePanel } from "../MypagePanel";
 
 type Filter = "all" | "unread";
 
@@ -130,14 +131,10 @@ export default function NotificationListPage() {
   const lastPage = meta?.last_page ?? 1;
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold">알림</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            댓글·답글·쪽지·문의 답변 등 내게 온 알림입니다. 앱으로 받은 알림도 여기에 같이 쌓입니다.
-          </p>
-        </div>
+    <MypagePanel
+      title="알림"
+      description="댓글·답글·쪽지·문의 답변 등 내게 온 알림입니다. 앱으로 받은 알림도 여기에 같이 쌓입니다."
+      actions={
         <Button
           type="button"
           variant="outline"
@@ -147,8 +144,8 @@ export default function NotificationListPage() {
           <CheckCheck className="mr-2 h-4 w-4" />
           모두 읽음
         </Button>
-      </div>
-
+      }
+    >
       <NotificationSettings />
 
       <div className="flex gap-2 border-b">
@@ -312,6 +309,6 @@ export default function NotificationListPage() {
           알림을 누르면 읽음으로 바뀌고, 연결된 글이 있으면 그리로 이동합니다.
         </p>
       )}
-    </div>
+    </MypagePanel>
   );
 }

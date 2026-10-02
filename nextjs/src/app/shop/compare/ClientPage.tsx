@@ -15,6 +15,7 @@ import { shouldBypassImageOptimization } from "@/lib/image";
 import { shopProductHref } from "@/lib/product-url";
 import { getClientPublicSettings } from "@/services/settings";
 import { GitCompare, X } from "lucide-react";
+import { isTelInquiry, formatProductPrice } from "@/lib/shop-product-state";
 
 /**
  * 상품 비교 — compare store 의 it_id 목록을 다시 fetch 해 표 형태로 표시.
@@ -106,14 +107,14 @@ export default function CompareePage() {
       label: "가격",
       render: (p) => (
         <span className="font-bold text-primary">
-          {String(p.it_tel_inq ?? "0") === "1" ? "전화문의" : formatPrice(p.it_price)}
+          {formatProductPrice(p)}
         </span>
       ),
     },
     {
       label: "정가",
       render: (p) =>
-        String(p.it_tel_inq ?? "0") !== "1" && p.it_cust_price > 0 ? (
+        !isTelInquiry(p) && p.it_cust_price > 0 ? (
           <span className="text-muted-foreground line-through">{formatPrice(p.it_cust_price)}</span>
         ) : <span className="text-muted-foreground">-</span>,
     },

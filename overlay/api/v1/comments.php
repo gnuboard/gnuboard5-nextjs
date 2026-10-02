@@ -168,7 +168,7 @@ if ($apiMethod === 'POST') {
 
     // Option (secret comment)
     $wr_option = '';
-    if (isset($input['wr_option']) && strpos($input['wr_option'], 'secret') !== false) {
+    if (isset($input['wr_option']) && api_is_secret_option($input['wr_option'])) {
         $wr_option = 'secret';
     }
 
@@ -253,6 +253,10 @@ if ($apiMethod === 'POST') {
     );
 
     // 모든 카운트 갱신까지 끝났으면 transaction commit — FOR UPDATE 락 해제.
+    DB::commit();
+
+    // 포인트는 댓글이 실제로 저장된 뒤에 준다. insert_point 는 그누보드 연결(mysqli)로 따로 써서
+    // 위 트랜잭션이 되돌려져도 함께 되돌려지지 않는다 — 커밋 전에 주면 댓글 없이 포인트만 남을 수 있다.
     if (function_exists('insert_point')) {
         $commentLabel = json_decode('"\uB313\uAE00\uC4F0\uAE30"');
         $commentAction = json_decode('"\uB313\uAE00"');
@@ -265,8 +269,6 @@ if ($apiMethod === 'POST') {
             $commentAction
         );
     }
-
-    DB::commit();
 
     // 원글 작성자에게 푸시 알림 (본인 댓글 / 익명 글은 skip)
     $parentAuthor = DB::fetch(
@@ -312,6 +314,16 @@ if ($apiMethod === 'POST') {
         }
     }
 
+    // 그누보드 훅(bbs/write_comment_update.php 와 같은 인자) — 새 댓글은 $w = 'c', $wr_id 는 원글,
+    // 마지막은 대댓글이면 부모 댓글 행(아니면 빈 배열). $qstr · 이동 주소는 API 에 없으므로 빈 값.
+    // 알림은 위에서 이미 보냈다 — plugin/webapp/notify/events.php 는 API 요청에서 건너뛴다.
+    $replyArray = $replyTo > 0
+        ? (DB::fetch("SELECT * FROM {$write_table} WHERE wr_id = ? LIMIT 1", [$replyTo]) ?: array())
+        : array();
+    // 그누보드 latest() 위젯 캐시를 비운다(원본과 같이 훅 앞에서). 안의 delete_cache_latest 훅도 보호해서 부른다.
+    api_call_core('delete_cache_latest', array($bo_table), $member);
+    api_run_event('comment_update_after', array($board, $wr_id, 'c', '', '', $commentId, $replyArray), $member);
+
     // Fetch and return the created comment
     $comment = DB::fetch(
         "SELECT wr_id, wr_parent, wr_comment, wr_comment_reply,
@@ -350,6 +362,12 @@ if ($apiMethod === 'PATCH') {
         Response::error('You do not have permission to edit this comment.', 403);
     }
 
+    // 그누보드 bbs/write_comment_update.php 의 수정 제한(관리자 레벨 · 답변 댓글).
+    $blocked = api_comment_change_blocked($member, $bo_table, $comment, $write_table, 'modify');
+    if ($blocked !== null) {
+        Response::error($blocked[0], $blocked[1]);
+    }
+
     $input = get_request_body();
 
     if (!isset($input['wr_content']) || trim($input['wr_content']) === '') {
@@ -363,7 +381,7 @@ if ($apiMethod === 'PATCH') {
 
     // Option update
     if (isset($input['wr_option'])) {
-        $wr_option = (strpos($input['wr_option'], 'secret') !== false) ? 'secret' : '';
+        $wr_option = api_is_secret_option($input['wr_option']) ? 'secret' : '';
         DB::execute(
             "UPDATE {$write_table}
              SET wr_content = ?, wr_last = ?, wr_option = ?
@@ -378,6 +396,11 @@ if ($apiMethod === 'PATCH') {
             [$wr_content, $now, $commentId]
         );
     }
+
+    // 그누보드 훅 — 댓글 수정은 $w = 'cu', $wr_id 는 원글, 부모 댓글 정보는 원본처럼 빈 배열
+    // 그누보드 latest() 위젯 캐시를 비운다(원본과 같이 훅 앞에서). 안의 delete_cache_latest 훅도 보호해서 부른다.
+    api_call_core('delete_cache_latest', array($bo_table), $member);
+    api_run_event('comment_update_after', array($board, (int) $comment['wr_parent'], 'cu', '', '', $commentId, array()), $member);
 
     // Return updated comment
     $updated = DB::fetch(
@@ -417,12 +440,28 @@ if ($apiMethod === 'DELETE') {
         Response::error('You do not have permission to delete this comment.', 403);
     }
 
+    // 그누보드 bbs/delete_comment.php 의 삭제 제한 — 포인트를 거두기 전에 본다.
+    $blocked = api_comment_change_blocked($member, $bo_table, $comment, $write_table, 'delete');
+    if ($blocked !== null) {
+        Response::error($blocked[0], $blocked[1]);
+    }
+
     $parentId = (int) $comment['wr_parent'];
+
+    // 댓글로 받은 포인트를 거둔다(bbs/delete_comment.php 와 같은 내역 · 문구).
+    api_revoke_board_point($comment['mb_id'], $bo_table, $commentId, '댓글', (int) ($board['bo_comment_point'] ?? 0),
+        ($board['bo_subject'] ?? '') . " {$parentId}-{$commentId} 댓글삭제");
 
     // Delete the comment
     DB::execute(
         "DELETE FROM {$write_table} WHERE wr_id = ?",
         [$commentId]
+    );
+
+    // 최근 게시물(board_new)의 그 댓글 줄도 지운다 — 그누보드 bbs/delete_comment.php 와 같다.
+    DB::execute(
+        "DELETE FROM " . DB::table('board_new_table') . " WHERE bo_table = ? AND wr_id = ?",
+        [$bo_table, $commentId]
     );
 
     // Recalculate parent post comment count
@@ -448,6 +487,11 @@ if ($apiMethod === 'DELETE') {
          WHERE bo_table = ?",
         [$bo_table]
     );
+
+    // 그누보드 훅(bbs/delete_comment.php) — 지운 댓글 번호와 게시판
+    // 그누보드 latest() 위젯 캐시를 비운다(원본과 같이 훅 앞에서). 안의 delete_cache_latest 훅도 보호해서 부른다.
+    api_call_core('delete_cache_latest', array($bo_table), $member);
+    api_run_event('bbs_delete_comment', array($commentId, $board), $member);
 
     Response::noContent();
 }

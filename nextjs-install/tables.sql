@@ -152,7 +152,6 @@ CREATE TABLE IF NOT EXISTS `g5_member_pref` (
     `notify_reply`   TINYINT(1) NOT NULL DEFAULT 1,
     `notify_message` TINYINT(1) NOT NULL DEFAULT 1,
     `notify_inquiry` TINYINT(1) NOT NULL DEFAULT 1,
-    `notify_dday`    TINYINT(1) NOT NULL DEFAULT 1,
     `notify_system`  TINYINT(1) NOT NULL DEFAULT 1,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`mb_id`)

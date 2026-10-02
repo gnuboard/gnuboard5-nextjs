@@ -107,9 +107,7 @@ if ($apiMethod === 'GET' && $od_id === '') {
         Response::error('Unauthorized. Please provide a valid access token.', 401);
     }
 
-    $page    = max(1, (int) ($_GET['page'] ?? 1));
-    $perPage = max(1, min(100, (int) ($_GET['per_page'] ?? 20)));
-    $offset  = ($page - 1) * $perPage;
+    [$page, $perPage, $offset] = api_page_params(20, 100);
 
     // SC-08: status/q 필터 — 지원하지 않는 status 는 422(예전처럼 조용히 전체 목록을 주지 않는다).
     $filter = shop_orders_list_filter(
@@ -194,7 +192,7 @@ if ($apiMethod === 'GET' && $od_id === '') {
                 'it_sc_qty' => (int) ($oi['it_sc_qty'] ?? 0),
                 'line_total' => shop_api_cart_line_total($oi),
                 'image_url' => !empty($oi['it_img1'])
-                    ? api_shop_item_image_url($oi['it_id'], $oi['it_img1'])
+                    ? api_image_url_with_width(api_shop_item_image_url($oi['it_id'], $oi['it_img1']), 240)
                     : '',
             ];
         }
@@ -266,7 +264,7 @@ if ($apiMethod === 'POST' && $od_id === 'lookup') {
 
     if (!$order || !shop_api_guest_order_password_matches($lookupPassword, $order['od_pwd'] ?? '')) {
         if (function_exists('run_event')) {
-            run_event('password_is_wrong', 'shop', $order ?: ['od_id' => $lookupOrderId]);
+            api_run_event('password_is_wrong', array('shop', $order ?: ['od_id' => $lookupOrderId]));
         }
         Response::error('Order not found.', 404);
     }
@@ -345,7 +343,7 @@ if ($apiMethod === 'GET' && $od_id !== '') {
             'line_total' => shop_api_cart_line_total($oi),
             'line_point' => $linePoint,
             'image_url' => !empty($oi['it_img1'])
-                ? api_shop_item_image_url($oi['it_id'], $oi['it_img1'])
+                ? api_image_url_with_width(api_shop_item_image_url($oi['it_id'], $oi['it_img1']), 240)
                 : '',
         ];
     }

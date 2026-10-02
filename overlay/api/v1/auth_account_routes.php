@@ -160,6 +160,9 @@ if ($action === 'login' && $apiMethod === 'POST') {
         Response::error($lockedMsg, 429);
     }
 
+    // 그누보드 훅(bbs/login_check.php 와 같은 자리 · 인자) — 로그인 시도 전
+    api_run_before_event('member_login_check_before', array($mb_id));
+
     // Find member
     $sql = "SELECT * FROM " . DB::table('member_table') . "
             WHERE mb_id = ?
@@ -174,6 +177,7 @@ if ($action === 'login' && $apiMethod === 'POST') {
     // Check password
     if (!Auth::verifyPassword($password, $member['mb_password'])) {
         Throttle::recordLoginFailure($mb_id, $ip);
+        api_run_event('password_is_wrong', array('login', $member));
         Response::error('Invalid member ID or password.', 401);
     }
 
@@ -203,6 +207,10 @@ if ($action === 'login' && $apiMethod === 'POST') {
         }
     }
 
+    // 그누보드 훅(bbs/login_check.php) — 검사를 모두 통과하고 로그인 세션을 만들기 직전. 플러그인이 막으면
+    // (2단계 인증 등) 토큰 · 쿠키 · 로그인 기록을 남기기 전에 멈춰야 하므로 발급보다 앞에 둔다.
+    api_run_before_event('login_session_before', array($member, false), $member);
+
     // Update login info
     $now = date('Y-m-d H:i:s');
     $ip  = $_SERVER['REMOTE_ADDR'];
@@ -225,6 +233,8 @@ if ($action === 'login' && $apiMethod === 'POST') {
     $memberData = api_auth_member_payload($member);
     api_auth_set_session_cookies($token, $refresh, $autoLogin);
     api_auth_open_php_session($member, $sessionId);
+    // 로그인 완료 — 원본은 이동할 주소($link)를 넘긴다. API 는 이동하지 않으므로 빈 값.
+    api_run_event('member_login_check', array($member, '', false), $member);
 
     Response::success(api_auth_with_merged_cart([
         'token'         => $token,
@@ -437,6 +447,9 @@ if ($action === 'register' && $apiMethod === 'POST') {
     $mb_name  = $input['mb_name'];
     $mb_email = $input['mb_email'];
 
+    // 그누보드 훅(bbs/register_form_update.php 와 같은 이름 · 인자, 신규 가입이라 $w = '')
+    api_run_before_event('register_form_update_before', array($mb_id, ''));
+
     // 본인인증 (옵션) — 앱은 cert_token, 웹 프런트는 cert_no(같은 세션). 검증·중복 가입 차단은 auth_cert_helpers.php.
     // 인증했으면 이름·휴대폰은 인증값으로 저장하고, 생년월일·성인 여부는 입력값을 받지 않는다.
     $cert        = api_auth_register_cert($input);
@@ -528,6 +541,10 @@ if ($action === 'register' && $apiMethod === 'POST') {
         }
     }
 
+    // 검사를 모두 통과했다 — 저장 직전(원본의 register_form_update_valid 자리). 플러그인이 막으면 여기서
+    // 멈추므로, 되돌릴 수 없는 소셜 가입 ticket 사용보다 앞에 둔다.
+    api_run_before_event('register_form_update_valid', array('', $mb_id, $mb_nick, $mb_email));
+
     // 소셜 가입 ticket 은 회원을 만들기 전에 잡는다. 같은 ticket 으로 동시에 두 번
     // 가입하면 두 번째는 여기서 410 으로 끝나고 회원은 하나만 생긴다.
     if ($socialSignupRow && $socialSignupProfile) {
@@ -612,8 +629,12 @@ if ($action === 'register' && $apiMethod === 'POST') {
                 : '';
             $subject = '[' . $siteName . '] 회원가입 이메일 인증';
             $body = '아래 링크를 클릭해 이메일 인증을 완료해주세요.' . "\n\n" . $verifyUrl;
-            @mailer($siteName, $fromMail, $mb_email, $subject, $body, 0);
+            $body = api_run_replace('register_form_update_mail_certify_content', $body, array($mb_id));
+            api_call_core('mailer', array($siteName, $fromMail, $mb_email, $subject, $body, 0)); // 안의 mailer · mail_options · mail_send_result 훅도 보호해서
+            api_run_event('register_form_update_send_certify_mail', array($siteName, $fromMail, $mb_email, $subject, $body));
         }
+
+        api_run_event('register_form_update_after', array($mb_id, ''), $member);
 
         Response::success([
             'requires_email_verification' => true,
@@ -622,6 +643,8 @@ if ($action === 'register' && $apiMethod === 'POST') {
             'message'                     => '가입이 접수되었습니다. 이메일 인증 후 로그인할 수 있습니다.',
         ], 201);
     }
+
+    api_run_event('register_form_update_after', array($mb_id, ''), $member);
 
     // Generate refresh + access token (액세스 토큰에 로그인 세션 번호를 싣는다)
     $refresh = RefreshToken::issue(

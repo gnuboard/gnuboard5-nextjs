@@ -47,6 +47,7 @@ import { ProductDetailView } from "./ProductDetailView";
 import { useProductDetailMetadata } from "./useProductDetailMetadata";
 import { useProductMemberActions } from "./useProductMemberActions";
 import { useProductOptions } from "./useProductOptions";
+import { isTelInquiry } from "@/lib/shop-product-state";
 
 interface ProductDetailClientProps {
   itId?: string;
@@ -145,7 +146,7 @@ export default function ProductDetailClient({
     openRecommendDialog,
     submitRecommendation,
   } = useProductMemberActions(product);
-  const isTelInquiry = String(product?.it_tel_inq ?? "0") === "1";
+  const telInquiry = isTelInquiry(product);
   const shippingFreeThreshold = getShopShippingFreeThreshold(shippingPolicy);
   const shippingPayment = productShippingPayment(product, ctSendCostSelection);
   const legacyProductForm = productDetailFormFromSearch(productQueryString);
@@ -371,7 +372,7 @@ export default function ProductDetailClient({
 
   const handleAddToCart = useCallback(async () => {
     if (!product) return;
-    if (isTelInquiry) {
+    if (telInquiry) {
       toastError("전화문의 상품은 온라인 주문할 수 없습니다.");
       return;
     }
@@ -407,7 +408,7 @@ export default function ProductDetailClient({
     }
   }, [
     product,
-    isTelInquiry,
+    telInquiry,
     quantity,
     buildSelectedCartOptions,
     validateBuyQtyBeforeSubmit,
@@ -419,7 +420,7 @@ export default function ProductDetailClient({
 
   const handleBuyNow = useCallback(async () => {
     if (!product) return;
-    if (isTelInquiry) {
+    if (telInquiry) {
       toastError("전화문의 상품은 온라인 주문할 수 없습니다.");
       return;
     }
@@ -476,7 +477,7 @@ export default function ProductDetailClient({
     }
   }, [
     product,
-    isTelInquiry,
+    telInquiry,
     quantity,
     buildSelectedCartOptions,
     validateBuyQtyBeforeSubmit,
@@ -523,7 +524,7 @@ export default function ProductDetailClient({
 
   const validateNaverPaySelection = useCallback(() => {
     if (!product) return false;
-    if (isTelInquiry) {
+    if (telInquiry) {
       toastError("전화문의 상품은 네이버페이로 주문할 수 없습니다.");
       return false;
     }
@@ -542,7 +543,7 @@ export default function ProductDetailClient({
     return validateBuyQtyBeforeSubmit(cartOptions);
   }, [
     buildSelectedCartOptions,
-    isTelInquiry,
+    telInquiry,
     optionSubjects.length,
     product,
     validateBuyQtyBeforeSubmit,
@@ -635,7 +636,7 @@ export default function ProductDetailClient({
       lightboxOpen={lightboxOpen}
       onLightboxOpenChange={setLightboxOpen}
       productRewriteMode={productRewriteMode}
-      isTelInquiry={isTelInquiry}
+      isTelInquiry={telInquiry}
       shippingPayment={shippingPayment}
       ctSendCostSelection={ctSendCostSelection}
       onCtSendCostSelectionChange={setCtSendCostSelection}

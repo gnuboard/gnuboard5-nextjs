@@ -18,7 +18,7 @@ if (!defined('_GNUBOARD_')) exit;
 class Schema
 {
     /** 이 값이 바뀌면 표식이 무효가 되어 다음 요청에서 다시 점검한다. */
-    const VERSION = '2026-10-01.2'; // refresh_token.session_family · revoked_remotely (즉시 로그아웃) (이전: social_apple_token SC-11, web_ticket, SC-16, SC-07)
+    const VERSION = '2026-10-02.1'; // member_pref.notify_dday 는 plugin/dday · plugin/baby 가 만든다 (이전: session_family · revoked_remotely) (이전: social_apple_token SC-11, web_ticket, SC-16, SC-07)
 
     /**
      * 테이블 키 → 그 키를 등록하는 extend 파일. 키가 없으면 어떤 파일이 빠졌는지 안내한다.

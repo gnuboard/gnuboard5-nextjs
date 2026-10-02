@@ -5,6 +5,17 @@ if (!defined('_GNUBOARD_')) {
 
 require_once __DIR__ . '/members_helpers.php'; // api_member_legal_consent()
 
+if (!function_exists('api_auth_preferences_payload')) {
+    /** 환경설정 값에 이 사이트의 스위치 목록을 얹는다(옛 Prefs.php 면 목록 없이 값만). */
+    function api_auth_preferences_payload(array $prefs): array
+    {
+        if (method_exists('NotifyPrefs', 'options')) {
+            $prefs['notify_options'] = NotifyPrefs::options();
+        }
+        return $prefs;
+    }
+}
+
 if ($action === 'me' && $apiMethod === 'GET') {
 
     $member = Auth::getUser();
@@ -121,8 +132,8 @@ if ($action === 'logout' && $apiMethod === 'POST') {
     $all   = !empty($input['all']);
 
     $revoked = 0;
+    $member = Auth::getUser();
     if ($all) {
-        $member = Auth::getUser();
         if ($member && !empty($member['mb_id'])) {
             $revoked = RefreshToken::revokeAllFor((string) $member['mb_id']);
         }
@@ -131,6 +142,8 @@ if ($action === 'logout' && $apiMethod === 'POST') {
     }
     api_auth_clear_session_cookies();
     api_auth_close_php_session();
+    // 그누보드 훅(bbs/logout.php 와 같이 세션을 닫은 뒤) — 원본은 이동할 주소를 넘긴다. API 는 빈 값.
+    api_run_event('member_logout', array(''), $member ?: null);
 
     Response::success([
         'message' => 'Logged out.',
@@ -139,13 +152,15 @@ if ($action === 'logout' && $apiMethod === 'POST') {
 }
 
 // -------------------------------------------------------------------------
-// GET  /v1/auth/preferences — 회원 환경설정 조회 (locale, tz, notify_* 여섯 개)
+// GET  /v1/auth/preferences — 회원 환경설정 조회 (locale, tz, 이 사이트의 notify_* 항목)
 // PATCH /v1/auth/preferences — 부분 갱신: 보낸 키만 바꾸고 전체 설정을 돌려준다
 //
 // 앱은 언어를 바꿀 때 {locale, tz} 만, 알림 스위치를 누를 때 {notify_comment: false} 처럼
 // 키 하나만 보낸다. 행이 없는 회원도 GET 은 기본값(전부 true)을 채워서 준다.
 // 플래그의 뜻: 푸시(Expo)만 막는다. 알림함(notification_log)에는 그대로 남는다.
 // 값 검증은 plugin/webapp/notify/Prefs.php 한 곳에서 한다.
+// notify_options: 이 사이트에 있는 스위치 목록 [{key, label, hint}] — core 다섯 개에 제품 플러그인
+// (plugin/dday · plugin/baby …)이 훅으로 더한 것. 웹은 이 목록대로 그린다. 값 필드는 종전과 같다.
 // -------------------------------------------------------------------------
 if ($action === 'preferences') {
     $member = Auth::requireAuth();
@@ -155,7 +170,7 @@ if ($action === 'preferences') {
     }
 
     if ($apiMethod === 'GET') {
-        Response::success(NotifyPrefs::get($mb_id));
+        Response::success(api_auth_preferences_payload(NotifyPrefs::get($mb_id)));
     }
 
     if ($apiMethod === 'PATCH' || $apiMethod === 'POST') {
@@ -167,7 +182,7 @@ if ($action === 'preferences') {
         if ($result['errors']) {
             Response::error('Validation failed.', 422, $result['errors']);
         }
-        Response::success($result['prefs']);
+        Response::success(api_auth_preferences_payload($result['prefs']));
     }
 
     Response::error('Method not allowed.', 405);

@@ -59,6 +59,7 @@ const writePostShape = {
   wr_option: stringValue,
   wr_subject: stringValue,
   wr_content: stringValue,
+  wr_content_view: optionalString,
   wr_seo_title: stringValue,
   wr_name: stringValue,
   wr_email: stringValue,
@@ -111,6 +112,7 @@ export const postFileSchema = z
     bf_type: numberValue,
     bf_datetime: stringValue,
     bf_url: optionalString,
+    bf_view_url: optionalString,
     bf_download_url: optionalString,
   })
   .passthrough() as unknown as z.ZodType<PostFile>;
@@ -291,6 +293,7 @@ export const recentItemSchema = z
     wr_subject: stringValue,
     wr_seo_title: stringValue.optional(),
     is_comment: booleanValue,
+    comment_excerpt: z.string().nullable().optional(),
     mb_id: stringValue,
     wr_name: stringValue,
     wr_email: stringValue,

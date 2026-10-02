@@ -26,6 +26,7 @@ import {
   type ShopCartAddResponse,
 } from "@/services/cart";
 import { getClientPublicSettings } from "@/services/settings";
+import { isTelInquiry, formatProductPrice } from "@/lib/shop-product-state";
 
 function cartIdsFromAddResponse(response?: { data?: ShopCartAddResponse | null }) {
   const data = response?.data;
@@ -42,7 +43,7 @@ function cartIdsFromAddResponse(response?: { data?: ShopCartAddResponse | null }
 }
 
 function wishlistCartBlockReason(item: ShopWishItem) {
-  const isTelInquiry = String(item.it_tel_inq ?? "0") === "1";
+  const telInquiry = isTelInquiry(item);
   const isSoldout = String(item.it_soldout ?? "0") === "1";
   const isUnavailable = String(item.it_use ?? "1") !== "1";
   const optionCount = Number(item.option_count ?? 0);
@@ -52,7 +53,7 @@ function wishlistCartBlockReason(item: ShopWishItem) {
       ? "판매중지"
       : isSoldout
         ? "품절"
-        : isTelInquiry
+        : telInquiry
           ? "전화문의"
           : optionCount > 0
             ? "옵션 선택 필요"
@@ -349,7 +350,7 @@ export default function WishlistPage() {
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
         {items.map((item) => {
-          const isTelInquiry = String(item.it_tel_inq ?? "0") === "1";
+          const telInquiry = isTelInquiry(item);
           const isSoldout = String(item.it_soldout ?? "0") === "1";
           const isUnavailable = String(item.it_use ?? "1") !== "1";
           const optionCount = Number(item.option_count ?? 0);
@@ -360,7 +361,7 @@ export default function WishlistPage() {
               ? "판매중지"
               : isSoldout
                 ? "품절"
-                : isTelInquiry
+                : telInquiry
                   ? "전화문의"
                   : optionCount > 0
                     ? "옵션 선택 필요"
@@ -369,7 +370,7 @@ export default function WishlistPage() {
           const selectable = canSelectWishlistItem(item);
           const selected = selectedIds.has(item.it_id);
           const hasDiscount =
-            !isTelInquiry &&
+            !telInquiry &&
             item.it_cust_price > 0 &&
             item.it_cust_price > item.it_basic_price;
 
@@ -405,7 +406,7 @@ export default function WishlistPage() {
                   </h3>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold">
-                      {isTelInquiry ? "전화문의" : formatPrice(item.it_basic_price)}
+                      {formatProductPrice(item, item.it_basic_price)}
                     </span>
                     {hasDiscount && (
                       <span className="text-xs text-muted-foreground line-through">
@@ -422,7 +423,7 @@ export default function WishlistPage() {
               </a>
 
               <div className="mt-2 flex gap-2">
-                {optionCount > 0 && !isUnavailable && !isSoldout && !isTelInquiry ? (
+                {optionCount > 0 && !isUnavailable && !isSoldout && !telInquiry ? (
                   <Button size="sm" className="flex-1" asChild>
                     <a href={productHref}>
                       <SlidersHorizontal className="mr-1 h-3.5 w-3.5" />

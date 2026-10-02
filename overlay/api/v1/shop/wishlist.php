@@ -132,9 +132,7 @@ if ($apiMethod === 'GET' && $action === 'check' && $param !== '') {
 // =========================================================================
 if ($apiMethod === 'GET' && $action === '') {
 
-    $page    = max(1, (int) ($_GET['page'] ?? 1));
-    $perPage = max(1, min(100, (int) ($_GET['per_page'] ?? 20)));
-    $offset  = ($page - 1) * $perPage;
+    [$page, $perPage, $offset] = api_page_params(20, 100);
 
     $total = DB::count(
         "SELECT COUNT(*) FROM " . DB::table('g5_shop_wish_table') . "
@@ -193,7 +191,7 @@ if ($apiMethod === 'GET' && $action === '') {
             'option_count'   => $optionCount,
             'can_add_cart'   => $cartBlockReason === '',
             'cart_block_reason' => $cartBlockReason,
-            'image_url'      => api_image_url_with_width(api_shop_item_image_url($row['it_id'], $row['it_img1']), 800),
+            'image_url'      => api_image_url_with_width(api_shop_item_image_url($row['it_id'], $row['it_img1']), 400),
         ];
     }
 

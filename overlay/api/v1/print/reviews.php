@@ -31,9 +31,7 @@ if (!$id && $apiMethod === 'GET') {
     if ($product === '') {
         Response::error('product 파라미터가 필요합니다.', 422);
     }
-    $page  = max(1, (int) ($_GET['page'] ?? 1));
-    $limit = min(100, max(1, (int) ($_GET['limit'] ?? 20)));
-    $offset = ($page - 1) * $limit;
+    [$page, $limit, $offset] = api_page_params(20, 100, 'limit');
 
     $total = (int) DB::count("SELECT COUNT(*) FROM {$reviewTable} WHERE product_slug = ?", [$product]);
     $avgRow = DB::fetch("SELECT AVG(rating) AS avg_rating FROM {$reviewTable} WHERE product_slug = ?", [$product]);

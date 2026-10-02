@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { storageGet, storageSet } from "@/lib/safe-storage";
 
 const STORAGE_KEY = "restock_alerts";
 
@@ -19,7 +20,7 @@ interface RestockAlertState {
 function loadFromStorage(): RestockAlert[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = storageGet(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
@@ -29,7 +30,7 @@ function loadFromStorage(): RestockAlert[] {
 function saveToStorage(alerts: RestockAlert[]) {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(alerts));
+    storageSet(STORAGE_KEY, JSON.stringify(alerts));
   } catch {
     // storage full or unavailable
   }

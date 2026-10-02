@@ -61,7 +61,7 @@ if ($qnaAction !== '' && preg_match('/^\d+$/', (string) $qnaAction)) {
             [$iqId, $member['mb_id']]
         );
         if (function_exists('run_event')) {
-            run_event('shop_item_qa_deleted', $iqId, (string) ($qna['it_id'] ?? ''));
+            api_run_event('shop_item_qa_deleted', array($iqId, (string) ($qna['it_id'] ?? '')), $member);
         }
         Response::success([
             'deleted' => true,
@@ -106,7 +106,7 @@ if ($qnaAction !== '' && preg_match('/^\d+$/', (string) $qnaAction)) {
         [$iq_subject, $iq_question, $iq_secret, $iq_email, $iq_hp, $iqId, $member['mb_id']]
     );
     if (function_exists('run_event')) {
-        run_event('shop_item_qa_updated', $iqId, (string) ($qna['it_id'] ?? ''));
+        api_run_event('shop_item_qa_updated', array($iqId, (string) ($qna['it_id'] ?? '')), $member);
     }
 
     $updated = DB::fetch(
@@ -126,9 +126,7 @@ if ($qnaAction !== '' && preg_match('/^\d+$/', (string) $qnaAction)) {
 if ($apiMethod === 'GET' && $isMineScope) {
     $member = Auth::requireAuth();
 
-    $page    = max(1, (int) ($_GET['page'] ?? 1));
-    $perPage = max(1, min(100, (int) ($_GET['per_page'] ?? 10)));
-    $offset  = ($page - 1) * $perPage;
+    [$page, $perPage, $offset] = api_page_params(10, 100);
     $status  = trim((string) ($_GET['status'] ?? ''));
     $q       = trim((string) ($_GET['q'] ?? ''));
 
@@ -182,9 +180,7 @@ if ($apiMethod === 'GET' && $isMineScope) {
 if ($apiMethod === 'GET' && $qnaAction === '') {
 
     $it_id = isset($_GET['it_id']) ? trim($_GET['it_id']) : '';
-    $page    = max(1, (int) ($_GET['page'] ?? 1));
-    $perPage = max(1, min(100, (int) ($_GET['per_page'] ?? 20)));
-    $offset  = ($page - 1) * $perPage;
+    [$page, $perPage, $offset] = api_page_params(20, 100);
     $viewer  = Auth::getUser();
     $viewerId = !empty($viewer['mb_id']) ? (string) $viewer['mb_id'] : '';
     $isAdmin = $viewer && Auth::adminRole($viewer) === 'super';
@@ -285,7 +281,7 @@ if ($apiMethod === 'GET' && $qnaAction === '') {
             'iq_name'     => $canView ? $row['iq_name'] : '비공개',
             'iq_time'     => $row['iq_time'],
             'mb_nick'     => $canView ? $row['iq_name'] : '비공개',
-            'product_image_url' => shop_api_item_image_url($row['it_id'] ?? '', $row['it_img1'] ?? ''),
+            'product_image_url' => api_image_url_with_width(shop_api_item_image_url($row['it_id'] ?? '', $row['it_img1'] ?? ''), 400),
         ];
     }
 
@@ -365,7 +361,7 @@ if ($apiMethod === 'POST' && $qnaAction === '') {
 
     $newId = DB::lastInsertId();
     if (function_exists('run_event')) {
-        run_event('shop_item_qa_created', $newId, $it_id);
+        api_run_event('shop_item_qa_created', array($newId, $it_id), $member);
     }
     $newQa = DB::fetch(
         "SELECT q.iq_id, q.it_id, q.mb_id, q.iq_subject, q.iq_question, q.iq_answer,

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { storageGet, storageSet } from "@/lib/safe-storage";
 
 const MAX_ITEMS = 20;
 const STORAGE_KEY = "recent_products";
@@ -22,7 +23,7 @@ interface RecentProductsState {
 function loadFromStorage(): RecentProduct[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = storageGet(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
@@ -32,7 +33,7 @@ function loadFromStorage(): RecentProduct[] {
 function saveToStorage(items: RecentProduct[]) {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    storageSet(STORAGE_KEY, JSON.stringify(items));
   } catch {
     // storage full or unavailable
   }

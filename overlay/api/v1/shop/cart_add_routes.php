@@ -105,21 +105,9 @@ if ($apiMethod === 'POST' && $ct_id === '') {
             shop_api_cart_validate_buy_qty($item, $baseBatchQty, $existingBaseQty);
         }
 
-        $hasBaseOptions = DB::count(
-            "SELECT COUNT(*) FROM " . DB::table('g5_shop_item_option_table') . "
-             WHERE it_id = ? AND io_use = 1 AND io_type = 0",
-            [$it_id]
-        );
-        if ($hasBaseOptions > 0 && $baseBatchQty <= 0) {
-            $activeBase = DB::fetch(
-                "SELECT IFNULL(SUM(ct_qty), 0) AS qty FROM " . DB::table('g5_shop_cart_table') . "
-                 WHERE od_id = ? AND it_id = ? AND io_type = 0
-                   AND " . shop_api_cart_active_status_sql(),
-                array_merge([$cart_id, $it_id], shop_api_cart_active_statuses())
-            );
-            if ((int) ($activeBase['qty'] ?? 0) <= 0) {
-                Response::error('Base option is required before adding supply options.', 400);
-            }
+        // 추가옵션만 담는데 선택옵션 상품의 본품이 장바구니에 없으면, 아무 줄도 넣기 전에 거부한다.
+        if ($baseBatchQty <= 0 && shop_api_item_has_base_options($it_id) && !shop_api_cart_has_active_base($cart_id, $it_id)) {
+            Response::error('Base option is required before adding supply options.', 400);
         }
 
         // 재고는 담기 전에 옵션마다 한꺼번에 본다 — 몇 줄만 담기고 중간에 멈추지 않게.
@@ -173,12 +161,7 @@ if ($apiMethod === 'POST' && $ct_id === '') {
 
     // 상품에 선택옵션이 있는데 옵션을 안 골랐다면 거부(선택 강제). 재고보다 먼저 본다 —
     //   옵션 상품은 상품 재고를 쓰지 않으므로, 먼저 재고를 보면 "옵션을 고르라" 대신 "품절"이 나간다.
-    $hasOptions = DB::count(
-        "SELECT COUNT(*) FROM " . DB::table('g5_shop_item_option_table') . "
-         WHERE it_id = ? AND io_use = 1 AND io_type = 0",
-        [$it_id]
-    );
-    if ($hasOptions > 0 && $ct_option === '') {
+    if ($ct_option === '' && shop_api_item_has_base_options($it_id)) {
         Response::error('옵션을 선택해주세요.', 400);
     }
 

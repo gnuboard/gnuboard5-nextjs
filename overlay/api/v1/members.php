@@ -33,9 +33,7 @@ if ($seg0 === 'me' && isset($apiSegments[1]) && $apiSegments[1] === 'points' && 
 
     $member = Auth::requireAuth();
 
-    $page    = max(1, (int) ($_GET['page'] ?? 1));
-    $perPage = min(50, max(1, (int) ($_GET['per_page'] ?? 20)));
-    $offset  = ($page - 1) * $perPage;
+    [$page, $perPage, $offset] = api_page_params(20, 50);
 
     $pointTable = DB::table('point_table');
 
@@ -81,8 +79,7 @@ if (
     && $apiMethod === 'GET'
 ) {
     $member = Auth::requireAuth();
-    $page = max(1, (int) ($_GET['page'] ?? 1));
-    $perPage = min(50, max(1, (int) ($_GET['per_page'] ?? 20)));
+    [$page, $perPage] = api_page_params(20, 50);
     $isComment = $apiSegments[1] === 'comments';
 
     [$items, $total] = api_member_my_writes((string) $member['mb_id'], $isComment, $page, $perPage);
@@ -97,9 +94,7 @@ if ($seg0 === 'me' && $apiMethod === 'GET') {
     $member = Auth::requireAuth();
 
     // Return full member info minus sensitive fields
-    $safeData = api_member_safe($member);
-    $safeData['mb_icon_path'] = get_member_icon_url($member['mb_id']);
-    $safeData['mb_image_path'] = get_member_image_url($member['mb_id']);
+    $safeData = array_merge(api_member_safe($member), api_member_media_urls($member['mb_id'], true));
 
     Response::success([
         'member' => $safeData,
@@ -219,6 +214,9 @@ if ($seg0 === 'me' && $apiMethod === 'PATCH') {
 
     $member = Auth::requireAuth();
 
+    // 그누보드 훅(bbs/register_form_update.php) — 회원정보 수정은 $w = 'u'
+    api_run_before_event('register_form_update_before', array((string) $member['mb_id'], 'u'), $member);
+
     $input = get_request_body();
 
     // Updateable fields
@@ -322,6 +320,14 @@ if ($seg0 === 'me' && $apiMethod === 'PATCH') {
         Response::error('No valid fields provided for update.', 422);
     }
 
+    // 검사를 모두 통과했다 — 저장 직전(원본의 register_form_update_valid 자리). 바꾸지 않은 값은 지금 값.
+    api_run_before_event('register_form_update_valid', array(
+        'u',
+        (string) $member['mb_id'],
+        isset($input['mb_nick']) ? (string) $input['mb_nick'] : (string) ($member['mb_nick'] ?? ''),
+        isset($input['mb_email']) ? (string) $input['mb_email'] : (string) ($member['mb_email'] ?? ''),
+    ), $member);
+
     $now = date('Y-m-d H:i:s');
     $setClauses[] = "mb_nick_date = ?";
     $params[] = $now;
@@ -351,9 +357,9 @@ if ($seg0 === 'me' && $apiMethod === 'PATCH') {
     $updated = DB::fetch("SELECT * FROM " . DB::table('member_table') . "
             WHERE mb_id = ? LIMIT 1", [$member['mb_id']]);
 
-    $safeData = api_member_safe($updated);
-    $safeData['mb_icon_path'] = get_member_icon_url($member['mb_id']);
-    $safeData['mb_image_path'] = get_member_image_url($member['mb_id']);
+    $safeData = array_merge(api_member_safe($updated), api_member_media_urls($member['mb_id'], true));
+
+    api_run_event('register_form_update_after', array((string) $member['mb_id'], 'u'), $updated ?: $member);
 
     Response::success([
         'member' => $safeData,
@@ -455,12 +461,22 @@ if ($seg0 === 'me' && $apiMethod === 'DELETE') {
     require_once __DIR__ . '/../lib/AppleClient.php';
     $appleRevoked = AppleClient::revokeForMember($mb_id);
 
+    // 그누보드 훅(bbs/member_leave.php) — 회원 행이 아직 있을 때 탈퇴 회원을 넘긴다.
+    $leavingMember = DB::fetch("SELECT * FROM " . DB::table('member_table') . " WHERE mb_id = ? LIMIT 1", [$mb_id]);
+    if ($leavingMember) {
+        api_run_event('member_leave', array($leavingMember), $leavingMember);
+    }
+
     try {
         $result = api_member_purge_now($mb_id);
     } catch (\Throwable $e) {
         error_log('[members] purge failed for ' . $mb_id . ': ' . $e->getMessage());
         Response::error('회원 탈퇴 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 500);
     }
+
+    // 원본은 탈퇴일만 적고 실제 삭제는 나중(관리자 member_delete())인데 API 는 바로 지운다 —
+    // 그래서 member_delete() 가 부르는 member_delete_after 도 같이 부른다.
+    api_run_event('member_delete_after', array($mb_id));
 
     api_auth_clear_session_cookies();
 

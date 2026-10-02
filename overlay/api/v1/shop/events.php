@@ -16,16 +16,7 @@ if (!defined('_GNUBOARD_')) {
 
 require_once __DIR__ . '/common.php';
 
-// api_shop_item_image_url 헬퍼만 인라인 — products.php 를 require 하면 그 안의
-// 라우트 핸들러까지 다시 실행돼서 events 응답이 products 목록으로 덮어쓰임.
-if (!function_exists('api_shop_item_image_url')) {
-    function api_shop_item_image_url($it_id, $imageField)
-    {
-        if (!$imageField) return '';
-        if (preg_match('#^https?://#i', $imageField)) return $imageField;
-        return shop_api_item_image_url($it_id, $imageField);
-    }
-}
+// 상품 이미지 주소는 api_shop_item_image_url()(api/lib/helpers.php, 모든 핸들러보다 먼저 실림)을 쓴다.
 
 if (!function_exists('api_shop_event_image_url')) {
     function api_shop_event_image_url(int $evId, string $suffix): string
@@ -114,7 +105,7 @@ if ($apiMethod === 'GET' && $ev_id > 0) {
             'it_type2'      => (string) $row['it_type2'],
             'it_type4'      => (string) $row['it_type4'],
             'it_type5'      => (string) $row['it_type5'],
-            'image_url'     => api_image_url_with_width(api_shop_item_image_url($row['it_id'], $row['it_img1']), 800),
+            'image_url'     => api_image_url_with_width(api_shop_item_image_url($row['it_id'], $row['it_img1']), 400),
         ];
     }
 

@@ -144,9 +144,16 @@ body[data-g5-theme-source="default"] .solune-shop-page {
   /* 찜·추천·N Pay 는 위 패널에만. 상자는 담기와 사기만 둔다(레퍼런스 #sit_buy). */
   .solune-pdp-aside .product-action-wish, .solune-pdp-aside .product-action-recommend, .solune-pdp-aside .product-naverpay { display: none; }
 
-  /* 관련 · 최근 본 상품. 홈의 진열 줄과 같은 카드 폭(다섯 장). */
-  .product-related { margin-top: 20px; border-top: 0; padding-top: 0; }
-  .product-related-title { margin-bottom: 14px; font-size: 16px; font-weight: 600; }
+  /* 관련 · 최근 본 상품. 홈의 진열 줄과 같은 카드 폭(다섯 장).
+     위 본문(상품정보 표 등)과 붙어 보이지 않게 가는 선 하나와 넉넉한 여백으로 뗀다 — 두 줄이 이어지면 줄마다 선이 선다. */
+  .product-related { margin-top: 64px; border-top: 1px solid var(--solune-border); padding-top: 40px; }
+  .product-related + .product-related { margin-top: 48px; }
+  .product-related-title { margin-bottom: 20px; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+  @media (max-width: 767px) {
+    .product-related { margin-top: 44px; padding-top: 28px; }
+    .product-related + .product-related { margin-top: 36px; }
+    .product-related-title { margin-bottom: 14px; font-size: 16px; }
+  }
   @media (min-width: 1024px) { .product-related-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 20px; } }
   .product-related-grid a > div:first-child { border: 0; border-radius: 12px; }
   .product-related-grid h3 { padding: 0 2px; font-size: 14px; font-weight: 600; }

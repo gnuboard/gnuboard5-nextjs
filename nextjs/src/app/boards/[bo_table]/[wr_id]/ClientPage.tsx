@@ -422,20 +422,43 @@ export default function PostViewClient({
         {imageFiles.length > 0 && (
           <>
             <CardContent className="space-y-4 py-4">
-              {imageFiles.map((file) => (
-                <div key={file.bf_no} className="overflow-hidden rounded border">
+              {imageFiles.map((file) => {
+                /* 게시판 이미지 폭보다 넓은 첨부는 API 가 그 폭의 썸네일(bf_view_url)을 준다 — 그누보드 글 보기처럼
+                   썸네일을 보이고 원본은 새 창 링크로 연다. */
+                const viewSrc = file.bf_view_url || file.bf_url || "";
+                // 그릴 크기: 썸네일이면 그 크기, 아니면 원본 크기(그누보드가 올릴 때 재 둔 bf_width · bf_height).
+                // 크기를 알면 width/height 로 넘겨 사진을 받기 전에 자리를 잡고(밀림 없음), max-width 100% 로 본문 폭에서 줄인다.
+                // 모르면(옛 자료 · 0) 원래 크기를 따르게 width: auto 로 둔다.
+                const drawWidth = Number(file.bf_view_url ? file.bf_view_width : file.bf_width) || 0;
+                const drawHeight = Number(file.bf_view_url ? file.bf_view_height : file.bf_height) || 0;
+                const knownSize = drawWidth > 0 && drawHeight > 0;
+                const image = (
                   <Image
-                    src={file.bf_url || ""}
+                    src={viewSrc}
                     alt={file.bf_source}
-                    width={1200}
-                    height={800}
-                    sizes="100vw"
-                    className="mx-auto h-auto max-w-full"
-                    style={{ width: "100%", height: "auto" }}
-                    unoptimized={shouldBypassImageOptimization(file.bf_url)}
+                    width={knownSize ? drawWidth : 1200}
+                    height={knownSize ? drawHeight : 800}
+                    sizes={knownSize ? `(max-width: ${drawWidth}px) 100vw, ${drawWidth}px` : "100vw"}
+                    className="board-view-attached-image h-auto max-w-full"
+                    style={knownSize ? { maxWidth: "100%", height: "auto" } : { width: "auto", maxWidth: "100%", height: "auto" }}
+                    unoptimized={shouldBypassImageOptimization(viewSrc)}
                   />
-                </div>
-              ))}
+                );
+                return (
+                  <div key={file.bf_no}>
+                    {/* 원래 크기로 두고 본문보다 클 때만 줄인다(max-width: 100%). width: 100% 는 작은 첨부
+                        (아이콘 · 32px 이미지)까지 본문 폭으로 늘려 뭉개 보였다.
+                        테두리 상자 · 가운데 정렬 없이 본문처럼 왼쪽에 이미지만 둔다. */}
+                    {file.bf_view_url && file.bf_url ? (
+                      <a href={file.bf_url} target="_blank" rel="noopener noreferrer" className="view_image">
+                        {image}
+                      </a>
+                    ) : (
+                      image
+                    )}
+                  </div>
+                );
+              })}
             </CardContent>
             <Separator />
           </>
@@ -444,7 +467,8 @@ export default function PostViewClient({
         <CardContent className="board-view-content py-6">
           <SafeHtml
             className="prose prose-sm max-w-none dark:prose-invert"
-            html={post.wr_content}
+            /* 넓은 본문 사진을 게시판 이미지 폭의 썸네일로 바꾼 본문(그누보드 get_view_thumbnail). 없으면 원문. */
+            html={post.wr_content_view || post.wr_content}
             policy="content"
           />
         </CardContent>

@@ -27,6 +27,7 @@ import {
 import { ProductPurchasePanel } from "./ProductPurchasePanel";
 import { ProductPurchaseControls, type ProductPurchaseControlsProps } from "./ProductPurchaseControls";
 import type { ProductDetailTab } from "./ProductDetailTabs";
+import { hasProductDiscount, productDiscountPercent } from "@/lib/shop-product-state";
 
 const Lightbox = dynamic(
   () => import("@/components/ui/lightbox").then((mod) => ({ default: mod.Lightbox })),
@@ -254,17 +255,8 @@ export function ProductDetailView({
   const images = product.images?.length ? product.images : [product.image_url];
   const pointLabel = productPointLabel(product);
   const canPurchaseProduct = !isTelInquiry && product.it_soldout !== "1";
-  const hasDiscount =
-    !isTelInquiry &&
-    product.it_cust_price > 0 &&
-    product.it_cust_price > product.it_price;
-  const discountPercent = hasDiscount
-    ? Math.round(
-        ((product.it_cust_price - product.it_price) /
-          product.it_cust_price) *
-          100
-      )
-    : 0;
+  const hasDiscount = hasProductDiscount(product);
+  const discountPercent = productDiscountPercent(product);
 
   const reviewTotal = reviewSummary?.total ?? product.review_count ?? 0;
   const reviewAverage = reviewSummary?.average ?? product.review_avg ?? 0;

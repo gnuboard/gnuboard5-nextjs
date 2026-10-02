@@ -32,7 +32,7 @@ function api_qa_delete_files($row)
     }
 
     if (function_exists('delete_editor_thumbnail') && !empty($row['qa_content'])) {
-        delete_editor_thumbnail($row['qa_content']);
+        api_call_core('delete_editor_thumbnail', array($row['qa_content']));
     }
 }
 

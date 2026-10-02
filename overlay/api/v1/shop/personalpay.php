@@ -583,9 +583,7 @@ if (!function_exists('shop_personalpay_payload')) {
 }
 
 if ($apiMethod === 'GET' && $pp_id === '') {
-    $page = max(1, (int) ($_GET['page'] ?? 1));
-    $perPage = max(1, min(50, (int) ($_GET['per_page'] ?? 25)));
-    $offset = ($page - 1) * $perPage;
+    [$page, $perPage, $offset] = api_page_params(25, 50);
     $payTable = DB::table('g5_shop_personalpay_table');
     $orderTable = DB::table('g5_shop_order_table');
 

@@ -2,13 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Script from "next/script";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { MypagePanel } from "../MypagePanel";
 import { MapPin, Trash2, Plus, Star } from "lucide-react";
 import { toastError } from "@/lib/toast";
 import {
@@ -141,7 +136,15 @@ export default function MyAddressesPage() {
     "w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring";
 
   return (
-    <div className="space-y-6">
+    <MypagePanel
+      title="배송지 관리"
+      actions={
+        <Button onClick={() => setShowForm(!showForm)}>
+          <Plus className="mr-1 h-4 w-4" />
+          {showForm ? "취소" : "신규 배송지 추가"}
+        </Button>
+      }
+    >
       <Script
         src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"
         strategy="afterInteractive"
@@ -158,21 +161,11 @@ export default function MyAddressesPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">배송지 관리</h2>
-        <Button onClick={() => setShowForm(!showForm)}>
-          <Plus className="mr-1 h-4 w-4" />
-          {showForm ? "취소" : "신규 배송지 추가"}
-        </Button>
-      </div>
-
-      {/* New Address Form */}
+      {/* New Address Form — 카드 안의 카드 대신 옅은 바탕 구역으로 둔다. */}
       {showForm && (
-        <Card>
-          <CardHeader>
-            <CardTitle>신규 배송지</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <section className="rounded-lg border bg-muted/30 p-4" aria-labelledby="new-address-title">
+          <h3 id="new-address-title" className="mb-4 font-semibold">신규 배송지</h3>
+          <div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
@@ -329,8 +322,8 @@ export default function MyAddressesPage() {
                 </Button>
               </div>
             </form>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
 
       {/* Address List */}
@@ -347,20 +340,18 @@ export default function MyAddressesPage() {
           ))}
         </div>
       ) : addresses.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center py-16">
-            <MapPin className="mb-4 h-16 w-16 text-muted-foreground/50" />
-            <p className="text-lg font-bold">저장된 배송지가 없습니다</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              자주 사용하는 배송지를 등록해보세요
-            </p>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center py-16 text-center">
+          <MapPin className="mb-4 h-14 w-14 text-muted-foreground/50" />
+          <p className="text-lg font-medium">저장된 배송지가 없습니다</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            자주 사용하는 배송지를 등록해보세요
+          </p>
+        </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {addresses.map((addr) => (
-            <Card key={addr.ad_id}>
-              <CardContent className="pt-6">
+            <div key={addr.ad_id} className="rounded-lg border p-4">
+              <div>
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {addr.ad_default === 1 && (
@@ -390,11 +381,11 @@ export default function MyAddressesPage() {
                   {addr.ad_zip2}) {addr.ad_addr1} {addr.ad_addr2}{" "}
                   {addr.ad_addr3}
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))}
         </div>
       )}
-    </div>
+    </MypagePanel>
   );
 }

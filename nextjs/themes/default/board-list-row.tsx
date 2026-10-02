@@ -1,8 +1,7 @@
 "use client";
 
-import Image from "next/image";
+import { MemberAvatar } from "@/components/MemberAvatar";
 import type { G5ThemeBoardListRowProps } from "@/lib/theme-types";
-import { shouldBypassImageOptimization } from "@/lib/image";
 import { cn, formatDate, formatNumber } from "@/lib/utils";
 
 /**
@@ -27,7 +26,6 @@ export function SoluneBoardListRow({
   rowProps,
 }: G5ThemeBoardListRowProps) {
   const name = post.mb_nick || post.wr_name || "";
-  const initial = name.trim().charAt(0) || "?";
 
   return (
     <tr
@@ -85,20 +83,8 @@ export function SoluneBoardListRow({
         </span>
       </td>
       <td className="solune-blr-author">
-        <span className="solune-blr-avatar" aria-hidden="true">
-          {post.mb_icon_path ? (
-            <Image
-              src={post.mb_icon_path}
-              alt=""
-              width={24}
-              height={24}
-              unoptimized={shouldBypassImageOptimization(post.mb_icon_path)}
-            />
-          ) : (
-            initial
-          )}
-        </span>
-        <span className="solune-blr-name">{author}</span>
+        <MemberAvatar name={name} member={post} className="solune-blr-avatar" size={22} />
+        <span className="solune-blr-name" title={name || undefined}>{author}</span>
       </td>
       <td className="solune-blr-hit">
         <span className="sr-only">조회 </span>

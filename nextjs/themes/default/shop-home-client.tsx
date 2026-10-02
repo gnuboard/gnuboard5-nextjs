@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
+import { Children, useEffect, useState, type ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
 import { GalleryThumbnail } from "@/app/boards/[bo_table]/GalleryThumbnail";
 import { ProductImageFallback } from "@/components/shop/ProductImageFallback";
@@ -24,10 +23,17 @@ import { shopCategoryHref, shopTypeHref } from "./shop-links";
 import { SoluneProductCard } from "./product-card";
 import { assignCategoryIcons } from "./shop-category-icons";
 import { SOLUNE_SHOP_HOME_SECTIONS } from "./shop-home-sections";
-import { SoluneShopProductRowsSkeleton } from "./shop-home-skeletons";
+import {
+  SoluneShopBannerSkeleton,
+  SoluneShopCategoriesSkeleton,
+  SoluneShopProductRowsSkeleton,
+} from "./shop-home-skeletons";
+import { SoluneReviewHead, SoluneShopRowHead, SoluneStaticTrack } from "./shop-section-heads";
+import { rememberShopLayout } from "./shop-layout-hint";
 import { soluneListDate } from "./home-meta";
 import { toSoluneCompany, type SoluneCompany } from "./site-company";
 import { SoluneSitePopups } from "./site-popups";
+import { isSecretPost } from "@/lib/post-flags";
 
 /*
  * Swiper 를 쓰는 조각(배너 · 진열 줄 · 분류 줄 · 후기 줄)은 따로 받는다.
@@ -38,10 +44,117 @@ import { SoluneSitePopups } from "./site-popups";
  * 네 조각을 한 문(shop-home-carousels.tsx)으로 받는다 — 따로 받으면 Swiper 가 세 벌 들어간다.
  */
 const loadCarousels = () => import("./shop-home-carousels");
-const SoluneShopBanner = dynamic(() => loadCarousels().then((m) => m.SoluneShopBanner));
-const SoluneShopRow = dynamic(() => loadCarousels().then((m) => m.SoluneShopRow));
-const SoluneCategorySwiper = dynamic(() => loadCarousels().then((m) => m.SoluneCategorySwiper));
-const SoluneReviewSection = dynamic(() => loadCarousels().then((m) => m.SoluneReviewSection));
+/*
+ * 진열 줄 · 분류 줄 · 후기 줄은 Swiper 가 오기 전에도 내용을 보인다 — 같은 마크업의 정적 줄(shop-section-heads.tsx)에
+ * 실제 카드를 깔고, 조각이 오면 Swiper 줄로 바꾼다. 조각을 기다리며 빈 자리로 두면 상품이 와 있어도 진열이
+ * 높이 0 으로 있다가 한꺼번에 나타났다(조각만 5초 늦춘 시험). 정적 줄은 Swiper 의 "서기 전" 모양 그대로라
+ * 바뀔 때 자리가 거의 움직이지 않는다.
+ */
+type Carousels = Awaited<ReturnType<typeof loadCarousels>>;
+let loadedCarousels: Carousels | null = null;
+let carouselFailureLogged = false;
+
+/**
+ * Swiper 조각. 받기 전 · 못 받았을 때는 null — 줄들은 정적 모양 그대로 남는다.
+ * 조각을 못 받아도(망 끊김 · 배포 뒤 옛 조각) 쇼핑 홈이 오류 화면으로 넘어가지 않게 실패를 여기서 삼킨다.
+ */
+function useCarousels(): { carousels: Carousels | null; failed: boolean } {
+  const [carousels, setCarousels] = useState<Carousels | null>(loadedCarousels);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (carousels) return;
+    let alive = true;
+    loadCarousels()
+      .then((module) => {
+        loadedCarousels = module;
+        if (alive) setCarousels(module);
+      })
+      .catch((error: unknown) => {
+        // 줄마다 이 훅을 쓰므로 한 번만 남긴다.
+        if (!carouselFailureLogged) {
+          carouselFailureLogged = true;
+          console.error("[solune-shop-home:carousels]", error);
+        }
+        if (alive) setFailed(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [carousels]);
+  return { carousels, failed };
+}
+
+/** 배너. 조각을 받는 동안은 같은 높이의 자리를, 못 받으면 첫 배너를 넘김 없이 사진 한 장으로 보인다. */
+function SoluneShopBanner({ banners }: { banners: ShopBanner[] }) {
+  const { carousels, failed } = useCarousels();
+  if (carousels) return <carousels.SoluneShopBanner banners={banners} />;
+
+  const first = banners[0];
+  return (
+    <div className="solune-banner" aria-hidden={failed && first ? undefined : true}>
+      <div className="solune-banner-stage">
+        {failed && first ? (
+          <img
+            className="solune-banner-img"
+            src={normalizeG5ImageSrc(first.image_url)}
+            srcSet={first.image_srcset || undefined}
+            sizes={first.image_srcset ? "100vw" : undefined}
+            alt={first.bn_alt}
+          />
+        ) : (
+          <div className="skeleton absolute inset-0 rounded-none" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface ShopRowProps {
+  eyebrow: string;
+  title: string;
+  sub?: string;
+  href?: string;
+  peek?: boolean;
+  headingId?: string;
+  children: ReactNode;
+}
+
+function SoluneShopRow(props: ShopRowProps) {
+  const { carousels } = useCarousels();
+  if (carousels) return <carousels.SoluneShopRow {...props} />;
+  const { eyebrow, title, sub, href, headingId, children } = props;
+  return (
+    <section className="solune-shop-product-section solune-shop-row" aria-labelledby={headingId}>
+      <SoluneShopRowHead eyebrow={eyebrow} title={title} sub={sub} href={href} headingId={headingId} />
+      <SoluneStaticTrack className="solune-shop-swiper" wrapperClass="swiper-wrapper sct">
+        {Children.toArray(children)}
+      </SoluneStaticTrack>
+    </section>
+  );
+}
+
+function SoluneCategorySwiper({ children }: { children: ReactNode }) {
+  const { carousels } = useCarousels();
+  if (carousels) return <carousels.SoluneCategorySwiper>{children}</carousels.SoluneCategorySwiper>;
+  return (
+    <SoluneStaticTrack className="solune-catrow-swiper" wrapperClass="swiper-wrapper">
+      {Children.toArray(children)}
+    </SoluneStaticTrack>
+  );
+}
+
+function SoluneReviewSection({ headingId, children }: { headingId: string; children: ReactNode }) {
+  const { carousels } = useCarousels();
+  if (carousels) return <carousels.SoluneReviewSection headingId={headingId}>{children}</carousels.SoluneReviewSection>;
+  return (
+    <section className="solune-shop-product-section solune-shop-review-section" aria-labelledby={headingId}>
+      <SoluneReviewHead headingId={headingId} />
+      <SoluneStaticTrack className="solune-review-swiper" wrapperClass="swiper-wrapper ondam-review-grid">
+        {Children.toArray(children)}
+      </SoluneStaticTrack>
+    </section>
+  );
+}
 
 const ROW_COUNT = SHOP_HOME_ROW_LIMIT;
 /* 레퍼런스 쇼핑몰 공지는 latest(notice, 3) — 세 줄. 공지 글이 목록에 섞여 오면 더 오므로 잘라 쓴다. */
@@ -97,7 +210,7 @@ function ReviewSection({ reviews, rewriteMode }: { reviews: ShopReview[]; rewrit
         return (
           <article className="ondam-review-card" key={review.is_id}>
             <Link className="ondam-review-thumb" href={reviewHref} tabIndex={-1} aria-hidden>
-              <ShopImage src={review.product_image_url} alt="" sizes="(max-width: 780px) 50vw, 300px" />
+              <ShopImage src={review.thumbnail_url || review.product_image_url} alt="" sizes="(max-width: 780px) 50vw, 300px" />
             </Link>
             <div className="ondam-review-body">
               <p className="ondam-review-score">
@@ -163,7 +276,7 @@ function BottomAside({
               return (
                 <li key={post.wr_id}>
                   <Link href={boardPostHref(NOTICE_BOARD, post, rewriteMode)}>
-                    {(post.wr_option || "").includes("secret") ? <em className="ondam-notice-badge">비밀</em> : null}
+                    {isSecretPost(post) ? <em className="ondam-notice-badge">비밀</em> : null}
                     <span>{truncate(post.wr_subject || "제목 없음", 50)}</span>
                     {comments > 0 ? (
                       <b className="ondam-notice-comment">
@@ -306,12 +419,15 @@ type SoluneShopHomeClientProps = {
 export function SoluneShopHomeClient({ config, initialHome, initialExtras }: SoluneShopHomeClientProps) {
   const [shopHome, setShopHome] = useState(initialHome);
   const [extras, setExtras] = useState(initialExtras);
+  // 응답이 온 부가 조각(banners · categories …). 오기 전에는 배너 · 분류 자리를 같은 높이로 잡아 둔다 —
+  // 늦게 끼어들면 아래 상품 진열이 밀렸다(초기 CLS 0.44).
+  const [settled, setSettled] = useState<ReadonlySet<string>>(() => new Set());
   const [isLoading, setIsLoading] = useState(() => Object.values(initialHome).every((items) => items.length === 0));
 
   useEffect(() => {
     let alive = true;
-    // Swiper 조각을 API 와 나란히 받아 둔다(위 loadCarousels 설명).
-    void loadCarousels();
+    // Swiper 조각을 API 와 나란히 받아 둔다(위 loadCarousels 설명). 실패는 useCarousels 가 다룬다.
+    loadCarousels().catch(() => undefined);
     // 상품 줄과 부가 조각은 서로 기다리지 않는다 — 배너는 상품 목록이 오기 전에 뜰 수 있다.
     buildShopHomeData({ runtime: true, include: SHOP_HOME_INCLUDE })
       .then((nextHome) => {
@@ -325,7 +441,9 @@ export function SoluneShopHomeClient({ config, initialHome, initialExtras }: Sol
       });
     for (const part of loadSoluneShopHomeExtraParts()) {
       void part.then((patch) => {
-        if (alive) setExtras((prev) => ({ ...prev, ...patch }));
+        if (!alive) return;
+        setExtras((prev) => ({ ...prev, ...patch }));
+        setSettled((prev) => new Set([...prev, ...Object.keys(patch)]));
       });
     }
     return () => {
@@ -334,6 +452,12 @@ export function SoluneShopHomeClient({ config, initialHome, initialExtras }: Sol
   }, []);
 
   const { banners, categories, notices, rewriteMode } = extras;
+  const layoutKnown = settled.has("banners") && settled.has("categories");
+
+  // 배너 · 분류 줄이 있었는지 기억해 다음 방문의 첫 페인트가 자리를 잡을지 정하게 한다(shop-layout-hint.ts).
+  useEffect(() => {
+    if (layoutKnown) rememberShopLayout(banners.length > 0, categories.length > 0);
+  }, [layoutKnown, banners.length, categories.length]);
 
   return (
     <>
@@ -343,8 +467,14 @@ export function SoluneShopHomeClient({ config, initialHome, initialExtras }: Sol
         <div className="solune-shop-banner">
           <SoluneShopBanner banners={banners} />
         </div>
+      ) : !settled.has("banners") ? (
+        <SoluneShopBannerSkeleton />
       ) : null}
-      <CategoryRow categories={categories} />
+      {categories.length > 0 || settled.has("categories") ? (
+        <CategoryRow categories={categories} />
+      ) : (
+        <SoluneShopCategoriesSkeleton />
+      )}
 
       <div className="solune-shop-product-feed" aria-busy={isLoading}>
         {isLoading ? (

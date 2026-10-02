@@ -3,18 +3,11 @@
 import { GalleryThumbnail } from "@/app/boards/[bo_table]/GalleryThumbnail";
 import { ProductImageFallback } from "@/components/shop/ProductImageFallback";
 import { ProductQuickAdd } from "@/components/shop/ProductQuickAdd";
-import { isProductSoldOut } from "@/lib/shop-product-state";
+import { productDiscountPercent, formatProductPrice, isProductSoldOut } from "@/lib/shop-product-state";
 import { G5Link as Link } from "@/components/ui/g5-link";
 import { normalizeG5ImageSrc } from "@/lib/image";
 import type { G5ThemeProductCardProps } from "@/lib/theme-types";
-import type { ShopProduct } from "@/lib/shop-types";
 import { formatNumber, formatPrice } from "@/lib/utils";
-
-function discountPercent(product: ShopProduct): number {
-  if (String(product.it_tel_inq ?? "0") === "1") return 0;
-  if (product.it_price <= 0 || product.it_cust_price <= product.it_price) return 0;
-  return Math.round(((product.it_cust_price - product.it_price) / product.it_cust_price) * 100);
-}
 
 /**
  * 레퍼런스 온담 상품 카드(sct_li). 홈의 상품 줄과 목록 페이지(ProductCard 슬롯)가
@@ -22,8 +15,7 @@ function discountPercent(product: ShopProduct): number {
  * "담기"는 앱의 ProductQuickAdd — 옵션 없는 상품은 바로 담고, 옵션 상품은 옵션 고르기 창을 연다.
  */
 export function SoluneProductCard({ product, href, priority = false }: G5ThemeProductCardProps) {
-  const discount = discountPercent(product);
-  const telInquiry = String(product.it_tel_inq ?? "0") === "1";
+  const discount = productDiscountPercent(product);
   const brand = product.it_brand || product.it_maker || product.ca_name || "";
   const rating = Number(product.review_avg ?? 0);
   const image = normalizeG5ImageSrc(product.image_url);
@@ -45,7 +37,7 @@ export function SoluneProductCard({ product, href, priority = false }: G5ThemePr
       </Link>
       <div className="ondam-card-prices">
         {discount > 0 ? <span className="ondam-card-off">{discount}%</span> : null}
-        <span className="ondam-card-now">{telInquiry ? "전화문의" : formatPrice(product.it_price)}</span>
+        <span className="ondam-card-now">{formatProductPrice(product)}</span>
         {discount > 0 ? <span className="ondam-card-was">{formatPrice(product.it_cust_price)}</span> : null}
       </div>
       <div className="ondam-card-meta">

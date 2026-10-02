@@ -12,6 +12,7 @@ import { shouldBypassImageOptimization } from "@/lib/image";
 import { shopProductHref } from "@/lib/product-url";
 import { cn, formatPrice } from "@/lib/utils";
 import { useRecentProductsStore, type RecentProduct } from "@/store/recent-products";
+import { isTelInquiry, formatProductPrice } from "@/lib/shop-product-state";
 
 type ProductCardItem = Pick<ShopProduct, "it_id" | "it_name" | "it_price"> &
   Partial<Pick<ShopProduct, "it_cust_price" | "it_tel_inq" | "it_seo_title" | "image_url">>;
@@ -153,10 +154,10 @@ function ProductGridCard({
   productRewriteMode?: BbsRewriteMode;
   showComparePrice?: boolean;
 }) {
-  const isTelInquiry = String(item.it_tel_inq ?? "0") === "1";
+  const telInquiry = isTelInquiry(item);
   const comparePrice = "it_cust_price" in item ? item.it_cust_price ?? 0 : 0;
   const hasDiscount =
-    showComparePrice && !isTelInquiry && comparePrice > 0 && comparePrice > item.it_price;
+    showComparePrice && !telInquiry && comparePrice > 0 && comparePrice > item.it_price;
 
   return (
     <a href={shopProductHref(item, productRewriteMode)} className="group block">
@@ -179,7 +180,7 @@ function ProductGridCard({
       </h3>
       <div className="mt-1 flex items-center gap-2">
         <span className="text-sm font-bold">
-          {isTelInquiry ? "전화문의" : formatPrice(item.it_price)}
+          {formatProductPrice(item)}
         </span>
         {hasDiscount && (
           <span className="text-xs text-muted-foreground line-through">

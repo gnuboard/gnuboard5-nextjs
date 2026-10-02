@@ -1,14 +1,13 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import Image from "next/image";
 import { Check, Copy, Eye, FolderInput, ImageIcon, Lock, MessageCircle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MemberAvatar } from "@/components/MemberAvatar";
 import { MemberSideview } from "@/components/MemberSideview";
 import type { WritePost } from "@/lib/types";
 import { boardPostHref, type BbsRewriteMode } from "@/lib/board-url";
 import { g5ShortHref } from "@/lib/g5-short-url";
-import { shouldBypassImageOptimization } from "@/lib/image";
 import { cn, formatDate, formatNumber } from "@/lib/utils";
 import { BatchTransferDialog } from "./BatchTransferDialog";
 import { GalleryThumbnail } from "./GalleryThumbnail";
@@ -265,28 +264,15 @@ function GalleryCard({
 
 /** 발자취 줄: [아바타 · 글쓴이] ······ [조회 · 날짜]. 얇은 선 하나로 본문과 뗀다. */
 function GalleryCardFoot({ post, boTable, name }: { post: GalleryPost; boTable: string; name: string }) {
-  const initial = name.trim().charAt(0) || "?";
-
   return (
     <div className="gallery-card-foot mt-auto flex items-center justify-between gap-1.5 border-t pt-2 text-xs text-muted-foreground md:gap-2.5 md:pt-3">
       <span className="gallery-card-author flex min-w-0 items-center gap-1.5">
-        <span
-          className="gallery-card-avatar grid h-[18px] w-[18px] flex-none place-items-center overflow-hidden rounded-full bg-primary/10 text-[9px] font-bold text-primary md:h-5 md:w-5"
-          aria-hidden="true"
-        >
-          {post.mb_icon_path ? (
-            <Image
-              src={post.mb_icon_path}
-              alt=""
-              width={20}
-              height={20}
-              className="h-full w-full object-cover"
-              unoptimized={shouldBypassImageOptimization(post.mb_icon_path)}
-            />
-          ) : (
-            initial
-          )}
-        </span>
+        <MemberAvatar
+          name={name}
+          member={post}
+          size={20}
+          className="gallery-card-avatar grid h-[18px] w-[18px] flex-none place-items-center rounded-full bg-primary/10 text-[9px] font-bold text-primary md:h-5 md:w-5"
+        />
         <MemberSideview
           mbId={post.mb_id}
           name={name}

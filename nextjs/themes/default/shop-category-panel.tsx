@@ -8,10 +8,10 @@ import type { BbsRewriteMode } from "@/lib/board-url";
 import { normalizeG5ImageSrc } from "@/lib/image";
 import { shopProductHref } from "@/lib/product-url";
 import type { ShopCategory, ShopProduct } from "@/lib/shop-types";
-import { formatPrice } from "@/lib/utils";
 import { getClientPublicSettings } from "@/services/settings";
 import { getShopProducts } from "@/services/shop";
 import { shopCategoryHref } from "./shop-links";
+import { formatProductPrice } from "@/lib/shop-product-state";
 
 /** 레퍼런스 solune_shop_category_picks() 와 같은 네 개. */
 const PICK_COUNT = 4;
@@ -157,7 +157,6 @@ function CategoryPicks({
         <ul className="solune-shop-category-picks-list">
           {products.map((product) => {
             const image = normalizeG5ImageSrc(product.image_url);
-            const telInquiry = String(product.it_tel_inq ?? "0") === "1";
             return (
               <li key={product.it_id}>
                 <Link
@@ -175,7 +174,7 @@ function CategoryPicks({
                   </span>
                   <span className="solune-shop-category-pick-name">{product.it_name}</span>
                   <span className="solune-shop-category-pick-price">
-                    {telInquiry ? "전화문의" : formatPrice(product.it_price)}
+                    {formatProductPrice(product)}
                   </span>
                 </Link>
               </li>

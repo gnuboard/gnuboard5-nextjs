@@ -115,11 +115,11 @@ if ($mime === '' || strpos($mime, 'image/') !== 0) {
  * 애니메이션(GIF·WebP)은 줄이면 첫 장면만 남으므로 손대지 않는다.
  */
 // 받아 주는 브라우저에는 WebP 로 옮긴 사본을 준다(lib/image-variants.php).
-$variant = api_image_variant($path, $mime, isset($_GET['w']) ? (int) $_GET['w'] : 0);
+$variant = api_image_variant($path, $mime, isset($_GET['w']) ? (int) $_GET['w'] : 0, isset($_GET['h']) ? (int) $_GET['h'] : 0);
 $path = $variant['path'];
 $mime = $variant['mime'];
 if ($variant['vary']) {
-    header('Vary: Accept');
+    header('Vary: Accept', false); // 앞서 붙은 Vary: Origin(index.php)을 덮지 않고 더한다.
 }
 
 $size = filesize($path);

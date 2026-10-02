@@ -4,6 +4,7 @@ import type { WritePost } from "@/lib/types";
 import { requestShare } from "@/lib/request-share";
 import { getBoards, getBoardPosts } from "@/services/boards";
 import { getClientPublicSettings, getPublicSettings } from "@/services/settings";
+import { isSecretPost } from "@/lib/post-flags";
 
 function positiveInt(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
@@ -31,7 +32,7 @@ export function postTime(post: HomePost) {
 }
 
 export function isPublicHomePost(post: WritePost) {
-  return !post.is_secret && !String(post.wr_option || "").split(",").includes("secret");
+  return !isSecretPost(post);
 }
 
 /**

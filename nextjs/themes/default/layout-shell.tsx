@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, FolderOpen, LogIn, Menu, Search, UserPlus, X } from "lucide-react";
+import { ChevronDown, ChevronRight, FolderOpen, LogIn, LogOut, Menu, Search, User, UserPlus, X } from "lucide-react";
 import { G5Link as Link } from "@/components/ui/g5-link";
 import { g5PathForRuntime } from "@/lib/config";
+import { toG5ShortPath } from "@/lib/g5-short-url";
 import { G5_COMMUNITY_LOGO, SoluneBrandLogo } from "./brand-logo";
 import { SoluneCompanyInfo, useSoluneCompany } from "./site-company";
 import { isUnsafeMenuLink, menuAnchorTarget, menuHref, type MenuItem } from "@/components/layout/menu";
@@ -109,13 +110,17 @@ function NavAnchor({
   item,
   className,
   onNavigate,
+  current = false,
   children,
 }: {
   item: NavItem;
   className: string;
   onNavigate?: () => void;
+  /** 지금 보고 있는 화면의 메뉴 — aria-current 를 단다. */
+  current?: boolean;
   children: React.ReactNode;
 }) {
+  const ariaCurrent = current ? ("page" as const) : undefined;
   if (item.target === "_blank") {
     return (
       <a
@@ -130,14 +135,180 @@ function NavAnchor({
     );
   }
   return (
-    <Link href={item.href} className={className} onClick={onNavigate}>
+    <Link href={item.href} className={className} onClick={onNavigate} aria-current={ariaCurrent}>
       {children}
     </Link>
   );
 }
 
+function navPathOf(href: string): string {
+  const path = (toG5ShortPath(href).split(/[?#]/)[0] || "/").replace(/\/+$/, "");
+  return path || "/";
+}
+
+/* 지금 보고 있는 화면의 메뉴인가. 레퍼런스(solune_menu_is_current)는 게시판 링크면 그 게시판의
+   글을 볼 때도 현재로 친다 — 같은 뜻으로 링크 경로 아래(/board/870 은 /board 아래)면 현재다. 홈(/)은 홈에서만. */
+function isCurrentNav(item: NavItem, pathname: string): boolean {
+  if (item.target === "_blank") return false;
+  const href = navPathOf(item.href);
+  const here = navPathOf(pathname);
+  return href === here || (href !== "/" && here.startsWith(`${href}/`));
+}
+
+/* 서랍 메뉴. 레퍼런스(head.layout.php)처럼 하위 메뉴가 있는 묶음은 접고 펴는 단추를 두고,
+   지금 화면이 든 묶음만 펴 둔다 — 다 펴 두면 메뉴가 길어 원하는 묶음을 찾기 어렵다.
+   직접 접고 편 것은 다른 화면으로 옮기면 다시 지금 화면 기준으로 돌아간다. */
+function DrawerNav({
+  nav,
+  pathname,
+  onNavigate,
+}: {
+  nav: NavItem[];
+  pathname: string;
+  onNavigate: () => void;
+}) {
+  const [toggled, setToggled] = useState<{ pathname: string; open: Record<number, boolean> }>({
+    pathname,
+    open: {},
+  });
+  const overrides = toggled.pathname === pathname ? toggled.open : {};
+  const toggle = (index: number, open: boolean) =>
+    setToggled({ pathname, open: { ...overrides, [index]: !open } });
+
+  return (
+    <nav className="solune-community-drawer-nav" aria-label="전체 메뉴">
+      <ul className="solune-community-drawer-menu">
+        {nav.map((item, index) => {
+          if (item.children.length === 0) {
+            const current = isCurrentNav(item, pathname);
+            return (
+              <li key={`${item.label}:${index}`} className="solune-community-drawer-menu-item">
+                <NavAnchor
+                  item={item}
+                  className={`solune-community-drawer-menu-link solune-community-drawer-menu-link-direct${current ? " is-current" : ""}`}
+                  onNavigate={onNavigate}
+                  current={current}
+                >
+                  <ChevronRight size={16} aria-hidden />
+                  <span>{item.label}</span>
+                </NavAnchor>
+              </li>
+            );
+          }
+
+          const hasCurrent = item.children.some((child) => isCurrentNav(child, pathname));
+          const open = overrides[index] ?? hasCurrent;
+          const submenuId = `solune-drawer-submenu-${index + 1}`;
+          return (
+            <li
+              key={`${item.label}:${index}`}
+              className={`solune-community-drawer-menu-item${open ? " is-open" : ""}`}
+            >
+              <div className="solune-community-drawer-menu-row">
+                <NavAnchor item={item} className="solune-community-drawer-menu-link" onNavigate={onNavigate}>
+                  <FolderOpen size={16} aria-hidden />
+                  <span>{item.label}</span>
+                </NavAnchor>
+                <button
+                  type="button"
+                  className="solune-community-drawer-submenu-toggle"
+                  aria-controls={submenuId}
+                  aria-expanded={open}
+                  aria-label={`${item.label} 하위 메뉴 ${open ? "닫기" : "열기"}`}
+                  onClick={() => toggle(index, open)}
+                >
+                  <ChevronDown size={14} strokeWidth={2.6} aria-hidden />
+                </button>
+              </div>
+              <ul id={submenuId} className="solune-community-drawer-submenu" hidden={!open}>
+                {item.children.map((child, childIndex) => {
+                  const current = isCurrentNav(child, pathname);
+                  return (
+                    <li key={`${child.href}:${childIndex}`}>
+                      <NavAnchor
+                        item={child}
+                        className={`solune-community-drawer-submenu-link${current ? " is-current" : ""}`}
+                        onNavigate={onNavigate}
+                        current={current}
+                      >
+                        <span>{child.label}</span>
+                      </NavAnchor>
+                    </li>
+                  );
+                })}
+              </ul>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
+/* 서랍 아래 두 단추. 레퍼런스처럼 주 버튼 없이 두 동작을 나란히 놓고,
+   로그인했으면 정보 수정 · 로그아웃, 아니면 로그인 · 회원가입을 둔다. */
+function DrawerActions({ loginHref, onNavigate }: { loginHref: string; onNavigate: () => void }) {
+  const { isInitialized, user, logout } = useAuthStore();
+  const signedIn = isInitialized && Boolean(user);
+
+  if (signedIn) {
+    return (
+      <div className="solune-community-drawer-actions">
+        <Link className="solune-drawer-action solune-drawer-action-edit" href="/mypage/profile" onClick={onNavigate}>
+          <User size={14} aria-hidden />
+          <span>정보 수정</span>
+        </Link>
+        <button
+          type="button"
+          className="solune-drawer-action solune-drawer-action-logout"
+          onClick={() => {
+            onNavigate();
+            void logout();
+          }}
+        >
+          <LogOut size={14} aria-hidden />
+          <span>로그아웃</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="solune-community-drawer-actions">
+      <Link className="solune-drawer-action solune-drawer-action-edit" href={loginHref} onClick={onNavigate}>
+        <LogIn size={14} aria-hidden />
+        <span>로그인</span>
+      </Link>
+      <Link className="solune-drawer-action" href="/register" onClick={onNavigate}>
+        <UserPlus size={14} aria-hidden />
+        <span>회원가입</span>
+      </Link>
+    </div>
+  );
+}
+
+/* 머리줄 오른쪽 도움 링크. 레퍼런스(theme/solune)는 서비스마다 다르다 —
+   커뮤니티: FAQ · Q&A · 새글, 쇼핑몰(shop/): FAQ · 1:1문의 · 개인결제 · 사용후기 · 상품문의 · 쿠폰존. */
+const COMMUNITY_UTILITIES = [
+  { label: "FAQ", href: "/faq" },
+  { label: "Q&A", href: "/mypage/qas" },
+  { label: "새글", href: "/recent" },
+] as const;
+
+const SHOP_UTILITIES = [
+  { label: "FAQ", href: "/faq" },
+  { label: "1:1문의", href: "/mypage/qas" },
+  { label: "개인결제", href: "/shop/personalpay" },
+  { label: "사용후기", href: "/shop/reviews" },
+  { label: "상품문의", href: "/shop/qas" },
+  { label: "쿠폰존", href: "/shop/couponzone" },
+] as const;
+
 /* 서비스 전환 바. 커뮤니티와 쇼핑 셸이 같은 컴포넌트를 쓴다 — 두 서비스의
-   머리가 같은 모양이어야 오가는 것이 한 사이트로 읽힌다. */
+   머리가 같은 모양이어야 오가는 것이 한 사이트로 읽힌다. 오른쪽 링크만 서비스에 맞춘다.
+   쇼핑몰은 레퍼런스처럼 계정 링크(로그인 · 회원가입 · 마이페이지 · 로그아웃)를 두지 않는다 —
+   쇼핑 헤더의 사람 아이콘(비회원 로그인 · 회원 마이페이지)이 그 자리를 맡는다.
+   알림 · 관리자는 쇼핑몰에서도 둔다(쇼핑 헤더에는 그 길이 없다). */
 export function ServiceSwitch({
   isShop,
   shellClassName = "solune-shell",
@@ -170,27 +341,27 @@ export function ServiceSwitch({
 
         <nav aria-label="회원 메뉴" className="solune-community-member-menu">
           <span className="solune-community-member-utilities">
-            <Link className="solune-community-member-utility" href="/faq">
-              FAQ
-            </Link>
-            <Link className="solune-community-member-utility" href="/mypage/qas">
-              Q&amp;A
-            </Link>
-            <Link className="solune-community-member-utility" href="/recent">
-              새글
-            </Link>
+            {(isShop ? SHOP_UTILITIES : COMMUNITY_UTILITIES).map((item) => (
+              <Link key={item.href + item.label} className="solune-community-member-utility" href={item.href}>
+                {item.label}
+              </Link>
+            ))}
           </span>
           {signedIn ? (
             <>
               <SoluneNotifyLink />
               {/* 사이드바가 없는 화면(쇼핑몰 · 마이페이지)에서도 관리자 화면으로 갈 수 있게 머리줄에도 둔다. */}
               {user?.is_super_admin && <a href={g5PathForRuntime("/adm/")}>관리자</a>}
-              <Link href="/mypage">마이페이지</Link>
-              <button type="button" onClick={() => void logout()}>
-                로그아웃
-              </button>
+              {isShop ? null : (
+                <>
+                  <Link href="/mypage">마이페이지</Link>
+                  <button type="button" onClick={() => void logout()}>
+                    로그아웃
+                  </button>
+                </>
+              )}
             </>
-          ) : (
+          ) : isShop ? null : (
             <>
               <Link href={loginHref}>로그인</Link>
               <Link className="solune-community-member-signup" href="/register">
@@ -427,56 +598,12 @@ export function SoluneLayoutShell({ children, config, menus }: G5ThemeLayoutShel
                       aria-label="메뉴 닫기"
                       onClick={closeDrawer}
                     >
-                      <X size={18} aria-hidden />
+                      <X size={16} strokeWidth={3} aria-hidden />
                     </button>
                   </div>
 
-                  <nav className="solune-community-drawer-nav" aria-label="전체 메뉴">
-                    <ul className="solune-community-drawer-menu">
-                      {nav.map((item, index) => (
-                        <li key={`${item.label}:${index}`}>
-                          <NavAnchor
-                            item={item}
-                            className="solune-community-drawer-menu-link"
-                            onNavigate={closeDrawer}
-                          >
-                            <FolderOpen size={16} aria-hidden />
-                            <span>{item.label}</span>
-                          </NavAnchor>
-                          {item.children.length > 0 ? (
-                            <ul className="solune-community-drawer-submenu">
-                              {item.children.map((child, childIndex) => (
-                                <li key={`${child.href}:${childIndex}`}>
-                                  <NavAnchor
-                                    item={child}
-                                    className="solune-community-drawer-submenu-link"
-                                    onNavigate={closeDrawer}
-                                  >
-                                    <span>{child.label}</span>
-                                  </NavAnchor>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  </nav>
-
-                  <div className="solune-community-drawer-actions">
-                    <Link
-                      className="solune-drawer-action solune-drawer-action-primary"
-                      href={loginHref}
-                      onClick={closeDrawer}
-                    >
-                      <LogIn size={15} aria-hidden />
-                      <span>로그인</span>
-                    </Link>
-                    <Link className="solune-drawer-action" href="/register" onClick={closeDrawer}>
-                      <UserPlus size={15} aria-hidden />
-                      <span>회원가입</span>
-                    </Link>
-                  </div>
+                  <DrawerNav nav={nav} pathname={pathname} onNavigate={closeDrawer} />
+                  <DrawerActions loginHref={loginHref} onNavigate={closeDrawer} />
                 </aside>
               </div>
             </div>

@@ -32,9 +32,7 @@ if ($slug !== '' && $apiMethod === 'GET') {
 // GET /v1/print/products - 목록
 // -------------------------------------------------------------------------
 if ($slug === '' && $apiMethod === 'GET') {
-    $page  = max(1, (int) ($_GET['page'] ?? 1));
-    $limit = min(100, max(1, (int) ($_GET['limit'] ?? 50)));
-    $offset = ($page - 1) * $limit;
+    [$page, $limit, $offset] = api_page_params(50, 100, 'limit');
     $category = isset($_GET['category']) ? trim((string) $_GET['category']) : '';
 
     // 관리자(super)는 include_inactive=1 로 비활성 상품까지 조회 가능.

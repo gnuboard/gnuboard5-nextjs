@@ -6,6 +6,10 @@
    fade 효과로 물러나는 것은 녹아 사라지고, 오는 것(.swiper-slide-active)은
    천천히 다가온다(켄 번즈). */
 .solune-shop-page .solune-shop-wrapper { overflow-x: clip; }
+/* 지난 방문에 배너 · 분류 줄이 없던 사이트는 그 자리 잡기(스켈레톤)를 첫 페인트부터 감춘다 — 응답 뒤 접히며
+   아래 진열이 올라가는 것을 막는다. <html> 의 표시는 첫 페인트 전 스크립트가 단다(shop-layout-hint.ts). */
+html[data-shop-banner="0"] .solune-shop-banner-reserve,
+html[data-shop-cats="0"] .solune-shop-cats-reserve { display: none; }
 .solune-shop-page .solune-shop-banner {
   --solune-banner-bleed: 20px;
   --solune-banner-gutter: 1rem;

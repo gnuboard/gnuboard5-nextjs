@@ -5,7 +5,8 @@ import { themeComponents, themeConfig } from "@/lib/theme";
 import { buildShopHomeData } from "@/lib/shop-home";
 import { getShopBanners, getShopPopups } from "@/services/shop";
 import { DeferredShopSections } from "../DeferredShopSections";
-import { ShopHomeBanners, ShopHomePopups } from "../ShopHomeMarketing";
+import { ShopHomeBanners } from "../ShopHomeBanners";
+import { ShopHomePopupsLazy as ShopHomePopups } from "../ShopHomePopupsLazy";
 import { ShopHomePopular } from "../ShopHomePopular";
 
 export const metadata = buildPageMetadata({

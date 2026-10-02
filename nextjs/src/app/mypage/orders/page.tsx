@@ -8,6 +8,7 @@ import { Package } from "lucide-react";
 import { getMyOrders } from "@/services/member";
 import { ShopOrderListCard } from "@/components/shop/ShopOrderListCard";
 import { useAuthStore } from "@/store/auth";
+import { MypagePanel } from "../MypagePanel";
 
 export default function MyOrdersPage() {
   const userId = useAuthStore((state) => state.user?.mb_id ?? "");
@@ -45,44 +46,33 @@ export default function MyOrdersPage() {
     };
   }, [page, userId]);
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="skeleton h-8 w-40 rounded" />
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="skeleton h-24 rounded-lg" />
-        ))}
-      </div>
-    );
-  }
-
-  if (orders.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center rounded-lg border py-20">
-        <Package className="mb-4 h-16 w-16 text-muted-foreground/50" />
-        <h2 className="text-xl font-bold">주문 내역이 없습니다</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          첫 주문을 해보세요
-        </p>
-        <Button className="mt-6" asChild>
-          <Link href="/shop/products">쇼핑하러 가기</Link>
-        </Button>
-      </div>
-    );
-  }
-
   return (
-    <div>
-      <h2 className="mb-6 text-xl font-bold">주문 내역</h2>
+    <MypagePanel title="주문 내역">
+      {loading ? (
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="skeleton h-24 rounded-lg" />
+          ))}
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <Package className="mb-4 h-14 w-14 text-muted-foreground/50" />
+          <p className="text-lg font-medium">주문 내역이 없습니다</p>
+          <p className="mt-1 text-sm text-muted-foreground">첫 주문을 해보세요</p>
+          <Button className="mt-6" asChild>
+            <Link href="/shop/products">쇼핑하러 가기</Link>
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {orders.map((order) => (
+            <ShopOrderListCard key={order.od_id} order={order} />
+          ))}
+        </div>
+      )}
 
-      <div className="space-y-4">
-        {orders.map((order) => (
-          <ShopOrderListCard key={order.od_id} order={order} />
-        ))}
-      </div>
-
-      {totalPages > 1 && (
-        <div className="mt-8 flex justify-center gap-2">
+      {!loading && totalPages > 1 && (
+        <div className="flex justify-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -104,6 +94,6 @@ export default function MyOrdersPage() {
           </Button>
         </div>
       )}
-    </div>
+    </MypagePanel>
   );
 }

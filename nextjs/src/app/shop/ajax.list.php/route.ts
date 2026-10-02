@@ -1,6 +1,7 @@
 // @g5-server-runtime-only
 import { NextRequest, NextResponse } from "next/server";
 import { apiUrl } from "@/lib/config";
+import { isTelInquiry } from "@/lib/shop-product-state";
 
 export const dynamic = "force-dynamic";
 
@@ -119,7 +120,7 @@ function renderProduct(product: Product) {
   const id = String(product.it_id || "");
   const name = String(product.it_name || "");
   const href = `/shop/${encodeURIComponent(id)}`;
-  const telInquiry = String(product.it_tel_inq || "0") === "1";
+  const telInquiry = isTelInquiry(product);
   const soldout = String(product.it_soldout || "0") === "1";
   const image = String(product.image_url || "");
   const price = telInquiry ? "전화문의" : formatNumber(Number(product.it_price || 0));

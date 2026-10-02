@@ -83,9 +83,10 @@ export function SoluneShopProductRowsSkeleton() {
   );
 }
 
-function SoluneShopBannerSkeleton() {
+/* solune-shop-*-reserve: 지난 방문에 그 줄이 없었으면 첫 페인트부터 감춘다(shop-layout-hint.ts · theme.shop.home.css). */
+export function SoluneShopBannerSkeleton() {
   return (
-    <div className="solune-shop-banner" aria-hidden="true">
+    <div className="solune-shop-banner solune-shop-banner-reserve" aria-hidden="true">
       <div className="solune-banner">
         <div className="solune-banner-stage">
           <div className="skeleton absolute inset-0 rounded-none" />
@@ -95,9 +96,9 @@ function SoluneShopBannerSkeleton() {
   );
 }
 
-function SoluneShopCategoriesSkeleton() {
+export function SoluneShopCategoriesSkeleton() {
   return (
-    <nav className="ondam-catrow" aria-hidden="true">
+    <nav className="ondam-catrow solune-shop-cats-reserve" aria-hidden="true">
       <div className="grid grid-cols-2 gap-[14px] sm:grid-cols-4 lg:grid-cols-6">
         {Array.from({ length: 6 }, (_, index) => (
           <div key={index} className="flex min-h-[146px] flex-col items-center gap-3 rounded-lg border border-base-300 bg-base-100 px-2 py-[18px]">

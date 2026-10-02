@@ -21,6 +21,7 @@ import { useShopProductSuggest } from "@/hooks/useShopProductSuggest";
 import { getShopProductList, type ShopProductParams } from "@/services/shop";
 import { getClientPublicSettings } from "@/services/settings";
 import type { ShopProduct } from "@/lib/api";
+import { hasProductDiscount, productDiscountPercent, formatProductPrice } from "@/lib/shop-product-state";
 
 const SORT_OPTIONS = [
   { value: "", label: "기본순" },
@@ -46,11 +47,8 @@ function ProductListCard({
   productRewriteMode?: BbsRewriteMode;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
-  const isTelInquiry = String(product.it_tel_inq ?? "0") === "1";
-  const hasDiscount = !isTelInquiry && product.it_cust_price > 0 && product.it_cust_price > product.it_price;
-  const discountPercent = hasDiscount
-    ? Math.round(((product.it_cust_price - product.it_price) / product.it_cust_price) * 100)
-    : 0;
+  const hasDiscount = hasProductDiscount(product);
+  const discountPercent = productDiscountPercent(product);
   const showImage = Boolean(product.image_url && !imageFailed);
 
   return (
@@ -78,7 +76,7 @@ function ProductListCard({
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {hasDiscount && <span className="text-sm font-black text-[#b45309]">{discountPercent}%</span>}
           <span className="text-base font-black text-[#1f2933]">
-            {isTelInquiry ? "전화문의" : formatPrice(product.it_price)}
+            {formatProductPrice(product)}
           </span>
           {hasDiscount && (
             <span className="text-xs text-[#5f6872] line-through">{formatPrice(product.it_cust_price)}</span>
@@ -390,7 +388,7 @@ export default function ProductListPage() {
                 )}
                 <span className="flex-1 truncate">{item.it_name}</span>
                 <span className="text-xs text-muted-foreground">
-                  {String(item.it_tel_inq ?? "0") === "1" ? "전화문의" : formatPrice(item.it_price)}
+                  {formatProductPrice(item)}
                 </span>
               </a>
             ))}

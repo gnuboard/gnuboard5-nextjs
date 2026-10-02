@@ -25,7 +25,7 @@ import { ProductOptionPicker } from "@/app/shop/products/[it_id]/ProductOptionPi
 import { productShippingPayment } from "@/app/shop/products/[it_id]/productDetailHelpers";
 import { useProductOptions } from "@/app/shop/products/[it_id]/useProductOptions";
 import { addProductToCart, toastAddedToCart } from "./addProductToCart";
-import { isProductSoldOut } from "@/lib/shop-product-state";
+import { isTelInquiry, isProductSoldOut } from "@/lib/shop-product-state";
 
 interface ProductQuickAddDialogProps {
   /** 카드가 가진 목록 행 — 옵션은 없다. 창이 열리면 상세를 받아 옵션을 채운다. */
@@ -75,7 +75,7 @@ export function ProductQuickAddDialog({ product, href, open, onOpenChange }: Pro
   const shippingPayment = productShippingPayment(detail, ctSendCostSelection);
   const unavailableReason = !detail
     ? ""
-    : String(detail.it_tel_inq ?? "0") === "1"
+    : isTelInquiry(detail)
       ? "전화문의 상품은 온라인 주문할 수 없습니다."
       : isProductSoldOut({ ...detail, has_options: options.baseOptions.length > 0 })
         ? "품절된 상품입니다."

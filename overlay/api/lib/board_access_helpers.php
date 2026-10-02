@@ -180,12 +180,11 @@ function api_can_write_board_post(?array $viewer, string $bo_table, array $board
 }
 
 /**
- * Return true when the viewer may read a board post body and attachment list.
- *
- * This mirrors bbs/board.php: group/cert/read-level checks run before the
- * secret-post owner/admin bypass.
+ * 이 게시판의 글 본문을 읽을 수 있는가 — 그룹 · 본인인증 · 읽기 레벨(글 하나와 상관없는 게시판 단위 판정).
+ * api_can_read_board_post() 의 앞부분이고, 목록 카드의 본문 발췌(wr_excerpt)도 이것으로 가린다
+ * (목록 보기 권한만 있는 사람에게 본문이 보이면 안 된다).
  */
-function api_can_read_board_post(?array $viewer, string $bo_table, array $board, array $post): bool
+function api_can_read_board(?array $viewer, string $bo_table, array $board): bool
 {
     if (!api_board_group_access_allowed($viewer, $bo_table, $board, false)) {
         return false;
@@ -196,7 +195,18 @@ function api_can_read_board_post(?array $viewer, string $bo_table, array $board,
     }
 
     $viewerLevel = $viewer && isset($viewer['mb_level']) ? (int) $viewer['mb_level'] : 1;
-    if ($viewerLevel < (int) ($board['bo_read_level'] ?? 1)) {
+    return $viewerLevel >= (int) ($board['bo_read_level'] ?? 1);
+}
+
+/**
+ * Return true when the viewer may read a board post body and attachment list.
+ *
+ * This mirrors bbs/board.php: group/cert/read-level checks run before the
+ * secret-post owner/admin bypass.
+ */
+function api_can_read_board_post(?array $viewer, string $bo_table, array $board, array $post): bool
+{
+    if (!api_can_read_board($viewer, $bo_table, $board)) {
         return false;
     }
 
@@ -204,7 +214,7 @@ function api_can_read_board_post(?array $viewer, string $bo_table, array $board,
         return true;
     }
 
-    return strpos((string) ($post['wr_option'] ?? ''), 'secret') === false;
+    return !api_is_secret_option($post['wr_option'] ?? '');
 }
 
 function api_is_board_read_point_exempt(?array $viewer, array $board, array $post): bool

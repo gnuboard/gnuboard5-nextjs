@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { storageGet, storageSet } from "@/lib/safe-storage";
 
 const STORAGE_KEY = "post_bookmarks";
 const MAX_ENTRIES = 100;
@@ -14,7 +15,7 @@ export interface Bookmark {
 
 function getBookmarksFromStorage(): Bookmark[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = storageGet(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
@@ -24,7 +25,7 @@ function getBookmarksFromStorage(): Bookmark[] {
 function saveBookmarks(bookmarks: Bookmark[]): void {
   try {
     cachedSnapshot = JSON.stringify(bookmarks);
-    localStorage.setItem(STORAGE_KEY, cachedSnapshot);
+    storageSet(STORAGE_KEY, cachedSnapshot);
   } catch {
     // storage full or unavailable
   }
@@ -38,7 +39,7 @@ function subscribe(callback: () => void): () => void {
   };
 
   const check = () => {
-    const current = localStorage.getItem(STORAGE_KEY) ?? "[]";
+    const current = storageGet(STORAGE_KEY) ?? "[]";
     if (current !== cachedSnapshot) {
       cachedSnapshot = current;
       callback();
@@ -56,7 +57,7 @@ function subscribe(callback: () => void): () => void {
 
 function snapshotSelector(): string {
   try {
-    return localStorage.getItem(STORAGE_KEY) ?? "[]";
+    return storageGet(STORAGE_KEY) ?? "[]";
   } catch {
     return "[]";
   }

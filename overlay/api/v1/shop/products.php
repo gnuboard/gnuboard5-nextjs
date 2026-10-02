@@ -68,35 +68,7 @@ if ($apiMethod === 'GET' && $it_id === 'seo') {
     $it_id = (string) $resolved['it_id'];
 }
 
-// ---------------------------------------------------------------------------
-// Helper: build image URL for a product
-// ---------------------------------------------------------------------------
-if (!function_exists('api_shop_item_image_url')) {
-    function api_shop_item_image_url($it_id, $imageField)
-    {
-        if (!$imageField) {
-            return '';
-        }
-        if (preg_match('#^https?://#i', $imageField)) {
-            return $imageField;
-        }
-
-        $imageField = ltrim(str_replace('\\', '/', $imageField), '/');
-        $candidates = array($imageField);
-        if ($it_id && strpos($imageField, '/') === false) {
-            $candidates[] = $it_id . '/' . $imageField;
-        }
-
-        foreach ($candidates as $candidate) {
-            $path = G5_DATA_PATH . '/item/' . $candidate;
-            if (is_file($path)) {
-                return shop_api_image_url('item', $candidate);
-            }
-        }
-
-        return '';
-    }
-}
+// 상품 이미지 주소는 api_shop_item_image_url()(api/lib/helpers.php, 모든 핸들러보다 먼저 실림)을 쓴다.
 
 if (!function_exists('api_shop_item_image_urls')) {
     function api_shop_item_image_urls(array $item): array
@@ -212,7 +184,7 @@ if (!function_exists('api_shop_product_related_items')) {
                 'it_price'       => (int) $row['it_price'],
                 'it_cust_price'  => (int) $row['it_cust_price'],
                 'it_tel_inq'     => (string) (int) ($row['it_tel_inq'] ?? 0),
-                'image_url'      => api_image_url_with_width(api_shop_item_image_url((string) $row['it_id'], $row['it_img1'] ?? ''), 800),
+                'image_url'      => api_image_url_with_width(api_shop_item_image_url((string) $row['it_id'], $row['it_img1'] ?? ''), 400),
             ];
         }
 
@@ -240,9 +212,7 @@ function api_shop_category_name($ca_id)
 // =========================================================================
 if ($apiMethod === 'GET' && $it_id === '') {
 
-    $page     = max(1, (int) ($_GET['page'] ?? 1));
-    $perPage  = max(1, min(100, (int) ($_GET['per_page'] ?? 20)));
-    $offset   = ($page - 1) * $perPage;
+    [$page, $perPage, $offset] = api_page_params(20, 100);
 
     $itemTable = DB::table('g5_shop_item_table');
 
@@ -376,8 +346,10 @@ if ($apiMethod === 'GET' && $it_id === '') {
             'it_sc_type'     => (int) ($row['it_sc_type'] ?? 0),
             'it_sc_method'   => (int) ($row['it_sc_method'] ?? 0),
             'has_options'    => isset($extras['options'][(string) $row['it_id']]),
+            // 그누보드 is_soldout() 과 같은 품절 판정(선택옵션 상품은 옵션 재고 기준) — 카드의 품절 표시 · 담기 단추가 쓴다.
+            'is_soldout'     => !empty($extras['soldout'][(string) $row['it_id']]),
             // 진열 카드용 — 폭을 붙여 줄이거나 WebP 로 옮긴 사본을 받게 한다. images 는 원본 그대로.
-            'image_url'      => api_image_url_with_width($images[0] ?? '', 800),
+            'image_url'      => api_image_url_with_width($images[0] ?? '', 400),
             'images'         => $images,
         ];
     }
@@ -618,7 +590,7 @@ if ($apiMethod === 'POST' && $it_id !== '' && ($shopSegments[1] ?? '') === 'reco
         ob_start();
         include G5_SHOP_PATH . '/mail/itemrecommend.mail.php';
         $recommendBody = (string) ob_get_clean();
-        @mailer($from_name ?: $recommendSiteName, $fromEmail, $toEmail, $recommendSubject, $recommendBody, 1);
+        api_call_core('mailer', array($from_name ?: $recommendSiteName, $fromEmail, $toEmail, $recommendSubject, $recommendBody, 1)); // 안의 mailer · mail_options · mail_send_result 훅도 보호해서
     } else {
         $itemPath = function_exists('api_shop_product_href')
             ? api_shop_product_href($it_id, $item['it_seo_title'] ?? '')
@@ -631,7 +603,7 @@ if ($apiMethod === 'POST' && $it_id !== '' && ($shopSegments[1] ?? '') === 'reco
             . $itemUrl . "\n\n"
             . ($message !== '' ? "[Message]\n" . $message . "\n\n" : '')
             . $recommendSiteName . "\n";
-        @mailer($from_name ?: $recommendSiteName, $fromEmail, $toEmail, $recommendSubject, $recommendBody, 0);
+        api_call_core('mailer', array($from_name ?: $recommendSiteName, $fromEmail, $toEmail, $recommendSubject, $recommendBody, 0)); // 안의 mailer · mail_options · mail_send_result 훅도 보호해서
     }
 
     Response::success(['sent' => true, 'template' => 'itemrecommend.mail.php']);

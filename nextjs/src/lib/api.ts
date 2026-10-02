@@ -2,6 +2,7 @@ import { apiBaseUrlForRuntime } from "@/lib/config";
 import { parseApiEnvelope } from "@/lib/api-response";
 import type { ApiResponse } from "@/lib/api-response";
 import { koreanApiErrorMessage, koreanApiFieldErrors } from "@/lib/api-error-messages";
+import { storageGet, storageRemove } from "@/lib/safe-storage";
 
 // Server-side: call PHP API directly. Client-side: use Next.js proxy to avoid CORS.
 const API_URL = apiBaseUrlForRuntime();
@@ -112,10 +113,10 @@ class ApiClient {
     this.baseUrl = baseUrl;
     if (typeof window !== 'undefined') {
       // Migrate legacy localStorage into memory, then remove it from persistent JS storage.
-      const legacy = localStorage.getItem(TOKEN_COOKIE);
+      const legacy = storageGet(TOKEN_COOKIE);
       if (legacy) {
         this.token = legacy;
-        localStorage.removeItem(TOKEN_COOKIE);
+        storageRemove(TOKEN_COOKIE);
       }
       clearClientAuthCookies();
     }

@@ -1,7 +1,8 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
+import { safeLocalStateStorage } from "@/lib/safe-storage";
 import {
   DEFAULT_LOCALE,
   MESSAGES,
@@ -35,7 +36,8 @@ export const useLocaleStore = create<LocaleState>()(
         if (SUPPORTED_LOCALES.includes(locale)) set({ locale });
       },
     }),
-    { name: "shop-locale" }
+    // 저장소가 막히거나 가득 차도 언어 바꾸기가 예외로 끝나지 않게(lib/safe-storage.ts).
+    { name: "shop-locale", storage: createJSONStorage(() => safeLocalStateStorage) }
   )
 );
 

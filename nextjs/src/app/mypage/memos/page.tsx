@@ -11,6 +11,7 @@ import { cn, formatDate, truncate } from "@/lib/utils";
 import { deleteMemo, getMemos, type MemoBoxType } from "@/services/memos";
 import { Button } from "@/components/ui/button";
 import { toastError, toastSuccess } from "@/lib/toast";
+import { MypagePanel } from "../MypagePanel";
 
 const BOXES: { type: MemoBoxType; label: string }[] = [
   { type: "recv", label: "받은 쪽지" },
@@ -80,22 +81,18 @@ export default function MemoListPage() {
   const lastPage = meta?.last_page ?? 1;
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold">쪽지함</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            그누보드 쪽지를 확인하고 새 쪽지를 보낼 수 있습니다.
-          </p>
-        </div>
+    <MypagePanel
+      title="쪽지함"
+      description="그누보드 쪽지를 확인하고 새 쪽지를 보낼 수 있습니다."
+      actions={
         <Button asChild>
           <Link href="/mypage/memos/new">
             <PenSquare className="mr-2 h-4 w-4" />
             쪽지 쓰기
           </Link>
         </Button>
-      </div>
-
+      }
+    >
       <div className="flex gap-2 border-b">
         {BOXES.map((box) => (
           <button
@@ -121,7 +118,7 @@ export default function MemoListPage() {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border py-20 text-center">
+        <div className="flex flex-col items-center justify-center py-20 text-center">
           <Mail className="mb-4 h-14 w-14 text-muted-foreground/50" />
           <p className="text-lg font-medium">쪽지가 없습니다</p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -196,6 +193,6 @@ export default function MemoListPage() {
           </Button>
         </div>
       )}
-    </div>
+    </MypagePanel>
   );
 }

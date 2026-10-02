@@ -35,6 +35,26 @@ function shop_api_cart_option_inputs($input, $defaultQty) {
     return $rows;
 }
 
+/** 쓰는 중인 선택옵션(io_type 0)이 있는 상품인가 — 있으면 옵션을 고르지 않고는 담을 수 없다. */
+function shop_api_item_has_base_options($it_id) {
+    return DB::count(
+        "SELECT COUNT(*) FROM " . DB::table('g5_shop_item_option_table') . "
+         WHERE it_id = ? AND io_use = 1 AND io_type = 0",
+        [$it_id]
+    ) > 0;
+}
+
+/** 이 장바구니에 본품(선택옵션 · 옵션 없는 본품) 줄이 담겨 있나. 바로구매 · 일반을 가리지 않는다. */
+function shop_api_cart_has_active_base($cart_id, $it_id) {
+    $row = DB::fetch(
+        "SELECT IFNULL(SUM(ct_qty), 0) AS qty FROM " . DB::table('g5_shop_cart_table') . "
+         WHERE od_id = ? AND it_id = ? AND io_type = 0
+           AND " . shop_api_cart_active_status_sql(),
+        array_merge([$cart_id, $it_id], shop_api_cart_active_statuses())
+    );
+    return (int) ($row['qty'] ?? 0) > 0;
+}
+
 function shop_api_cart_active_base_qty($cart_id, $it_id, $direct = false, $excludeCtId = 0) {
     $sql = "SELECT IFNULL(SUM(ct_qty), 0) AS qty FROM " . DB::table('g5_shop_cart_table') . "
             WHERE od_id = ? AND it_id = ? AND io_type = 0 AND ct_direct = ?
@@ -162,24 +182,10 @@ function shop_api_cart_add_row($cart_id, $mb_id, $item, $it_id, $ioId, $qty, $di
 
         if ($ioType === 1) {
             $activeBaseQty = shop_api_cart_active_base_qty($cart_id, $it_id, $direct);
+            // 같은 바로구매 구분 안에 본품이 있어야 한다. (예전에 이 뒤에 붙어 있던 "구분 없이 본품이 있나"
+            // 검사는 이 검사를 통과하면 언제나 참이라 걷었다.)
             if ($activeBaseQty <= 0) {
                 Response::error('Base option is required before adding supply options.', 400);
-            }
-            $hasBaseOptions = DB::count(
-                "SELECT COUNT(*) FROM " . DB::table('g5_shop_item_option_table') . "
-                 WHERE it_id = ? AND io_use = 1 AND io_type = 0",
-                [$it_id]
-            );
-            if ($hasBaseOptions > 0) {
-                $activeBase = DB::fetch(
-                    "SELECT IFNULL(SUM(ct_qty), 0) AS qty FROM " . DB::table('g5_shop_cart_table') . "
-                     WHERE od_id = ? AND it_id = ? AND io_type = 0
-                       AND " . shop_api_cart_active_status_sql(),
-                    array_merge([$cart_id, $it_id], shop_api_cart_active_statuses())
-                );
-                if ((int) ($activeBase['qty'] ?? 0) <= 0) {
-                    Response::error('Base option is required before adding supply options.', 400);
-                }
             }
         }
     }

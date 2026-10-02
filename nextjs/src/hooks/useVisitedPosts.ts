@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { storageGet, storageSet } from "@/lib/safe-storage";
 
 const STORAGE_KEY = "visited_posts";
 const MAX_ENTRIES = 500;
@@ -11,7 +12,7 @@ function makeKey(boTable: string, wrId: string | number): string {
 
 function getSnapshot(): string[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = storageGet(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
@@ -25,7 +26,7 @@ function subscribe(callback: () => void): () => void {
   };
 
   const check = () => {
-    const current = localStorage.getItem(STORAGE_KEY) ?? "[]";
+    const current = storageGet(STORAGE_KEY) ?? "[]";
     if (current !== cachedSnapshot) {
       cachedSnapshot = current;
       callback();
@@ -43,7 +44,7 @@ function subscribe(callback: () => void): () => void {
 
 function snapshotSelector(): string {
   try {
-    return localStorage.getItem(STORAGE_KEY) ?? "[]";
+    return storageGet(STORAGE_KEY) ?? "[]";
   } catch {
     return "[]";
   }
@@ -85,7 +86,7 @@ export function useVisitedPosts() {
         : updated;
 
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+        storageSet(STORAGE_KEY, JSON.stringify(trimmed));
         cachedSnapshot = JSON.stringify(trimmed);
       } catch {
         // storage full or unavailable

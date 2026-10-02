@@ -32,6 +32,8 @@ import { toastInfo } from "@/lib/toast";
 import { htmlToPlainText } from "@/lib/sanitize";
 import { PostTemplates } from "./PostTemplates";
 import { FileAttachments, type Attachment, type ExistingAttachment } from "@/components/FileAttachments";
+import { isSecretPost } from "@/lib/post-flags";
+import { storageGet, storageRemove, storageSet } from "@/lib/safe-storage";
 
 const DRAFT_PREFIX = "draft_";
 
@@ -42,19 +44,19 @@ function getDraftKey(boTable: string): string {
 function saveDraft(boTable: string, data: Record<string, unknown>) {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(getDraftKey(boTable), JSON.stringify({ ...data, saved_at: Date.now() }));
+    storageSet(getDraftKey(boTable), JSON.stringify({ ...data, saved_at: Date.now() }));
   } catch { /* storage full */ }
 }
 
 function loadDraft(boTable: string): Record<string, string> | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(getDraftKey(boTable));
+    const raw = storageGet(getDraftKey(boTable));
     if (!raw) return null;
     const data = JSON.parse(raw);
     // Expire drafts older than 24 hours
     if (data.saved_at && Date.now() - data.saved_at > 24 * 60 * 60 * 1000) {
-      localStorage.removeItem(getDraftKey(boTable));
+      storageRemove(getDraftKey(boTable));
       return null;
     }
     return data;
@@ -65,7 +67,7 @@ function loadDraft(boTable: string): Record<string, string> | null {
 
 function clearDraft(boTable: string) {
   if (typeof window === "undefined") return;
-  localStorage.removeItem(getDraftKey(boTable));
+  storageRemove(getDraftKey(boTable));
 }
 
 const TiptapEditor = dynamic(
@@ -181,7 +183,7 @@ export default function WritePage({ boTable: fallbackBoTable }: WritePageProps) 
             wr_content: post.wr_content || "",
             wr_link1: post.wr_link1 || "",
             wr_link2: post.wr_link2 || "",
-            wr_secret: !!post.wr_option?.includes("secret"),
+            wr_secret: isSecretPost(post),
             html: post.wr_option?.includes("html1")
               ? "1"
               : post.wr_option?.includes("html2")

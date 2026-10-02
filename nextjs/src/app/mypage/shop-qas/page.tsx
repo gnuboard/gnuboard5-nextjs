@@ -18,6 +18,8 @@ import type { ApiMeta } from "@/lib/api-response";
 import { shopProductHref } from "@/lib/product-url";
 import { runtimeRouterPush } from "@/lib/runtime-router";
 import { cn, formatDate, formatPrice, truncate } from "@/lib/utils";
+import { htmlToText } from "@/lib/html-text";
+import { MypagePanel } from "../MypagePanel";
 import { deleteShopQa, getMyShopQas, updateShopQa } from "@/services/shop";
 import { getClientPublicSettings } from "@/services/settings";
 import { Button } from "@/components/ui/button";
@@ -205,19 +207,17 @@ export default function MyShopQasPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-bold">
-          상품문의 {meta ? `(${meta.total.toLocaleString()}건)` : ""}
-        </h2>
+    <MypagePanel
+      title={`상품문의${meta ? ` (${meta.total.toLocaleString()}건)` : ""}`}
+      actions={
         <Button variant="outline" size="sm" asChild>
           <Link href="/shop/products">
             <ExternalLink className="size-4" />
             상품 보기
           </Link>
         </Button>
-      </div>
-
+      }
+    >
       <div className="flex flex-col gap-3 border-b pb-3 md:flex-row md:items-center md:justify-between">
         <div className="flex gap-2">
           {STATUS_OPTIONS.map((item) => (
@@ -258,7 +258,7 @@ export default function MyShopQasPage() {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-[4px] border py-16 text-center">
+        <div className="flex flex-col items-center justify-center py-16 text-center">
           <HelpCircle className="mb-3 size-12 text-muted-foreground/50" />
           <p className="text-sm text-muted-foreground">등록된 상품문의가 없습니다.</p>
         </div>
@@ -444,14 +444,15 @@ export default function MyShopQasPage() {
                     <div>
                       <p className="break-words text-sm font-semibold">{item.iq_subject}</p>
                       <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">
-                        {truncate(item.iq_question, 260)}
+                        {/* 문의 · 답변은 에디터 HTML 일 수 있다 — 태그를 글자로 찍지 않고 글만 보인다. */}
+                        {truncate(htmlToText(item.iq_question), 260)}
                       </p>
                     </div>
                     {answered && (
                       <div className="rounded-[4px] bg-muted p-3">
                         <p className="mb-1 text-xs font-medium text-primary">답변</p>
                         <p className="whitespace-pre-wrap break-words text-sm">
-                          {item.iq_answer}
+                          {htmlToText(item.iq_answer)}
                         </p>
                       </div>
                     )}
@@ -486,6 +487,6 @@ export default function MyShopQasPage() {
           </Button>
         </div>
       )}
-    </div>
+    </MypagePanel>
   );
 }

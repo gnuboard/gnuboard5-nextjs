@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiUrl } from "@/lib/config";
 import { crossSiteRequestMessage } from "@/lib/server/request-guard";
+import { isTelInquiry } from "@/lib/shop-product-state";
 
 export const dynamic = "force-dynamic";
 
@@ -158,7 +159,7 @@ async function getItemOption(request: NextRequest, params: URLSearchParams) {
   }
 
   const product = envelope.data;
-  if (String(product.it_soldout || "0") === "1" || String(product.it_tel_inq || "0") === "1") {
+  if (String(product.it_soldout || "0") === "1" || isTelInquiry(product)) {
     return NextResponse.json({ error: "Product is not available for purchase." }, { status: 200 });
   }
 

@@ -73,14 +73,14 @@ if ($apiMethod === 'GET') {
 
     $rows = DB::fetchAll(
         "SELECT bf_no, bf_source, bf_file, bf_content, bf_filesize,
-                bf_width, bf_height, bf_type, bf_download, bf_datetime
+                bf_width, bf_height, bf_type, bf_download, bf_datetime, bf_fileurl, bf_thumburl
          FROM {$boardFileTable}
          WHERE bo_table = ? AND wr_id = ?
          ORDER BY bf_no ASC",
         [$bo_table, $wr_id]
     );
     foreach ($rows as &$r) {
-        $r['bf_url'] = api_board_file_url($bo_table, $wr_id, $r['bf_no'], $r['bf_file']);
+        $r['bf_url'] = api_board_file_url($bo_table, $wr_id, $r['bf_no'], $r['bf_file'], 0, 0, $r);
         $r['bf_download_url'] = api_board_file_download_url($bo_table, $wr_id, $r['bf_no']);
     }
     Response::success($rows);
@@ -98,6 +98,11 @@ $member = Auth::requireAuth();
 // 그누보드 표준 권한: 본인 OR cf_admin / gr_admin / bo_admin 중 하나
 if (!Auth::canManagePost($member, $bo_table, $post)) {
     Response::error('Forbidden.', 403);
+}
+// 첨부를 바꾸는 것도 글 수정이다 — 원본 write_update.php 와 같은 수정 제한(관리자 레벨 · 답변글 · bo_count_modify).
+$blocked = api_post_change_blocked($member, $bo_table, $board, $post, $writeTable, 'modify');
+if ($blocked !== null) {
+    Response::error($blocked[0], $blocked[1]);
 }
 $isAdmin = Auth::adminRole($member, $bo_table) !== '';
 
@@ -187,7 +192,7 @@ try {
     foreach ($uploaded as $i => $u) {
         $saved = post_files_save_disk($u, $boardDir);
         $savedDisk[] = $saved['path'];
-        $newRows[] = $saved['meta'];
+        $newRows[] = post_files_run_upload_hooks($saved, $board, $wr_id, $member);
     }
 } catch (Throwable $e) {
     foreach ($savedDisk as $p) @unlink($p);
@@ -203,8 +208,9 @@ try {
 // -------------------------------------------------------------------------
 foreach ($existing as $bfNo => $row) {
     if (!isset($keptBfNoSet[$bfNo])) {
-        $filePath = $boardDir . '/' . $row['bf_file'];
-        if (is_file($filePath)) @unlink($filePath);
+        // 그누보드 훅(bbs/write_update.php 의 파일 삭제) — 외부 저장소 플러그인이 지울 경로를 바꾸거나 직접 지운다.
+        $filePath = api_run_replace('delete_file_path', $boardDir . '/' . str_replace('../', '', $row['bf_file']), array($row), $member);
+        if (is_string($filePath) && is_file($filePath)) @unlink($filePath);
         if (function_exists('delete_board_thumbnail') && $row['bf_file']) {
             @delete_board_thumbnail($bo_table, $row['bf_file']);
         }
@@ -255,21 +261,28 @@ foreach ($final as $i => $row) {
                 : $now,
         ]
     );
+    // 그누보드 훅 — 새로 올린 첨부의 행을 넣은 뒤(bo_table, wr_id, 원본 $upload 모양 배열, $w)
+    if (isset($row['_upload'])) {
+        api_run_event('write_update_file_insert', array($bo_table, $wr_id, $row['_upload'], 'u'), $member);
+    }
 }
 
 // Re-fetch and return the new state.
 $updated = DB::fetchAll(
     "SELECT bf_no, bf_source, bf_file, bf_content, bf_filesize,
-            bf_width, bf_height, bf_type, bf_download, bf_datetime
+            bf_width, bf_height, bf_type, bf_download, bf_datetime, bf_fileurl, bf_thumburl
      FROM {$boardFileTable}
      WHERE bo_table = ? AND wr_id = ?
      ORDER BY bf_no ASC",
     [$bo_table, $wr_id]
 );
 foreach ($updated as &$u) {
-    $u['bf_url'] = api_board_file_url($bo_table, $wr_id, $u['bf_no'], $u['bf_file']);
+    $u['bf_url'] = api_board_file_url($bo_table, $wr_id, $u['bf_no'], $u['bf_file'], 0, 0, $u);
     $u['bf_download_url'] = api_board_file_download_url($bo_table, $wr_id, $u['bf_no']);
 }
+
+// 첨부가 바뀌면 목록 썸네일도 바뀐다 — 그누보드 latest() 위젯 캐시를 비운다(bbs/write_update.php 와 같다).
+api_call_core('delete_cache_latest', array($bo_table), $member);
 
 Response::success($updated);
 
@@ -502,4 +515,40 @@ function post_files_save_disk(array $u, $boardDir)
             'bf_type'     => $imgInfo ? (int) $imgInfo[2] : 0,
         ],
     ];
+}
+
+/**
+ * 그누보드 훅 write_update_upload_file · write_update_upload_array 를 원본과 같은 인자로 부른다.
+ * 플러그인은 원본 $upload[$i] 모양(file · source · filesize · image · fileurl · thumburl · storage)을 받으므로
+ * 그 모양으로 건네고, 돌려받은 값을 첨부 행으로 옮긴다. 행을 넣은 뒤 부를 write_update_file_insert 용으로
+ * 그 배열을 '_upload' 에 같이 둔다(INSERT 는 열을 하나씩 고르므로 이 키는 저장되지 않는다).
+ */
+function post_files_run_upload_hooks(array $saved, array $board, $wr_id, array $member): array
+{
+    $meta = $saved['meta'];
+    $upload = [
+        'file'     => $meta['bf_file'],
+        'source'   => $meta['bf_source'],
+        'filesize' => $meta['bf_filesize'],
+        'image'    => [$meta['bf_width'], $meta['bf_height'], $meta['bf_type']],
+        'fileurl'  => '',
+        'thumburl' => '',
+        'storage'  => '',
+    ];
+
+    $destFile = api_run_replace('write_update_upload_file', $saved['path'], [$board, $wr_id, 'u'], $member);
+    $hooked = api_run_replace('write_update_upload_array', $upload, [$destFile, $board, $wr_id, 'u'], $member);
+    if (is_array($hooked)) {
+        $upload = array_merge($upload, $hooked);
+    }
+
+    return array_merge($meta, [
+        'bf_file'     => (string) $upload['file'],
+        'bf_source'   => (string) $upload['source'],
+        'bf_filesize' => (int) $upload['filesize'],
+        'bf_fileurl'  => (string) $upload['fileurl'],
+        'bf_thumburl' => (string) $upload['thumburl'],
+        'bf_storage'  => (string) $upload['storage'],
+        '_upload'     => $upload,
+    ]);
 }

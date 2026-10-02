@@ -213,6 +213,10 @@ if ($action === 'social' && isset($apiSegments[1]) && $apiSegments[1] === 'link-
         );
     }
 
+    // 그누보드 훅 — 소셜 로그인도 원본 login_check.php 처럼 $is_social_login = true 로. 플러그인이 막으면
+    // ticket 을 쓰기 전에 멈춘다(사용자가 다시 시도할 수 있게).
+    api_run_before_event('login_session_before', array($member, true), $member);
+
     // 연결하기 전에 ticket 을 잡는다 — 같은 ticket 으로 두 계정에 연결되지 않게.
     api_social_claim_signup_ticket($socialSignupRow);
     social_user_profile_replace(
@@ -231,6 +235,7 @@ if ($action === 'social' && isset($apiSegments[1]) && $apiSegments[1] === 'link-
     $token = Auth::generateToken($member, $sessionId);
     api_auth_set_session_cookies($token, $refresh, false);
     api_auth_open_php_session($member, $sessionId);
+    api_run_event('member_login_check', array($member, '', true), $member);
 
     Response::success(api_auth_with_merged_cart([
         'token'         => $token,
@@ -306,6 +311,10 @@ if ($action === 'social' && isset($apiSegments[1]) && $apiSegments[1] === 'excha
         Response::error('차단된 회원입니다.', 403);
     }
 
+    // 그누보드 훅 — 소셜 로그인도 원본 login_check.php 처럼 $is_social_login = true 로. 플러그인이 막으면
+    // ticket 을 쓰기 전에 멈춘다(사용자가 다시 시도할 수 있게).
+    api_run_before_event('login_session_before', array($member, true), $member);
+
     // Ticket 일회성 — 즉시 used_at 마킹.
     $claimed = DB::execute(
         "UPDATE {$ticketTable}
@@ -334,6 +343,7 @@ if ($action === 'social' && isset($apiSegments[1]) && $apiSegments[1] === 'excha
     $token = Auth::generateToken($member, $sessionId);
     api_auth_set_session_cookies($token, $refresh, false);
     api_auth_open_php_session($member, $sessionId);
+    api_run_event('member_login_check', array($member, '', true), $member);
     Response::success(api_auth_with_merged_cart([
         'token'         => $token,
         'refresh_token' => $refresh,
@@ -383,6 +393,8 @@ if ($action === 'password-reset' && $apiMethod === 'POST') {
                     'nonce' => $nonce,
                 ], null, 600);
                 api_auth_send_password_reset_mail($member, $resetToken);
+                // 그누보드 훅(bbs/password_lost2.php) — 회원, 확인 값(nonce), 저장한 값(mb_lost_certify)
+                api_run_event('password_lost2_after', array($member, $nonce, $nonceHash));
             }
         }
 
@@ -446,6 +458,9 @@ if ($action === 'password-reset' && $apiMethod === 'POST') {
             Response::error($enumMsg, 429);
         }
 
+        // 그누보드 훅(bbs/password_lost_certify.php) — 새 비밀번호 확정 전
+        api_run_before_event('password_lost_certify_before');
+
         $resetToken = isset($input['reset_token']) ? (string) $input['reset_token'] : '';
         $password = isset($input['mb_password']) ? (string) $input['mb_password'] : '';
         $passwordRe = isset($input['mb_password_re']) ? (string) $input['mb_password_re'] : '';
@@ -485,6 +500,12 @@ if ($action === 'password-reset' && $apiMethod === 'POST') {
             RefreshToken::revokeAllFor($mbId);
         } catch (\Throwable $e) {
             error_log('[api/auth] Failed to revoke refresh tokens after password reset: ' . $e->getMessage());
+        }
+
+        // 그누보드 훅 — 비밀번호를 바꾼 회원과 확인 값(nonce)
+        $resetMember = DB::fetch("SELECT * FROM {$memberTable} WHERE mb_id = ? LIMIT 1", [$mbId]);
+        if ($resetMember) {
+            api_run_event('password_lost_certify_after', array($resetMember, (string) $payload['nonce']));
         }
 
         Response::success([

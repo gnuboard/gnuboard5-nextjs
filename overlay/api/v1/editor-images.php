@@ -38,6 +38,16 @@ if ($mime === '' || strpos($mime, 'image/') !== 0) {
     Response::error('Unsupported image type.', 415);
 }
 
+// ?w= 를 붙인 주소(글 보기 본문 · 목록 썸네일)에는 줄이거나 WebP 로 옮긴 사본을 준다
+// (lib/image-variants.php). 사본은 코어 thumbnail() 처럼 원본 옆에 thumb-… 이름으로 둔다 —
+// 코어가 글을 지울 때 부르는 delete_editor_thumbnail 이 thumb-{원본 이름}* 를 함께 지운다.
+$variant = api_image_variant($path, $mime, isset($_GET['w']) ? (int) $_GET['w'] : 0, isset($_GET['h']) ? (int) $_GET['h'] : 0);
+$path = $variant['path'];
+$mime = $variant['mime'];
+if ($variant['vary']) {
+    header('Vary: Accept', false); // 앞서 붙은 Vary: Origin(index.php)을 덮지 않고 더한다.
+}
+
 $size = filesize($path);
 $mtime = filemtime($path) ?: time();
 $etag = '"' . sha1($path . '|' . $size . '|' . $mtime) . '"';

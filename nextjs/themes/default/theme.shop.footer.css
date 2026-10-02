@@ -225,9 +225,19 @@ body[data-g5-theme-source="default"] {
     gap: 0.25rem;
     overflow-x: auto;
     scrollbar-width: none;
+    /* 스크롤 막대를 숨기면 옆에 링크가 더 있다는 신호가 없다(390 폭에서 "쿠폰존"을 지나친다). 레퍼런스처럼
+       오른쪽 끝을 흐리게 하고, 끝까지 넘겼을 때 마지막 링크가 흐림에 가리지 않게 같은 폭의 끝 여백을 둔다. */
+    padding-inline-end: 1.5rem;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
   }
   .solune-shop-page .solune-community-member-utilities::-webkit-scrollbar { display: none; }
   .solune-shop-page .solune-community-member-menu .solune-community-member-utility { display: inline-flex; }
+  /* 회원은 알림 · 관리자가 붙어 쇼핑 링크 칸이 좁아진다. 알림은 종 아이콘만 남긴다(이름은 링크의 aria-label). */
+  .solune-shop-page .solune-community-member-notify > span:not(.solune-community-member-notify-badge) { display: none; }
+  /* 항목 사이 1rem 은 넓은 화면 기준이다. 폰에서는 쇼핑 링크 사이와 같은 간격으로 좁혀 남는 폭을 링크 칸에 준다
+     (각 항목은 여전히 44px 터치 칸을 가진다). */
+  .solune-shop-page .solune-community-member-menu { gap: 0.25rem; }
 }
 @media (max-width: 1023px) {
   .solune-shop-page .sct { grid-template-columns: repeat(3, minmax(0, 1fr)); }

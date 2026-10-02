@@ -24,8 +24,26 @@ function api_shop_banner_image_url(array $row): string
     }
 
     $stamp = preg_replace('/[^0-9]/', '', (string) ($row['bn_time'] ?? ''));
-    // 첫 화면 배너 — 1920 폭 안으로 맞추고 받아 주는 브라우저에는 WebP 로(lib/image-variants.php).
-    return api_image_url_with_width(shop_api_image_url('banner', (string) $id) . ($stamp ? '?' . $stamp : ''), 1920);
+
+    return shop_api_image_url('banner', (string) $id) . ($stamp ? '?' . $stamp : '');
+}
+
+/**
+ * 첫 화면 배너의 폭별 주소 — 1440(레퍼런스 쇼핑 홈 배너와 같은 폭)과 1920. 받아 주는 브라우저에는 WebP(lib/image-variants.php).
+ * image_url 은 1440, image_srcset 은 둘 다 — 브라우저가 화면 폭 · 밀도에 맞는 쪽을 고른다(큰 화면만 1920).
+ */
+function api_shop_banner_image_variants(string $url): array
+{
+    if ($url === '') {
+        return ['image_url' => '', 'image_srcset' => ''];
+    }
+    $w1440 = api_image_url_with_width($url, 1440);
+    $w1920 = api_image_url_with_width($url, 1920);
+
+    return [
+        'image_url' => $w1440,
+        'image_srcset' => $w1440 . ' 1440w, ' . $w1920 . ' 1920w',
+    ];
 }
 
 function api_shop_banner_summary(array $row): array
@@ -44,9 +62,8 @@ function api_shop_banner_summary(array $row): array
         'bn_border' => (int) ($row['bn_border'] ?? 0),
         'bn_new_win' => (int) ($row['bn_new_win'] ?? 0),
         'bn_order' => (int) ($row['bn_order'] ?? 0),
-        'image_url' => api_shop_banner_image_url($row),
         'hit_url' => $hitUrl,
-    ];
+    ] + api_shop_banner_image_variants(api_shop_banner_image_url($row));
 }
 
 function api_shop_banner_redirect_url(array $row): string

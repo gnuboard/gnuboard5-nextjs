@@ -45,9 +45,7 @@ function print_json_text($value, string $fallback): ?string
 // -------------------------------------------------------------------------
 if (!$id && $apiMethod === 'GET') {
     $me = Auth::requireAuth();
-    $page  = max(1, (int) ($_GET['page'] ?? 1));
-    $limit = min(100, max(1, (int) ($_GET['limit'] ?? 50)));
-    $offset = ($page - 1) * $limit;
+    [$page, $limit, $offset] = api_page_params(50, 100, 'limit');
     $product = isset($_GET['product']) ? trim((string) $_GET['product']) : '';
 
     $where = 'mb_id = ?';

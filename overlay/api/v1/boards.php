@@ -232,7 +232,13 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'GET') {
      * 기존 N+1: 글 15건 → mb_nick 15회 + thumbnail 15회 = 30 round-trip.
      * 새 방식: WHERE mb_id IN (...) 1회 + WHERE (bo_table, wr_id) IN (...) 1회 = 2 round-trip.
      */
-    $enrichPosts = function(array $posts, bool $isNotice) use ($bo_table, $memberTable, $boardFileTable): array {
+    // 목록 썸네일 크기 — 그누보드 갤러리 목록과 같은 게시판 갤러리 크기 · 자르기(2배 밀도, lib/image-variants.php).
+    $listThumbSize = api_image_board_list_size($board);
+    // 본문 발췌(wr_excerpt)는 글을 읽을 수 있는 사람에게만 낸다 — 목록 보기 권한만으로 본문 일부가 보이면 안 된다.
+    // 읽을 때 포인트를 깎는 게시판(bo_read_point < 0)도 발췌로 본문을 공짜로 보이지 않게 뺀다.
+    $canExcerpt = api_can_read_board($viewer, $bo_table, $board) && (int) ($board['bo_read_point'] ?? 0) >= 0;
+
+    $enrichPosts = function(array $posts, bool $isNotice) use ($bo_table, $memberTable, $boardFileTable, $listThumbSize, $canExcerpt): array {
         if (!$posts) return [];
 
         // 1) mb_id 들 모아 한 번에 mb_nick 조회
@@ -268,7 +274,15 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'GET') {
                 SUBSTRING_INDEX(
                     GROUP_CONCAT(bf_no ORDER BY bf_no ASC SEPARATOR '||'),
                     '||', 1
-                ) AS bf_no
+                ) AS bf_no,
+                SUBSTRING_INDEX(
+                    GROUP_CONCAT(bf_fileurl ORDER BY bf_no ASC SEPARATOR '||'),
+                    '||', 1
+                ) AS bf_fileurl,
+                SUBSTRING_INDEX(
+                    GROUP_CONCAT(bf_thumburl ORDER BY bf_no ASC SEPARATOR '||'),
+                    '||', 1
+                ) AS bf_thumburl
                  FROM {$boardFileTable}
                  WHERE bo_table = ? AND bf_type IN (2, 3) AND wr_id IN ({$ph})
                  GROUP BY wr_id",
@@ -277,17 +291,21 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'GET') {
             foreach ($rows as $r) {
                 if (!empty($r['bf_file'])) {
                     $fileName = ltrim(str_replace('\\', '/', $r['bf_file']), '/');
-                    $filePath = G5_DATA_PATH . '/file/' . $bo_table . '/' . $fileName;
-                    if (is_file($filePath)) {
-                        // 목록 썸네일은 작은 칸에 들어간다. 원본을 그대로 내보내면 갤러리
-                        // 한 화면이 수 MB 가 된다(실측 여덟 장 2.4MB). 줄인 사본을 가리킨다.
-                        $thumbByWr[(int) $r['wr_id']] = api_board_file_url(
-                            $bo_table,
-                            (int) $r['wr_id'],
-                            (int) $r['bf_no'],
-                            $fileName,
-                            400
-                        );
+                    // 목록 썸네일은 작은 칸에 들어간다. 원본을 그대로 내보내면 갤러리
+                    // 한 화면이 수 MB 가 된다(실측 여덟 장 2.4MB). 줄인 사본을 가리킨다.
+                    // 로컬에 없으면 외부 저장소 주소(bf_thumburl · bf_fileurl), 그것도 없으면 썸네일 없음.
+                    $thumbUrl = api_board_file_url(
+                        $bo_table,
+                        (int) $r['wr_id'],
+                        (int) $r['bf_no'],
+                        $fileName,
+                        $listThumbSize[0],
+                        $listThumbSize[1],
+                        $r,
+                        true
+                    );
+                    if ($thumbUrl !== '') {
+                        $thumbByWr[(int) $r['wr_id']] = $thumbUrl;
                     }
                 }
             }
@@ -297,14 +315,18 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'GET') {
         $out = [];
         foreach ($posts as $post) {
             $post['is_notice'] = $isNotice;
-            $post['is_secret'] = (strpos((string) $post['wr_option'], 'secret') !== false);
-            $post['mb_icon_path'] = get_member_icon_url($post['mb_id']);
+            $post['is_secret'] = api_is_secret_option($post['wr_option']);
+            $post = array_merge($post, api_member_media_urls($post['mb_id']));
             $post['mb_nick'] = $post['mb_id'] && isset($nickByMb[$post['mb_id']])
                 ? $nickByMb[$post['mb_id']]
                 : $post['wr_name'];
 
             $post['thumbnail'] = $post['is_secret'] ? '' : ($thumbByWr[(int) $post['wr_id']] ?? '');
-            $post['wr_excerpt'] = $post['is_secret'] ? '' : api_post_excerpt($post['wr_content'] ?? '');
+            // 첨부 사진이 없으면 본문의 첫 사진(그누보드 get_list_thumbnail 과 같다). 비밀글은 내지 않는다.
+            if ($post['thumbnail'] === '' && !$post['is_secret']) {
+                $post['thumbnail'] = api_editor_first_image_url($post['wr_content'] ?? '', $listThumbSize[0], $listThumbSize[1]);
+            }
+            $post['wr_excerpt'] = ($canExcerpt && !$post['is_secret']) ? api_post_excerpt($post['wr_content'] ?? '') : '';
             unset($post['wr_content'], $post['wr_ip']);
             $out[] = $post;
         }
@@ -505,10 +527,15 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'POST') {
     if ($adminRole === '' && (int) ($board['bo_use_secret'] ?? 0) === 2 && !in_array('secret', $options, true)) {
         $options[] = 'secret';
     }
-    if ($replyParent && strpos((string) $replyParent['wr_option'], 'secret') !== false && !in_array('secret', $options, true)) {
+    if ($replyParent && api_is_secret_option($replyParent['wr_option']) && !in_array('secret', $options, true)) {
         $options[] = 'secret'; // 비밀글의 답글은 비밀글
     }
     $wr_option = implode(',', $options);
+
+    // 그누보드 훅(bbs/write_update.php 와 같은 인자) — 새 글은 $w = '', 답글은 $w = 'r'($wr_id 는 원글).
+    // $qstr(목록 쿼리)과 이동 주소는 API 에 없으므로 빈 값.
+    $hookW = $replyParent ? 'r' : '';
+    api_run_before_event('write_update_before', array($board, $replyParent ? (int) $replyParent['wr_id'] : 0, $hookW, ''), $member);
 
     $now = date('Y-m-d H:i:s');
     $ip  = $_SERVER['REMOTE_ADDR'];
@@ -597,7 +624,7 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'POST') {
         );
     }
 
-    if (strpos($wr_option, 'secret') !== false && function_exists('set_session')) {
+    if (api_is_secret_option($wr_option) && function_exists('set_session')) {
         set_session('ss_secret_' . $bo_table . '_' . $wrNum, true);
     }
 
@@ -617,6 +644,10 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'POST') {
             error_log('[api/boards] reply notify failed: ' . $e->getMessage());
         }
     }
+
+    // 그누보드 latest() 위젯 캐시를 비운다(원본과 같이 훅 앞에서). 안의 delete_cache_latest 훅도 보호해서 부른다.
+    api_call_core('delete_cache_latest', array($bo_table), $member);
+    api_run_event('write_update_after', array($board, $wr_id, $hookW, '', ''), $member);
 
     // Fetch and return the created post
     $post = DB::fetch(

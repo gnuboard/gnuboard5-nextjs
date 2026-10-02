@@ -98,6 +98,18 @@ async function main() {
   } finally {
     seedStock([`--product-id=${optionItem.it_id}`, `--io-id-b64=${ioIdB64}`, '--io-type=0', `--stock=${previous.previous_stock}`]);
   }
+
+  // 담은 뒤 재고가 줄면: 줄이기는 허용, 늘리기는 거부(남은 초과분은 주문 때 막힌다).
+  const optionRow = (await api('/shop/cart')).data?.items?.find((row) => String(row.ct_option) === String(option.io_id) && Number(row.io_type) === 0);
+  if (!optionRow) throw new Error('option cart row not found');
+  await api(`/shop/cart/${optionRow.ct_id}`, { method: 'PATCH', body: { ct_qty: 5 } });
+  const shrink = seedStock([`--product-id=${optionItem.it_id}`, `--io-id-b64=${ioIdB64}`, '--io-type=0', '--stock=2']);
+  try {
+    check('재고가 줄어든 뒤에도 수량 줄이기는 된다', await api(`/shop/cart/${optionRow.ct_id}`, { method: 'PATCH', body: { ct_qty: 3 } }), { status: 200 });
+    check('재고가 줄어든 뒤 수량 늘리기는 막는다', await api(`/shop/cart/${optionRow.ct_id}`, { method: 'PATCH', body: { ct_qty: 4 } }), { status: 400, message: 'exceeds available' });
+  } finally {
+    seedStock([`--product-id=${optionItem.it_id}`, `--io-id-b64=${ioIdB64}`, '--io-type=0', `--stock=${shrink.previous_stock}`]);
+  }
 }
 
 try {

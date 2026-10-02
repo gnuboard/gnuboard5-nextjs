@@ -45,6 +45,8 @@ export interface ShopProduct {
   it_option_subject?: string;
   /** 목록 응답에만 있다: 쓰는 중인 선택옵션이 있어 옵션 없이는 담을 수 없는 상품 */
   has_options?: boolean;
+  /** 목록 응답에만 있다: 그누보드 is_soldout() 과 같은 품절 판정(선택옵션 상품은 옵션 재고 기준) */
+  is_soldout?: boolean;
   it_supply_subject?: string;
   // 상품 메타 — 영카트 it_brand/it_maker/it_origin/it_model/it_seo_title.
   it_brand?: string;
@@ -102,6 +104,8 @@ export interface ShopBanner {
   bn_new_win: number;
   bn_order: number;
   image_url: string;
+  /** 폭별 주소("… 1440w, … 1920w") — 화면 폭에 맞는 쪽을 브라우저가 고른다. 옛 API 는 주지 않는다. */
+  image_srcset?: string;
   hit_url?: string;
 }
 
@@ -381,6 +385,8 @@ export interface ShopReview {
   is_confirm?: string;
   is_time: string;
   product_image_url?: string;
+  /** 후기 카드 사진 — 후기 본문의 첫 사진, 없으면 상품 사진(그누보드 get_itemuselist_thumbnail). */
+  thumbnail_url?: string;
 }
 
 export interface ShopReviewScoreSummary {

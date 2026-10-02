@@ -135,9 +135,7 @@ if ($apiMethod === 'GET' && $ca_id !== '') {
     );
 
     // Items in this category (including subcategories)
-    $page    = max(1, (int) ($_GET['page'] ?? 1));
-    $perPage = max(1, min(100, (int) ($_GET['per_page'] ?? 20)));
-    $offset  = ($page - 1) * $perPage;
+    [$page, $perPage, $offset] = api_page_params(20, 100);
     $orderBy = shop_api_product_order_by($_GET['sort'] ?? '', $_GET['sortodr'] ?? '');
 
     $total = DB::count(
@@ -191,7 +189,9 @@ if ($apiMethod === 'GET' && $ca_id !== '') {
             'it_sc_type'     => (int) ($row['it_sc_type'] ?? 0),
             'it_sc_method'   => (int) ($row['it_sc_method'] ?? 0),
             'has_options'    => isset($extras['options'][(string) $row['it_id']]),
-            'image_url'      => api_image_url_with_width(api_shop_item_image_url($row['it_id'], $row['it_img1']), 800),
+            // 그누보드 is_soldout() 과 같은 품절 판정(선택옵션 상품은 옵션 재고 기준) — 카드의 품절 표시 · 담기 단추가 쓴다.
+            'is_soldout'     => !empty($extras['soldout'][(string) $row['it_id']]),
+            'image_url'      => api_image_url_with_width(api_shop_item_image_url($row['it_id'], $row['it_img1']), 400),
         ];
     }
 

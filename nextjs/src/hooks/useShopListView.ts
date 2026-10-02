@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { ShopListView } from "@/lib/theme-types";
+import { storageGet, storageSet } from "@/lib/safe-storage";
 
 const STORAGE_KEY = "shop:list-view";
 
 function readStoredView(): ShopListView | null {
   try {
-    const value = window.localStorage.getItem(STORAGE_KEY);
+    const value = storageGet(STORAGE_KEY);
     return value === "grid" || value === "list" ? value : null;
   } catch {
     return null;
@@ -30,7 +31,7 @@ export function useShopListView(initial: ShopListView = "grid"): [ShopListView, 
   const update = useCallback((next: ShopListView) => {
     setView(next);
     try {
-      window.localStorage.setItem(STORAGE_KEY, next);
+      storageSet(STORAGE_KEY, next);
     } catch {
       /* 사생활 모드 등에서 저장이 막혀도 이번 페이지에서는 바뀐 대로 보인다. */
     }

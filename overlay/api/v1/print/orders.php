@@ -32,9 +32,7 @@ function print_order_decorate(array $order): array
 // -------------------------------------------------------------------------
 if (!$id && $apiMethod === 'GET') {
     $me = Auth::requireAuth();
-    $page  = max(1, (int) ($_GET['page'] ?? 1));
-    $limit = min(100, max(1, (int) ($_GET['limit'] ?? 30)));
-    $offset = ($page - 1) * $limit;
+    [$page, $limit, $offset] = api_page_params(30, 100, 'limit');
 
     $total = (int) DB::count("SELECT COUNT(*) FROM {$orderTable} WHERE mb_id = ?", [$me['mb_id']]);
     $rows = DB::fetchAll(

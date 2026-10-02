@@ -97,6 +97,9 @@ function api_member_registration_days($datetime): int
 
 function api_member_profile_payload(array $member): array
 {
+    // 회원아이콘 · 회원이미지 경로(api/lib/helpers.php 공용). 한 사람만 다루므로 언제나 파일을 다시 본다.
+    $media = api_member_media_urls(isset($member['mb_id']) ? (string) $member['mb_id'] : '', true);
+
     return [
         'mb_id'        => isset($member['mb_id']) ? (string) $member['mb_id'] : '',
         'mb_nick'      => isset($member['mb_nick']) ? (string) $member['mb_nick'] : '',
@@ -106,8 +109,8 @@ function api_member_profile_payload(array $member): array
         'mb_datetime'  => isset($member['mb_datetime']) ? (string) $member['mb_datetime'] : '',
         'mb_homepage'  => isset($member['mb_homepage']) ? (string) $member['mb_homepage'] : '',
         'mb_profile'   => isset($member['mb_profile']) ? (string) $member['mb_profile'] : '',
-        'mb_icon_path' => get_member_icon_url(isset($member['mb_id']) ? $member['mb_id'] : ''),
-        'mb_image_path' => get_member_image_url(isset($member['mb_id']) ? $member['mb_id'] : ''),
+        'mb_icon_path' => $media['mb_icon_path'],
+        'mb_image_path' => $media['mb_image_path'],
         'reg_days'     => api_member_registration_days($member['mb_datetime'] ?? ''),
     ];
 }
@@ -170,7 +173,7 @@ function api_member_send_email_verification_mail(string $mbId, string $email, st
     $verifyUrl = api_member_public_app_url('/api/v1/auth/verify-email?mb_id=' . rawurlencode($mbId) . '&token=' . rawurlencode($token));
     $subject = '[' . $siteName . '] Email verification';
     $body = "Please verify your new email address.\n\n" . $verifyUrl;
-    @mailer($siteName, $fromMail, $email, $subject, $body, 0);
+    api_call_core('mailer', array($siteName, $fromMail, $email, $subject, $body, 0)); // 안의 mailer · mail_options · mail_send_result 훅도 보호해서
 }
 
 /**

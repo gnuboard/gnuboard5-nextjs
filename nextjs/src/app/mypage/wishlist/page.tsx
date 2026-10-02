@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import type { ShopWishItem } from "@/lib/api";
 import type { BbsRewriteMode } from "@/lib/board-url";
 import { formatPrice } from "@/lib/utils";
+import { isTelInquiry } from "@/lib/shop-product-state";
 import { Button } from "@/components/ui/button";
 import { ProductImageFallback } from "@/components/shop/ProductImageFallback";
 import { ToastAction } from "@/components/ui/toast";
@@ -18,9 +19,10 @@ import { shopProductHref } from "@/lib/product-url";
 import { notifyCartChanged } from "@/lib/cart-events";
 import { getClientPublicSettings } from "@/services/settings";
 import { runtimeRouterPush } from "@/lib/runtime-router";
+import { MypagePanel } from "../MypagePanel";
 
 function wishlistCartBlockReason(item: ShopWishItem) {
-  const isTelInquiry = String(item.it_tel_inq ?? "0") === "1";
+  const telInquiry = isTelInquiry(item);
   const isSoldout = String(item.it_soldout ?? "0") === "1";
   const isUnavailable = String(item.it_use ?? "1") !== "1";
   const optionCount = Number(item.option_count ?? 0);
@@ -30,7 +32,7 @@ function wishlistCartBlockReason(item: ShopWishItem) {
       ? "판매중지"
       : isSoldout
         ? "품절"
-        : isTelInquiry
+        : telInquiry
           ? "전화문의"
           : optionCount > 0
             ? "옵션 선택 필요"
@@ -132,8 +134,7 @@ export default function MyWishlistPage() {
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <div className="skeleton mb-6 h-8 w-40 rounded" />
+      <MypagePanel title="위시리스트">
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i}>
@@ -142,28 +143,27 @@ export default function MyWishlistPage() {
             </div>
           ))}
         </div>
-      </div>
+      </MypagePanel>
     );
   }
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-lg border py-20">
-        <Heart className="mb-4 h-16 w-16 text-muted-foreground/50" />
-        <h2 className="text-xl font-bold">위시리스트가 비어있습니다</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          마음에 드는 상품을 추가해보세요
-        </p>
-        <Button className="mt-6" asChild>
-          <Link href="/shop/products">상품 둘러보기</Link>
-        </Button>
-      </div>
+      <MypagePanel title="위시리스트">
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <Heart className="mb-4 h-14 w-14 text-muted-foreground/50" />
+          <p className="text-lg font-medium">위시리스트가 비어있습니다</p>
+          <p className="mt-1 text-sm text-muted-foreground">마음에 드는 상품을 추가해보세요</p>
+          <Button className="mt-6" asChild>
+            <Link href="/shop/products">상품 둘러보기</Link>
+          </Button>
+        </div>
+      </MypagePanel>
     );
   }
 
   return (
-    <div>
-      <h2 className="mb-6 text-xl font-bold">위시리스트 ({items.length})</h2>
+    <MypagePanel title={`위시리스트 (${items.length})`}>
 
       <div className="wishlist-grid grid grid-cols-2 gap-4 md:grid-cols-3">
         {items.map((item) => {
@@ -232,6 +232,6 @@ export default function MyWishlistPage() {
           );
         })}
       </div>
-    </div>
+    </MypagePanel>
   );
 }

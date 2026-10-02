@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import type { Swiper as SwiperInstance } from "swiper";
 
 /**
@@ -9,18 +8,8 @@ import type { Swiper as SwiperInstance } from "swiper";
  * Swiper 기본 CSS 는 theme.shop.css 가 싣는다.
  */
 
-/** 움직임을 줄여 달라고 한 사람인지. 바뀌면 따라 바뀐다. */
-export function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const sync = () => setReduced(media.matches);
-    sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
-  }, []);
-  return reduced;
-}
+/** 움직임을 줄여 달라고 한 사람인지 — 앱 공용 훅(src/hooks). 테마 안에서 여기서 가져다 쓰던 이름을 그대로 둔다. */
+export { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 /** 키보드로 옮긴 초점인가. 마우스로 단추를 누를 때 생기는 초점은 :focus-visible 이 아니다. */
 function isKeyboardFocus(target: Element): boolean {

@@ -17,6 +17,7 @@ import { runtimeRouterPush } from "@/lib/runtime-router";
 import { getClientPublicSettings } from "@/services/settings";
 import { Sparkles } from "lucide-react";
 import { g5PathForRuntime } from "@/lib/config";
+import { hasProductDiscount, formatProductPrice } from "@/lib/shop-product-state";
 
 interface EventProduct {
   it_id: string;
@@ -219,8 +220,7 @@ export default function EventDetailPage() {
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {event.products.map((p) => {
-            const isTelInquiry = String(p.it_tel_inq ?? "0") === "1";
-            const hasDiscount = !isTelInquiry && p.it_cust_price > 0 && p.it_cust_price > p.it_price;
+            const hasDiscount = hasProductDiscount(p);
 
             return (
             <a
@@ -250,7 +250,7 @@ export default function EventDetailPage() {
               <div className="mt-2">
                 <p className="line-clamp-2 text-sm font-medium">{p.it_name}</p>
                 <p className="mt-1 text-sm font-bold text-primary">
-                  {isTelInquiry ? "전화문의" : formatPrice(p.it_price)}
+                  {formatProductPrice(p)}
                 </p>
                 {hasDiscount && (
                   <p className="text-xs text-muted-foreground line-through">

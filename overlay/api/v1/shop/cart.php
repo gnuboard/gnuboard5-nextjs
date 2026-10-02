@@ -288,12 +288,7 @@ if ($apiMethod === 'POST' && $ct_id === 'legacy-update') {
             continue;
         }
 
-        $hasOptions = DB::count(
-            "SELECT COUNT(*) FROM " . DB::table('g5_shop_item_option_table') . "
-             WHERE it_id = ? AND io_use = 1 AND io_type = 0",
-            [$it_id]
-        );
-        if ($hasOptions > 0) {
+        if (shop_api_item_has_base_options($it_id)) {
             Response::error('Select a product option.', 400);
         }
 
@@ -396,7 +391,7 @@ if ($apiMethod === 'GET' && $ct_id === '') {
             'it_soldout'     => $row['it_soldout'],
             'it_use'         => (string) (int) ($row['it_use'] ?? 0),
             'it_tel_inq'     => (string) (int) ($row['it_tel_inq'] ?? 0),
-            'image_url'      => api_shop_item_image_url($row['it_id'], $row['it_img1']),
+            'image_url'      => api_image_url_with_width(api_shop_item_image_url($row['it_id'], $row['it_img1']), 240),
         ];
     }
 
@@ -431,7 +426,7 @@ if ($apiMethod === 'PATCH' && $ct_id !== '') {
 
     // Verify ownership
     $cartItem = DB::fetch(
-        "SELECT ct_id, it_id, ct_option, io_id, io_type, ct_direct FROM " . DB::table('g5_shop_cart_table') . "
+        "SELECT ct_id, it_id, ct_option, io_id, io_type, ct_direct, ct_qty FROM " . DB::table('g5_shop_cart_table') . "
          WHERE ct_id = ?
            AND od_id = ?
            AND " . shop_api_cart_active_status_sql() . "
@@ -473,9 +468,11 @@ if ($apiMethod === 'PATCH' && $ct_id !== '') {
         }
     }
 
-    // 수량만 바꿀 때: 이 줄(이 행을 뺀 같은 상품 · 옵션) + 새 수량이 쓸 수 있는 재고를 넘으면 거부.
+    // 수량만 늘릴 때: 이 줄(이 행을 뺀 같은 상품 · 옵션) + 새 수량이 쓸 수 있는 재고를 넘으면 거부.
     //   담기와 같은 shop_api_cart_assert_stock — 재고 0 은 품절, 옵션 행은 옵션 재고로 센다.
-    if (!$isChangingOption) {
+    //   줄이는 것은 막지 않는다 — 담은 뒤 재고가 줄었을 때(5개 담음, 재고 2) 3개로 줄이는 것까지 거부되면
+    //   손님이 장바구니를 고칠 길이 없다. 남은 초과분은 주문 때 shop_api_validate_order_stock() 이 막는다.
+    if (!$isChangingOption && $newQty > (int) ($cartItem['ct_qty'] ?? 0)) {
         $lineIoId = (string) ($cartItem['io_id'] ?? '');
         $lineIoType = (int) ($cartItem['io_type'] ?? 0);
         shop_api_cart_assert_stock(

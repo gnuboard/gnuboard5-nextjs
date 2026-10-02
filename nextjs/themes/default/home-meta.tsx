@@ -1,16 +1,14 @@
 import { UserRound } from "lucide-react";
 import { MemberSideview } from "@/components/MemberSideview";
+import { formatListDate } from "@/lib/utils";
 
 /**
  * 첫 화면 목록의 날짜 — 레퍼런스 latest 스킨의 datetime2 처럼 오늘 글은 "17:33", 그 밖은 "09-24".
  * 해가 지난 글도 월-일만 쓴다(연도까지 쓰면 좁은 행에서 제목이 밀린다).
  */
+/** 목록 줄 날짜 — 앱 공용 formatListDate(오늘이면 시:분, 아니면 월-일). 테마 안에서 부르던 이름을 그대로 둔다. */
 export function soluneListDate(datetime: string): string {
-  if (!datetime) return "";
-  const day = datetime.slice(0, 10);
-  const now = new Date();
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  return day === today ? datetime.slice(11, 16) : datetime.slice(5, 10);
+  return formatListDate(datetime);
 }
 
 export type SoluneAuthorInfo = {

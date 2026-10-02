@@ -215,7 +215,7 @@ foreach ($targetBoards as $board) {
 
     foreach ($rows as $post) {
         // Truncate content for search preview
-        $isSecret = strpos((string) ($post['wr_option'] ?? ''), 'secret') !== false;
+        $isSecret = api_is_secret_option($post['wr_option'] ?? '');
         if ($viewerLevel < (int) ($board['bo_read_level'] ?? 1)) {
             $content = '';
         } elseif ($isSecret) {

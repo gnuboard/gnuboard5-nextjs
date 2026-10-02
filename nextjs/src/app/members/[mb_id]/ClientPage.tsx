@@ -16,6 +16,7 @@ import { runtimeRouterPush } from "@/lib/runtime-router";
 import { getMemberProfile } from "@/services/member";
 import { useAuthStore } from "@/store/auth";
 import type { MemberProfile } from "@/lib/types";
+import { memberAvatarUrl, memberInitial } from "@/lib/member-avatar";
 
 export default function ClientPage({ mbId: fallbackMbId }: { mbId: string }) {
   const router = useRouter();
@@ -101,11 +102,11 @@ export default function ClientPage({ mbId: fallbackMbId }: { mbId: string }) {
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-center gap-4">
                   <Avatar className="size-16 border">
-                    {profile.mb_icon_path ? (
-                      <AvatarImage src={profile.mb_icon_path} alt={profile.mb_nick} />
+                    {memberAvatarUrl(profile) ? (
+                      <AvatarImage src={memberAvatarUrl(profile)} alt={profile.mb_nick} />
                     ) : null}
                     <AvatarFallback className="text-lg">
-                      {(profile.mb_nick || profile.mb_id).charAt(0).toUpperCase()}
+                      {memberInitial(profile.mb_nick || profile.mb_id)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">

@@ -55,9 +55,7 @@ if (!$id && $apiMethod === 'GET') {
     $type  = isset($_GET['type']) && in_array($_GET['type'], ['send', 'recv'], true)
         ? $_GET['type']
         : 'recv';
-    $page  = max(1, (int) ($_GET['page'] ?? 1));
-    $limit = min(100, max(1, (int) ($_GET['limit'] ?? 20)));
-    $offset = ($page - 1) * $limit;
+    [$page, $limit, $offset] = api_page_params(20, 100, 'limit');
 
     // type=recv → 내가 받는 사람, type=send → 내가 보낸 사람
     $mbCol = $type === 'send' ? 'me_send_mb_id' : 'me_recv_mb_id';
@@ -151,6 +149,9 @@ if (!$id && $apiMethod === 'POST') {
 
     $isAdmin = Auth::adminRole($me) === 'super';
 
+    // 그누보드 훅(bbs/memo_form_update.php 와 같은 인자) — 받는 사람 목록. API 는 한 명씩 보낸다.
+    api_run_before_event('memo_form_update_before', array(array($recvMbId)), $me);
+
     // 받는 회원 존재 + 활성 상태 확인
     $recv = DB::fetch(
         "SELECT mb_id, mb_nick, mb_open, mb_leave_date, mb_intercept_date FROM {$memberTable}
@@ -158,10 +159,16 @@ if (!$id && $apiMethod === 'POST') {
          LIMIT 1",
         [$recvMbId]
     );
+    // 받을 수 있는 사람이 없으면 원본처럼 memo_form_update_failed(빈 회원 목록, 이동 주소, 본문)
+    $memoFailed = static function () use ($memoText, $me) {
+        api_run_event('memo_form_update_failed', array(array('id' => array(), 'nick' => array()), '', $memoText), $me);
+    };
     if (!$recv) {
+        $memoFailed();
         Response::error('받는 회원을 찾을 수 없습니다.', 404);
     }
     if (!$isAdmin && isset($recv['mb_open']) && (int) $recv['mb_open'] !== 1) {
+        $memoFailed();
         Response::error('정보공개하지 않은 회원에게는 쪽지를 보낼 수 없습니다.', 403);
     }
 
@@ -229,6 +236,16 @@ if (!$id && $apiMethod === 'POST') {
         );
     }
 
+    // 그누보드 훅 — 보낸 회원 목록(id · nick), 닉네임 문자열, 이동 주소(API 는 빈 값), 본문.
+    // 알림은 위에서 이미 보냈다 — plugin/webapp/notify/events.php 는 API 요청에서 건너뛴다.
+    $recvNickName = isset($recv['mb_nick']) && $recv['mb_nick'] !== '' ? (string) $recv['mb_nick'] : $recvMbId;
+    api_run_event('memo_form_update_after', array(
+        array('id' => array($recvMbId), 'nick' => array($recvNickName)),
+        $recvNickName,
+        '',
+        $memoText,
+    ), $me);
+
     Response::success([
         'me_id' => $recvMemoId,
         'send_me_id' => $sendMemoId,
@@ -244,7 +261,7 @@ if ($id && $apiMethod === 'DELETE') {
     $me = Auth::requireAuth();
 
     $memo = DB::fetch(
-        "SELECT me_recv_mb_id, me_send_mb_id FROM {$memoTable} WHERE me_id = ? LIMIT 1",
+        "SELECT * FROM {$memoTable} WHERE me_id = ? LIMIT 1",
         [$id]
     );
 
@@ -266,6 +283,9 @@ if ($id && $apiMethod === 'DELETE') {
             [api_memo_not_read_count($me['mb_id']), $me['mb_id']]
         );
     }
+
+    // 그누보드 훅(bbs/memo_delete.php) — 지운 쪽지 번호와 그 행
+    api_run_event('memo_delete', array($id, $memo), $me);
 
     Response::success(['message' => '쪽지를 삭제했습니다.']);
 }

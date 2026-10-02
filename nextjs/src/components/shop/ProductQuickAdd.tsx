@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 import { G5Link as Link } from "@/components/ui/g5-link";
 import type { ShopProduct } from "@/lib/api";
 import { toastError } from "@/lib/toast";
-import { isProductSoldOut } from "@/lib/shop-product-state";
+import { isTelInquiry, isProductSoldOut } from "@/lib/shop-product-state";
 import { cn } from "@/lib/utils";
 import { addProductToCart, toastAddedToCart } from "./addProductToCart";
 
@@ -44,7 +44,7 @@ export function ProductQuickAdd({ product, href, className }: ProductQuickAddPro
   const [adding, setAdding] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  if (String(product.it_tel_inq ?? "0") === "1") {
+  if (isTelInquiry(product)) {
     return (
       <Link href={href} className={cn("product-quick-add is-inquiry", className)}>
         문의

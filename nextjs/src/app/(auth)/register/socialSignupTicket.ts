@@ -1,3 +1,5 @@
+import { storageGet, storageRemove, storageSet } from "@/lib/safe-storage";
+
 /**
  * Social-signup ticket persistence — extracted from register/page.tsx.
  *
@@ -39,7 +41,7 @@ export function readStoredSocialSignupTicket(): string {
   if (typeof window === "undefined") return "";
   try {
     const sessionTicket = parseStoredSocialSignupTicket(
-      sessionStorage.getItem(SOCIAL_SIGNUP_TICKET_STORAGE_KEY)
+      storageGet(SOCIAL_SIGNUP_TICKET_STORAGE_KEY, "session")
     );
     if (sessionTicket) return sessionTicket;
   } catch {
@@ -47,7 +49,7 @@ export function readStoredSocialSignupTicket(): string {
   }
 
   try {
-    localStorage.removeItem(SOCIAL_SIGNUP_TICKET_STORAGE_KEY);
+    storageRemove(SOCIAL_SIGNUP_TICKET_STORAGE_KEY);
   } catch {
     // Storage may be unavailable in private or restricted browser contexts.
   }
@@ -60,12 +62,12 @@ export function storeSocialSignupTicket(ticket: string) {
   if (typeof window === "undefined" || !ticket) return;
   const value = createStoredSocialSignupTicket(ticket);
   try {
-    sessionStorage.setItem(SOCIAL_SIGNUP_TICKET_STORAGE_KEY, value);
+    storageSet(SOCIAL_SIGNUP_TICKET_STORAGE_KEY, value, "session");
   } catch {
     // The current page load can still continue with the ticket from the URL.
   }
   try {
-    localStorage.removeItem(SOCIAL_SIGNUP_TICKET_STORAGE_KEY);
+    storageRemove(SOCIAL_SIGNUP_TICKET_STORAGE_KEY);
   } catch {
     // The current page load can still continue with the session-scoped ticket.
   }
@@ -74,12 +76,12 @@ export function storeSocialSignupTicket(ticket: string) {
 export function clearStoredSocialSignupTicket() {
   if (typeof window === "undefined") return;
   try {
-    sessionStorage.removeItem(SOCIAL_SIGNUP_TICKET_STORAGE_KEY);
+    storageRemove(SOCIAL_SIGNUP_TICKET_STORAGE_KEY, "session");
   } catch {
     // Storage may be unavailable in private or restricted browser contexts.
   }
   try {
-    localStorage.removeItem(SOCIAL_SIGNUP_TICKET_STORAGE_KEY);
+    storageRemove(SOCIAL_SIGNUP_TICKET_STORAGE_KEY);
   } catch {
     // Storage may be unavailable in private or restricted browser contexts.
   }

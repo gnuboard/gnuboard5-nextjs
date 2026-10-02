@@ -9,6 +9,7 @@ import { shouldBypassImageOptimization } from "@/lib/image";
 import { formatNumber } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth";
 import { useRuntimeLocation } from "./use-runtime-pathname";
+import { memberAvatarUrl } from "@/lib/member-avatar";
 
 /* 소셜 단추 로고 — 그누보드가 skin/social/img 에 두는 30px 그림을 레퍼런스(#sns_login)처럼 쓴다.
    CSS 의 url() 은 그림이 어디 있는지 모르므로 그누보드 주소를 붙여 변수로 넘긴다. 화면이
@@ -52,8 +53,8 @@ export function SoluneLoginCard() {
   }
 
   const displayName = user.mb_nick || user.mb_name || user.mb_id;
-  // 회원이미지(프로필 사진)가 먼저, 없으면 회원아이콘, 둘 다 없으면 기본 그림.
-  const avatarUrl = user.mb_image_path || user.mb_icon_path || "";
+  // 회원이미지(프로필 사진)가 먼저, 없으면 회원아이콘, 둘 다 없으면 기본 그림(앱 공용 순서).
+  const avatarUrl = memberAvatarUrl(user);
 
   return (
     <section className="solune-sidebar-widget solune-login-card" aria-label="회원 정보">

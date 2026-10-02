@@ -15,7 +15,6 @@ import { useSearchSuggestions } from "@/hooks/useSearchSuggestions";
 import { useShopProductSuggest } from "@/hooks/useShopProductSuggest";
 import type { BbsRewriteMode } from "@/lib/board-url";
 import { shopProductHref } from "@/lib/product-url";
-import { formatPrice } from "@/lib/utils";
 import { gaSearch } from "@/lib/analytics";
 import { runtimeRouterPush } from "@/lib/runtime-router";
 import { isExternalMenuLink, menuAnchorTarget, menuHref, type MenuItem } from "@/components/layout/menu";
@@ -42,6 +41,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuthStore } from "@/store/auth";
 import { getClientPublicSettings } from "@/services/settings";
+import { memberAvatarUrl, memberInitial } from "@/lib/member-avatar";
+import { formatProductPrice } from "@/lib/shop-product-state";
 
 function MobileMenuLink({
   menu,
@@ -260,7 +261,7 @@ export function HeaderClientActions({
                       >
                         <span className="flex-1 truncate">{p.it_name}</span>
                         <span className="text-xs text-[#6b7280]">
-                          {String(p.it_tel_inq ?? "0") === "1" ? "전화문의" : formatPrice(p.it_price)}
+                          {formatProductPrice(p)}
                         </span>
                       </button>
                     ))}
@@ -298,11 +299,11 @@ export function HeaderClientActions({
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full">
                   <Avatar className="size-7">
-                    {displayUser.mb_icon_path && (
-                      <AvatarImage src={displayUser.mb_icon_path} alt={displayUser.mb_nick} />
+                    {memberAvatarUrl(displayUser) && (
+                      <AvatarImage src={memberAvatarUrl(displayUser)} alt={displayUser.mb_nick} />
                     )}
                     <AvatarFallback className="text-xs">
-                      {displayUser.mb_nick?.charAt(0)?.toUpperCase() || "U"}
+                      {memberInitial(displayUser.mb_nick)}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -437,10 +438,10 @@ export function HeaderClientActions({
                 <>
                   <div className="flex items-center gap-3">
                     <Avatar className="size-10">
-                      {displayUser.mb_icon_path && (
-                        <AvatarImage src={displayUser.mb_icon_path} alt={displayUser.mb_nick} />
+                      {memberAvatarUrl(displayUser) && (
+                        <AvatarImage src={memberAvatarUrl(displayUser)} alt={displayUser.mb_nick} />
                       )}
-                      <AvatarFallback>{displayUser.mb_nick?.charAt(0)?.toUpperCase() || "U"}</AvatarFallback>
+                      <AvatarFallback>{memberInitial(displayUser.mb_nick)}</AvatarFallback>
                     </Avatar>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-[#202124]">{displayUser.mb_nick}</p>

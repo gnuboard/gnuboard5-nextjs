@@ -141,6 +141,7 @@ export const shopBannerSchema = z
     bn_new_win: numberValue,
     bn_order: numberValue,
     image_url: imageUrlValue,
+    image_srcset: optionalString,
     hit_url: optionalString,
   })
   .passthrough() as unknown as z.ZodType<ShopBanner>;
@@ -385,6 +386,7 @@ export const shopReviewSchema = z
     is_confirm: stringValue.optional(),
     is_time: stringValue,
     product_image_url: optionalImageUrlValue,
+    thumbnail_url: optionalImageUrlValue,
   })
   .passthrough() as unknown as z.ZodType<ShopReview>;
 

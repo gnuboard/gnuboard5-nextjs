@@ -483,6 +483,8 @@ if (!$seg0 && $apiMethod === 'POST') {
     );
 
     $created = api_qa_find($qaId, $me);
+    // 그누보드 훅(bbs/qawrite_update.php 와 같은 인자) — 새 글은 $w = '', 답글 문의는 $w = 'r'(원글이 $write)
+    api_run_event('qawrite_update', array($qaId, $replySource ?: array(), $replySource ? 'r' : '', $qaConfig, null), $me);
     Response::success(api_qa_normalize_row($created, $me, true), 201);
 }
 
@@ -574,6 +576,8 @@ if ($qaId > 0 && !$seg1 && ($apiMethod === 'PATCH' || $isMultipartPatch)) {
     }
 
     $updated = api_qa_find($qaId, $me);
+    // 그누보드 훅 — 수정은 $w = 'u', $write 는 고치기 전 글
+    api_run_event('qawrite_update', array($qaId, $row, 'u', api_qa_config(), null), $me);
     Response::success(api_qa_normalize_row($updated, $me, true, true));
 }
 
@@ -670,6 +674,8 @@ if ($qaId > 0 && $seg1 === 'answer' && $apiMethod === 'POST') {
     );
 
     api_qa_push_answer_notification($question, $payload, $answerId);
+    // 그누보드 훅 — 답변은 $w = 'a', $write 는 질문, 마지막 인자가 답변 글 번호
+    api_run_event('qawrite_update', array($qaId, $question, 'a', api_qa_config(), $answerId), $me);
 
     $updated = DB::fetch(
         "SELECT * FROM {$qaContentTable}
@@ -707,9 +713,12 @@ if ($qaId > 0 && !$seg1 && $apiMethod === 'DELETE') {
              WHERE qa_type = 1 AND qa_parent = ?",
             [$qaId]
         );
+        $deleted = array();
         foreach ($answers as $answerRow) {
             api_qa_delete_files($answerRow);
+            $deleted[] = (int) $answerRow['qa_id'];
         }
+        $deleted[] = $qaId;
         DB::execute(
             "DELETE FROM {$qaContentTable}
              WHERE qa_type = 1 AND qa_parent = ?",
@@ -722,6 +731,7 @@ if ($qaId > 0 && !$seg1 && $apiMethod === 'DELETE') {
         );
     } else {
         api_qa_delete_files($row);
+        $deleted = array($qaId);
         DB::execute(
             "DELETE FROM {$qaContentTable}
              WHERE qa_id = ?",
@@ -735,6 +745,8 @@ if ($qaId > 0 && !$seg1 && $apiMethod === 'DELETE') {
         );
     }
 
+    // 그누보드 훅(bbs/qadelete.php) — 요청한 번호 목록과, 답변까지 실제로 지운 번호 목록
+    api_run_event('qa_delete', array(array($qaId), $deleted), $me);
     Response::success(['message' => 'Q&A item deleted.']);
 }
 

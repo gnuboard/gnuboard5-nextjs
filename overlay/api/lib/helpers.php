@@ -135,6 +135,9 @@ function get_upload_url($filename)
 
 /**
  * Build a public YoungCart item image URL only when the file exists locally.
+ * 상품 이미지 주소의 정본 — shop/common.php 의 shop_api_item_image_url() 도 이것을 부른다.
+ * (예전에는 shop/products.php · shop/events.php 에도 같은 이름의 사본이 있었지만, 이 파일이 먼저
+ *  실려 그 사본은 한 번도 정의되지 않았다.)
  *
  * Gnuboard data can store either "image.jpg" or "it_id/image.jpg" in it_imgN.
  * Returning an empty string for missing files prevents browsers from fetching
@@ -160,6 +163,10 @@ function api_shop_item_image_url($it_id, $imageField)
     }
 
     foreach ($candidates as $candidate) {
+        // data/item 밖을 가리키는 값(../)은 받지 않는다.
+        if (strpos($candidate, '..') !== false) {
+            continue;
+        }
         $path = G5_DATA_PATH . '/item/' . $candidate;
         if (is_file($path)) {
             $segments = array_map('rawurlencode', explode('/', trim(str_replace('\\', '/', $candidate), '/')));
@@ -239,6 +246,66 @@ function get_member_icon_url($mb_id)
     return null;
 }
 
+/**
+ * 글 · 목록 줄의 글쓴이 그림 두 가지 — 글 상세와 게시판 목록이 같은 필드를 내도록 한곳에서 만든다.
+ *   mb_icon_path : 회원아이콘(이름 옆 작은 그림, data/member)
+ *   mb_image_path: 회원이미지(프로필 사진, 아바타 원에 쓴다, data/member_image)
+ * 한 요청 안에서 같은 회원은 파일을 다시 확인하지 않는다(목록에 같은 글쓴이가 여러 줄).
+ * 회원 정보 · 로그인 응답처럼 한 사람만 다루는 곳은 $fresh = true 로 언제나 파일을 다시 본다
+ * (같은 요청에서 그림을 올리거나 지운 뒤에도 옛 값을 내지 않게).
+ *
+ * @return array{mb_icon_path: string|null, mb_image_path: string|null}
+ */
+function api_member_media_urls($mb_id, $fresh = false)
+{
+    static $cache = array();
+
+    $mb_id = (string) $mb_id;
+    if ($mb_id === '') {
+        return array('mb_icon_path' => null, 'mb_image_path' => null);
+    }
+    if ($fresh || !isset($cache[$mb_id])) {
+        $cache[$mb_id] = array(
+            'mb_icon_path' => get_member_icon_url($mb_id),
+            'mb_image_path' => get_member_image_url($mb_id),
+        );
+    }
+
+    return $cache[$mb_id];
+}
+
+/**
+ * 비밀글 · 비밀댓글인가 — wr_option 에 'secret' 이 들었나(그누보드 원본 strstr($wr_option, 'secret') 과 같다).
+ * 글 · 댓글 · 새글 · 검색 · 최근 댓글이 같은 판정을 쓴다. 요청으로 받은 wr_option 문자열에도 쓴다.
+ */
+function api_is_secret_option($wr_option)
+{
+    return strpos((string) $wr_option, 'secret') !== false;
+}
+
+/**
+ * 목록 API 의 쪽 번호(?page=, 1 부터). 숫자가 아니거나 1 보다 작으면 1.
+ */
+function api_page_number()
+{
+    return max(1, (int) ($_GET['page'] ?? 1));
+}
+
+/**
+ * 목록 API 의 쪽 번호 · 쪽당 개수 · 건너뛸 줄 수를 한 번에 읽는다.
+ * 쪽당 개수는 ?per_page= (또는 $param 으로 준 이름, 예: 'limit')를 1 ~ $max 로 자르고, 없으면 $default.
+ * 핸들러마다 기본값 · 상한이 다르므로(후기 10, 상품 20, 댓글 50 …) 그대로 넘긴다.
+ *
+ * @return array{0: int, 1: int, 2: int} [page, perPage, offset]
+ */
+function api_page_params($default = 20, $max = 100, $param = 'per_page')
+{
+    $page = api_page_number();
+    $perPage = min((int) $max, max(1, (int) ($_GET[$param] ?? $default)));
+
+    return [$page, $perPage, ($page - 1) * $perPage];
+}
+
 function api_current_origin()
 {
     return api_public_request_origin(false);
@@ -298,11 +365,37 @@ function api_board_file_thumb_widths()
     return api_image_variant_widths();
 }
 
-function api_board_file_url($bo_table, $wr_id, $bf_no, $bf_file, $width = 0)
+/**
+ * 외부 저장소에 둔 첨부의 주소. 저장소 플러그인(S3 등)은 그누보드 훅 write_update_upload_array 에서
+ * 파일을 옮기고 bf_fileurl · bf_thumburl 을 채운다. 목록 썸네일이면 bf_thumburl 을 먼저 쓴다 — 글 보기처럼
+ * 큰 칸에 그리는 사진에는 플러그인이 만든 작은 썸네일을 쓰지 않는다(흐려진다).
+ * http(s) 주소가 아니면 쓰지 않는다(javascript: 같은 값이 화면 링크로 가지 않게).
+ */
+function api_board_file_remote_url(array $fileRow, $preferThumb = false)
+{
+    $candidates = $preferThumb
+        ? array($fileRow['bf_thumburl'] ?? '', $fileRow['bf_fileurl'] ?? '')
+        : array($fileRow['bf_fileurl'] ?? '');
+    foreach ($candidates as $url) {
+        $url = trim((string) $url);
+        if ($url !== '' && preg_match('#^https?://#i', $url) && filter_var($url, FILTER_VALIDATE_URL)) {
+            return $url;
+        }
+    }
+    return '';
+}
+
+/**
+ * 첨부 사진 주소 — 로컬(data/file)에 있으면 board-files 통로(크기별 사본 · 캐시), 없으면 외부 저장소 주소.
+ *
+ * @param array $fileRow     첨부 행(bf_fileurl · bf_thumburl). 로컬 파일이 없을 때만 본다.
+ * @param bool  $remoteThumb 외부 저장소면 bf_thumburl 을 먼저 쓴다(목록 썸네일만)
+ */
+function api_board_file_url($bo_table, $wr_id, $bf_no, $bf_file, $width = 0, $height = 0, array $fileRow = array(), $remoteThumb = false)
 {
     $path = api_board_file_path($bo_table, $bf_file);
     if ($path === '') {
-        return '';
+        return api_board_file_remote_url($fileRow, (bool) $remoteThumb);
     }
 
     $bo_table = api_sanitize_bo_table($bo_table);
@@ -320,10 +413,15 @@ function api_board_file_url($bo_table, $wr_id, $bf_no, $bf_file, $width = 0)
     if ($stamp) {
         $query['v'] = $stamp;
     }
-    // 목록이 쓰는 폭만 싣는다. 주소에 폭이 들어가야 브라우저·CDN 이 크기별로 따로 캐시한다.
+    // 목록이 쓰는 크기만 싣는다. 주소에 크기가 들어가야 브라우저·CDN 이 크기별로 따로 캐시한다.
+    // 세로가 있으면 게시판 갤러리 크기로 잘라 낸 썸네일(lib/image-variants.php).
     $width = (int) $width;
-    if ($width > 0 && in_array($width, api_board_file_thumb_widths(), true)) {
+    $height = (int) $height;
+    if ($width > 0 && api_image_size_allowed($width, $height)) {
         $query['w'] = $width;
+        if ($height > 0) {
+            $query['h'] = $height;
+        }
     }
 
     return ($base !== '' ? $base : '')
@@ -473,6 +571,126 @@ function api_board_post_href($bo_table, $wr_id, $wr_seo_title = '', $suffix = ''
     }
 
     return api_g5_short_href('/boards/' . rawurlencode($bo_table) . '/' . $wr_id . $suffix);
+}
+
+/**
+ * 글 · 댓글을 지울 때 쓰면서 받은 포인트를 거둔다 — 그누보드 bbs/delete.php · delete_comment.php 와 같다.
+ * 받은 내역이 있으면 그 내역을 지우고(delete_point), 지울 수 없으면 같은 만큼 뺀다.
+ * 거두지 않으면 쓰고 지우기를 되풀이해 포인트를 쌓을 수 있다.
+ *
+ * @param string $action  '쓰기' 또는 '댓글' (줄 때 쓴 po_rel_action)
+ * @param int    $point   게시판의 bo_write_point 또는 bo_comment_point
+ * @param string $content 차감 내역에 남길 글(원본: "게시판 12 글삭제", "게시판 12-34 댓글삭제")
+ */
+function api_revoke_board_point($mbId, $bo_table, $relId, $action, $point, $content)
+{
+    $mbId = (string) $mbId;
+    if ($mbId === '' || !function_exists('delete_point') || !function_exists('insert_point')) {
+        return;
+    }
+    if (!delete_point($mbId, (string) $bo_table, (string) $relId, (string) $action)) {
+        insert_point($mbId, (int) $point * (-1), (string) $content);
+    }
+}
+
+/**
+ * 그룹 · 게시판 관리자가 자기보다 레벨이 높은 회원의 글 · 댓글을 건드리려 하나 — 그누보드 bbs/delete.php ·
+ * delete_comment.php 는 이때 지우지 못하게 한다. 최고관리자, 자기 글, 비회원 글은 해당 없음.
+ *
+ * @param string $role Auth::adminRole($member, $bo_table)
+ * @param array  $row  글 · 댓글 행(mb_id)
+ */
+function api_board_admin_outranked(array $member, $role, array $row)
+{
+    if ($role !== 'group' && $role !== 'board') {
+        return false;
+    }
+    $authorId = (string) ($row['mb_id'] ?? '');
+    if ($authorId === '' || $authorId === (string) ($member['mb_id'] ?? '')) {
+        return false;
+    }
+    $author = DB::fetch('SELECT mb_level FROM ' . DB::table('member_table') . ' WHERE mb_id = ? LIMIT 1', [$authorId]);
+    return $author && (int) ($member['mb_level'] ?? 0) < (int) $author['mb_level'];
+}
+
+/** LIKE 'prefix%' 에 넣을 값 — prefix 안의 % · _ · \ 는 글자 그대로 */
+function api_like_prefix($prefix)
+{
+    return addcslashes((string) $prefix, '%_\\') . '%';
+}
+
+/**
+ * 글을 고치거나 지우기 전에 그누보드가 거는 제한 — bbs/write.php · write_update.php(수정), bbs/delete.php(삭제).
+ *  - 그룹 · 게시판 관리자는 자기보다 레벨이 높은 회원의 글을 건드리지 못한다(403).
+ *  - 관리자가 아니면 답변글이 있는 글, 남이 단 댓글이 bo_count_modify / bo_count_delete 건 이상인 글은 막는다(409).
+ *    수정은 bo_count_modify 가 0 이면 제한이 없고, 삭제는 원본대로 bo_count_delete 를 그대로 비교한다.
+ * 권한(본인 · 관리자) 검사를 통과한 뒤에 부른다. 막으면 [메시지, 상태], 아니면 null.
+ *
+ * @param string $mode 'modify' 또는 'delete'
+ */
+function api_post_change_blocked(array $member, $bo_table, array $board, array $post, $write_table, $mode)
+{
+    $isDelete = $mode === 'delete';
+    $verb = $isDelete ? '삭제' : '수정';
+    $role = Auth::adminRole($member, $bo_table);
+    if (api_board_admin_outranked($member, $role, $post)) {
+        return array("자신의 권한보다 높은 권한의 회원이 작성한 글은 {$verb}할 수 없습니다.", 403);
+    }
+    if ($role !== '') {
+        return null;
+    }
+
+    // 답변글이 있으면 막는다 — 지우면 답변글만 남고, 고치면 답변글이 가리키는 내용이 바뀐다.
+    $replyCount = (int) DB::count(
+        "SELECT COUNT(*) FROM {$write_table}
+         WHERE wr_reply LIKE ? AND wr_id <> ? AND wr_num = ? AND wr_is_comment = 0",
+        [api_like_prefix($post['wr_reply'] ?? ''), (int) $post['wr_id'], (int) $post['wr_num']]
+    );
+    if ($replyCount > 0) {
+        return array("이 글과 관련된 답변글이 존재하므로 {$verb}할 수 없습니다.\n"
+            . ($isDelete ? '우선 답변글부터 삭제하여 주십시오.' : '답변글이 있는 원글은 수정할 수 없습니다.'), 409);
+    }
+
+    // 남이 단 댓글이 기준 이상이면 막는다 — 지우면 남의 댓글과 그 포인트까지 사라진다.
+    $limit = (int) ($board[$isDelete ? 'bo_count_delete' : 'bo_count_modify'] ?? 0);
+    if (!$isDelete && $limit <= 0) {
+        return null;
+    }
+    $othersComments = (int) DB::count(
+        "SELECT COUNT(*) FROM {$write_table} WHERE wr_parent = ? AND mb_id <> ? AND wr_is_comment = 1",
+        [(int) $post['wr_id'], (string) $member['mb_id']]
+    );
+    if ($othersComments >= $limit) {
+        return array("이 글과 관련된 댓글이 존재하므로 {$verb}할 수 없습니다.\n댓글이 {$limit}건 이상 달린 원글은 {$verb}할 수 없습니다.", 409);
+    }
+    return null;
+}
+
+/**
+ * 댓글을 고치거나 지우기 전에 그누보드가 거는 제한 — bbs/write_comment_update.php(수정), delete_comment.php(삭제).
+ * 관리자 레벨 비교(403), 관리자가 아니면 답변 댓글이 있는 댓글은 막는다(409). 막으면 [메시지, 상태], 아니면 null.
+ *
+ * @param string $mode 'modify' 또는 'delete'
+ */
+function api_comment_change_blocked(array $member, $bo_table, array $comment, $write_table, $mode)
+{
+    $verb = $mode === 'delete' ? '삭제' : '수정';
+    $role = Auth::adminRole($member, $bo_table);
+    if (api_board_admin_outranked($member, $role, $comment)) {
+        return array("관리자의 권한보다 높은 회원의 댓글이므로 {$verb}할 수 없습니다.", 403);
+    }
+    if ($role !== '') {
+        return null;
+    }
+    $replyCount = (int) DB::count(
+        "SELECT COUNT(*) FROM {$write_table}
+         WHERE wr_comment_reply LIKE ? AND wr_id <> ? AND wr_parent = ? AND wr_comment = ? AND wr_is_comment = 1",
+        [api_like_prefix($comment['wr_comment_reply'] ?? ''), (int) $comment['wr_id'], (int) $comment['wr_parent'], (int) $comment['wr_comment']]
+    );
+    if ($replyCount > 0) {
+        return array("이 댓글과 관련된 답변 댓글이 존재하므로 {$verb}할 수 없습니다.", 409);
+    }
+    return null;
 }
 
 function api_board_file_download_url($bo_table, $wr_id, $bf_no)

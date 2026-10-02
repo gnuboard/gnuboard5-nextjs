@@ -185,10 +185,10 @@ if (!function_exists('shop_api_send_order_mail')) {
         }
 
         // 구매자 메일.
-        @mailer($siteName, $adminMail, $order['od_email'], $subject, $body, 0);
+        api_call_core('mailer', array($siteName, $adminMail, $order['od_email'], $subject, $body, 0)); // 안의 mailer · mail_options · mail_send_result 훅도 보호해서
         // 운영자 메일 (BCC 대신 별도 전송).
         if ($adminMail) {
-            @mailer($siteName, $adminMail, $adminMail, $subject . ' [운영자 알림]', $body, 0);
+            api_call_core('mailer', array($siteName, $adminMail, $adminMail, $subject . ' [운영자 알림]', $body, 0)); // 안의 mailer · mail_options · mail_send_result 훅도 보호해서
         }
     }
 }

@@ -15,6 +15,7 @@ import { useCompareStore } from "@/store/compare";
 import { useThemeSlot } from "@/components/providers/ThemeSlotsProvider";
 import { ProductImageFallback } from "./ProductImageFallback";
 import { ProductQuickAdd } from "./ProductQuickAdd";
+import { isTelInquiry, hasProductDiscount, productDiscountPercent, formatProductPrice } from "@/lib/shop-product-state";
 
 interface ProductCardProps {
   product: ShopProduct;
@@ -50,14 +51,9 @@ function ProductBadges({ product }: { product: ShopProduct }) {
 
 function DefaultProductCard({ product, priority = false, productRewriteMode }: ProductCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
-  const isTelInquiry = String(product.it_tel_inq ?? "0") === "1";
-  const hasDiscount =
-    !isTelInquiry &&
-    product.it_price > 0 &&
-    product.it_cust_price > 0 && product.it_cust_price > product.it_price;
-  const discountPercent = hasDiscount
-    ? Math.round(((product.it_cust_price - product.it_price) / product.it_cust_price) * 100)
-    : 0;
+  const telInquiry = isTelInquiry(product);
+  const hasDiscount = hasProductDiscount(product);
+  const discountPercent = productDiscountPercent(product);
   const showImage = Boolean(product.image_url && !imageFailed);
   const href = shopProductHref(product, productRewriteMode);
 
@@ -93,11 +89,11 @@ function DefaultProductCard({ product, priority = false, productRewriteMode }: P
               <span className="text-sm font-black text-[#b45309]">{discountPercent}%</span>
             )}
             <span className="text-base font-black text-[#1f2933]">
-              {isTelInquiry ? "전화문의" : formatPrice(product.it_price)}
+              {formatProductPrice(product)}
             </span>
           </div>
           <span className="block min-h-4 text-xs text-[#5f6872] line-through">
-            {hasDiscount && !isTelInquiry ? formatPrice(product.it_cust_price) : "\u00A0"}
+            {hasDiscount && !telInquiry ? formatPrice(product.it_cust_price) : "\u00A0"}
           </span>
         </div>
       </Link>

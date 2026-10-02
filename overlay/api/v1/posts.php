@@ -97,7 +97,7 @@ if ($seg0 === 'latest' && $apiMethod === 'GET') {
 
         $posts = DB::readFetchAll(
             "SELECT wr_id, wr_subject, wr_seo_title, wr_name, mb_id, wr_datetime,
-                    wr_hit, wr_good, wr_comment, wr_option, ca_name
+                    wr_hit, wr_good, wr_comment, wr_option, ca_name, wr_content
              FROM {$write_table}
              {$latestWhere}
              ORDER BY wr_id DESC
@@ -107,28 +107,39 @@ if ($seg0 === 'latest' && $apiMethod === 'GET') {
 
         foreach ($posts as $post) {
             $post['bo_table']  = $bt;
-            $post['is_secret'] = (strpos($post['wr_option'], 'secret') !== false);
+            $post['is_secret'] = api_is_secret_option($post['wr_option']);
 
             // Thumbnail: first image attachment
             $post['thumbnail'] = '';
             if (!$post['is_secret']) {
                 $fileRow = DB::readFetch(
-                    "SELECT bf_no, bf_file FROM " . DB::table('board_file_table') . "
+                    "SELECT bf_no, bf_file, bf_fileurl, bf_thumburl FROM " . DB::table('board_file_table') . "
                      WHERE bo_table = ?
                        AND wr_id = ?
                        AND bf_type IN (2, 3)
                      ORDER BY bf_no ASC LIMIT 1",
                     [$bt, $post['wr_id']]
                 );
+                // 그 게시판의 갤러리 크기 · 자르기(2배 밀도) — 그누보드 get_list_thumbnail 과 같다.
+                $listThumbSize = api_image_board_list_size($board);
                 if ($fileRow && $fileRow['bf_file']) {
                     $post['thumbnail'] = api_board_file_url(
                         $bt,
                         (int) $post['wr_id'],
                         (int) $fileRow['bf_no'],
-                        $fileRow['bf_file']
+                        $fileRow['bf_file'],
+                        $listThumbSize[0],
+                        $listThumbSize[1],
+                        $fileRow,
+                        true
                     );
                 }
+                // 첨부 사진이 없으면 본문의 첫 사진(그누보드 get_list_thumbnail 과 같다).
+                if ($post['thumbnail'] === '') {
+                    $post['thumbnail'] = api_editor_first_image_url($post['wr_content'] ?? '', $listThumbSize[0], $listThumbSize[1]);
+                }
             }
+            unset($post['wr_content']);
 
             $latestPosts[] = $post;
         }
@@ -224,10 +235,9 @@ if ($action === 'comments' && $apiMethod === 'GET') {
             Response::error('Open the post first to read its comments.', 403);
         }
     }
-    $page = max(1, (int) ($_GET['page'] ?? 1));
-    $perPage = max(1, min(100, (int) ($_GET['per_page'] ?? 50)));
+    [$page, $perPage, $offset] = api_page_params(50, 100);
     $total = api_post_count_comments($write_table, $wr_id, $viewer);
-    $rows = api_post_load_comments($write_table, $bo_table, $post, $viewer, $perPage, ($page - 1) * $perPage);
+    $rows = api_post_load_comments($write_table, $bo_table, $post, $viewer, $perPage, $offset);
     Response::paginated($rows, $total, $page, $perPage);
 }
 
@@ -311,7 +321,15 @@ if (!$action && $apiMethod === 'GET') {
     // Remove sensitive fields. Keep wr_email present for old clients, but never expose PII.
     unset($post['wr_password'], $post['wr_ip']);
     $post['wr_email'] = '';
-    $post['wr_content'] = api_rewrite_editor_image_urls($post['wr_content'] ?? '');
+    // 글 보기용 본문 — 게시판 이미지 폭(bo_image_width)보다 넓은 본문 사진을 그 폭의 썸네일로(그누보드
+    // get_view_thumbnail). wr_content 에 바로 넣지 않는다: 수정 화면이 이 응답의 wr_content 로 에디터를 채워
+    // 그대로 저장하므로, 썸네일 주소와 원본 보기 링크가 본문에 굳는다. 바뀐 사진이 있을 때만 싣는다.
+    $rawContent = (string) ($post['wr_content'] ?? '');
+    $viewContent = api_view_thumbnail_html($rawContent, (int) ($board['bo_image_width'] ?? 0));
+    if ($viewContent !== $rawContent) {
+        $post['wr_content_view'] = api_rewrite_editor_image_urls($viewContent);
+    }
+    $post['wr_content'] = api_rewrite_editor_image_urls($rawContent);
 
     // Member info
     if ($post['mb_id']) {
@@ -321,26 +339,36 @@ if (!$action && $apiMethod === 'GET') {
             [$post['mb_id']]
         );
         $post['mb_nick']      = isset($mbRow['mb_nick']) ? $mbRow['mb_nick'] : $post['wr_name'];
-        $post['mb_icon_path'] = get_member_icon_url($post['mb_id']);
     } else {
         $post['mb_nick']      = $post['wr_name'];
-        $post['mb_icon_path'] = null;
     }
+    // 글쓴이 그림: 회원아이콘(이름 옆) + 회원이미지(글보기 머리의 아바타). 비회원 글은 둘 다 null.
+    $post = array_merge($post, api_member_media_urls($post['mb_id']));
 
     // Get file attachments
     $files = DB::readFetchAll(
         "SELECT bf_no, bo_table, wr_id, bf_source, bf_file, bf_download,
                 bf_content, bf_filesize, bf_width, bf_height, bf_type,
-                bf_datetime
+                bf_datetime, bf_fileurl, bf_thumburl
          FROM " . DB::table('board_file_table') . "
          WHERE bo_table = ?
            AND wr_id = ?
          ORDER BY bf_no",
         [$bo_table, $wr_id]
     );
+    $viewImageWidth = (int) ($board['bo_image_width'] ?? 0);
     foreach ($files as &$file) {
-        $file['bf_url'] = api_board_file_url($bo_table, $wr_id, $file['bf_no'], $file['bf_file']);
+        $file['bf_url'] = api_board_file_url($bo_table, $wr_id, $file['bf_no'], $file['bf_file'], 0, 0, $file);
         $file['bf_download_url'] = api_board_file_download_url($bo_table, $wr_id, $file['bf_no']);
+        // 글 보기에 그릴 첨부 사진 — 게시판 이미지 폭보다 넓으면 그 폭의 썸네일(그누보드 글 보기와 같다).
+        // bf_url 은 원본 그대로 둔다(원본 보기 · 수정 화면이 쓴다).
+        if ($viewImageWidth > 0 && in_array((int) $file['bf_type'], [1, 2, 3, 18], true)
+            && (int) $file['bf_width'] > $viewImageWidth) {
+            $file['bf_view_url'] = api_board_file_url($bo_table, $wr_id, $file['bf_no'], $file['bf_file'], $viewImageWidth, 0, $file);
+            // 썸네일로 그릴 크기 — 화면이 사진을 받기 전에 자리를 잡는다(가로세로 비율은 원본과 같다).
+            $file['bf_view_width'] = $viewImageWidth;
+            $file['bf_view_height'] = (int) round((int) $file['bf_height'] * $viewImageWidth / max(1, (int) $file['bf_width']));
+        }
     }
     unset($file);
     $post['files'] = $files;
@@ -434,6 +462,15 @@ if (!$action && $apiMethod === 'PATCH') {
         Response::error('You do not have permission to edit this post.', 403);
     }
 
+    // 그누보드 bbs/write.php · write_update.php 의 수정 제한(관리자 레벨 · 답변글 · bo_count_modify).
+    $blocked = api_post_change_blocked($member, $bo_table, $board, $post, $write_table, 'modify');
+    if ($blocked !== null) {
+        Response::error($blocked[0], $blocked[1]);
+    }
+
+    // 그누보드 훅(bbs/write_update.php) — 수정은 $w = 'u'. $qstr 는 API 에 없으므로 빈 값.
+    api_run_before_event('write_update_before', array($board, $wr_id, 'u', ''), $member);
+
     $input = get_request_body();
 
     if (isset($input['wr_subject']) || isset($input['wr_seo_title'])) {
@@ -506,6 +543,10 @@ if (!$action && $apiMethod === 'PATCH') {
     $setStr = implode(', ', $setClauses);
     DB::execute("UPDATE {$write_table} SET {$setStr} WHERE wr_id = ?", $params);
 
+    // 그누보드 latest() 위젯 캐시를 비운다(원본과 같이 훅 앞에서). 안의 delete_cache_latest 훅도 보호해서 부른다.
+    api_call_core('delete_cache_latest', array($bo_table), $member);
+    api_run_event('write_update_after', array($board, $wr_id, 'u', '', ''), $member);
+
     // Return updated post
     $updatedPost = DB::fetch(
         "SELECT * FROM {$write_table} WHERE wr_id = ? LIMIT 1",
@@ -542,6 +583,12 @@ if (!$action && $apiMethod === 'DELETE') {
         Response::error('You do not have permission to delete this post.', 403);
     }
 
+    // 그누보드 bbs/delete.php 의 삭제 제한 — 아무것도 지우기(포인트 회수 · 파일 삭제) 전에 본다.
+    $blocked = api_post_change_blocked($member, $bo_table, $board, $post, $write_table, 'delete');
+    if ($blocked !== null) {
+        Response::error($blocked[0], $blocked[1]);
+    }
+
     // 지울 댓글 수. 코어 delete.php 처럼 게시판 댓글 수(bo_count_comment)에서도 뺀다.
     $commentCountRow = DB::fetch(
         "SELECT COUNT(*) AS cnt FROM {$write_table}
@@ -550,12 +597,48 @@ if (!$action && $apiMethod === 'DELETE') {
     );
     $deletedComments = (int) ($commentCountRow['cnt'] ?? 0);
 
+    // 글과 그 댓글로 받은 포인트를 거둔다(bbs/delete.php 와 같은 내역 · 문구).
+    $boardSubject = (string) ($board['bo_subject'] ?? '');
+    foreach (DB::fetchAll("SELECT wr_id, mb_id, wr_is_comment FROM {$write_table} WHERE wr_parent = ?", [$wr_id]) as $pointRow) {
+        if ((int) $pointRow['wr_is_comment'] === 1) {
+            api_revoke_board_point($pointRow['mb_id'], $bo_table, $pointRow['wr_id'], '댓글',
+                (int) ($board['bo_comment_point'] ?? 0), "{$boardSubject} {$wr_id}-{$pointRow['wr_id']} 댓글삭제");
+        } else {
+            api_revoke_board_point($pointRow['mb_id'], $bo_table, $pointRow['wr_id'], '쓰기',
+                (int) ($board['bo_write_point'] ?? 0), "{$boardSubject} {$pointRow['wr_id']} 글삭제");
+        }
+    }
+
     // Delete comments belonging to this post
     DB::execute(
         "DELETE FROM {$write_table}
          WHERE wr_parent = ? AND wr_is_comment = 1",
         [$wr_id]
     );
+
+    // 첨부 파일을 디스크에서 지운다 — 그누보드 bbs/delete.php 처럼 delete_file_path 훅을 거쳐서.
+    // 행만 지우면 data/file 에 주인 없는 파일이 남는다.
+    $attachedFiles = DB::fetchAll(
+        "SELECT * FROM " . DB::table('board_file_table') . " WHERE bo_table = ? AND wr_id = ?",
+        [$bo_table, $wr_id]
+    );
+    foreach ($attachedFiles as $fileRow) {
+        if ((string) $fileRow['bf_file'] === '') {
+            continue;
+        }
+        $deleteFile = api_run_replace(
+            'delete_file_path',
+            G5_DATA_PATH . '/file/' . $bo_table . '/' . str_replace('../', '', (string) $fileRow['bf_file']),
+            array($fileRow),
+            $member
+        );
+        if (is_string($deleteFile) && is_file($deleteFile)) {
+            @unlink($deleteFile);
+        }
+        if (function_exists('delete_board_thumbnail')) {
+            delete_board_thumbnail($bo_table, (string) $fileRow['bf_file']);
+        }
+    }
 
     // Delete file records
     DB::execute(
@@ -585,11 +668,12 @@ if (!$action && $apiMethod === 'DELETE') {
         [$deletedComments, $bo_table]
     );
 
-    // Delete from board_new table
+    // 최근 게시물(board_new)에서 글과 그 댓글 줄을 함께 지운다 — 그누보드 bbs/delete.php 와 같이 wr_parent 로.
+    // wr_id 로만 지우면 댓글 줄이 남아 관리자 메인 "최근게시물"이 지워진 글을 읽다 경고를 낸다.
     DB::execute(
         "DELETE FROM " . DB::table('board_new_table') . "
          WHERE bo_table = ?
-           AND wr_id = ?",
+           AND wr_parent = ?",
         [$bo_table, $wr_id]
     );
 
@@ -603,6 +687,15 @@ if (!$action && $apiMethod === 'DELETE') {
         );
     }
 
+    // 그누보드 훅(bbs/delete.php) — 지운 글 행과 게시판
+    // 에디터로 넣은 사진의 썸네일과 이 글의 스크랩을 지운다(bbs/delete.php 와 같다).
+    api_call_core('delete_editor_thumbnail', array((string) ($post['wr_content'] ?? '')), $member);
+    DB::execute("DELETE FROM " . DB::table('scrap_table') . " WHERE bo_table = ? AND wr_id = ?", [$bo_table, $wr_id]);
+
+    // 그누보드 latest() 위젯 캐시를 비운다(원본과 같이 훅 앞에서). 안의 delete_cache_latest 훅도 보호해서 부른다.
+    api_call_core('delete_cache_latest', array($bo_table), $member);
+    api_run_event('bbs_delete', array($post, $board), $member);
+
     Response::noContent();
 }
 
@@ -614,6 +707,9 @@ if (($action === 'good' || $action === 'nogood') && $apiMethod === 'POST') {
     $member = Auth::requireAuth();
     $flag = $action;
     $countColumn = $flag === 'good' ? 'wr_good' : 'wr_nogood';
+
+    // 그누보드 훅(bbs/good.php) — 검사 전에 부른다. $good 은 'good' 또는 'nogood'.
+    api_run_before_event('bbs_good_before', array($bo_table, $wr_id, $flag), $member);
 
     // Fetch existing post
     $post = DB::fetch(
@@ -697,6 +793,10 @@ if (($action === 'good' || $action === 'nogood') && $apiMethod === 'POST') {
     );
 
     $updated = DB::fetch("SELECT wr_good, wr_nogood FROM {$write_table} WHERE wr_id = ?", [$wr_id]);
+
+    // 그누보드 훅 — 원본의 JSON(AJAX) 응답 길과 같이 올린 뒤, 그리고 끝에
+    api_run_event('bbs_increase_good_json', array($bo_table, $wr_id, $flag), $member);
+    api_run_event('bbs_good_after', array($bo_table, $wr_id, $flag), $member);
 
     Response::success([
         'wr_id'     => $wr_id,

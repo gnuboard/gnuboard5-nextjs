@@ -64,9 +64,9 @@ if (!function_exists('api_auth_member_payload')) {
             }
         }
 
-        if (!empty($member['mb_id']) && function_exists('get_member_icon_url')) {
-            $payload['mb_icon_path'] = get_member_icon_url((string) $member['mb_id']);
-            $payload['mb_image_path'] = function_exists('get_member_image_url') ? get_member_image_url((string) $member['mb_id']) : null;
+        if (!empty($member['mb_id']) && function_exists('api_member_media_urls')) {
+            // 회원아이콘 · 회원이미지 경로(api/lib/helpers.php 공용).
+            $payload = array_merge($payload, api_member_media_urls((string) $member['mb_id'], true));
         }
 
         $payload['is_super_admin'] = Auth::adminRole($member) === 'super';
@@ -98,7 +98,7 @@ if (!function_exists('api_auth_send_password_reset_mail')) {
             . $resetUrl . "\n\n"
             . "If you did not request this, you can ignore this email.";
 
-        @mailer($siteName, $fromMail, $toMail, $subject, $body, 0);
+        api_call_core('mailer', array($siteName, $fromMail, $toMail, $subject, $body, 0)); // 안의 mailer · mail_options · mail_send_result 훅도 보호해서
         return true;
     }
 }
