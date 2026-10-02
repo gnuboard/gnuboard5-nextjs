@@ -39,6 +39,7 @@ export function useOrderSubmit({
   directCtIds,
   setSubmitting,
   setPaymentNotice,
+  onCartChanged,
 }: UseOrderSubmitOptions) {
   const router = useRouter();
   // Synchronous re-entrancy guard. setSubmitting is async React state, so it
@@ -84,6 +85,7 @@ export function useOrderSubmit({
           directCtIds,
           setSubmitting,
           setPaymentNotice,
+          onCartChanged,
           router,
           origin: window.location.origin,
           clientUid: clientUidRef.current,
@@ -120,6 +122,7 @@ export function useOrderSubmit({
       directCtIds,
       setSubmitting,
       setPaymentNotice,
+      onCartChanged,
       router,
     ]
   );

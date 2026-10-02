@@ -497,7 +497,9 @@ if (!$action && $apiMethod === 'PATCH') {
     if (count(array_intersect($optionKeys, array_keys($input))) > 0) {
         $adminRole = Auth::adminRole($member, $bo_table);
         $options = array_values(array_filter(explode(',', api_build_wr_option($input, $post['wr_option'] ?? ''))));
-        if (!api_board_html_allowed($board, $member, $adminRole)) {
+        // html 을 요청했을 때만 권한으로 거른다 — 비밀글만 바꾸는 수정이 지금 글의 html1 까지 지우지 않게.
+        $htmlRequested = array_key_exists('html', $input) || array_key_exists('wr_option', $input);
+        if ($htmlRequested && !api_board_html_allowed($board, $member, $adminRole)) {
             // HTML 권한(bo_html_level) 아래면 html 옵션을 받지 않는다(그누보드 write.php 의 $is_html).
             $options = array_values(array_diff($options, array('html1', 'html2')));
         }

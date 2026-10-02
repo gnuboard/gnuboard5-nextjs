@@ -356,17 +356,38 @@ class RefreshToken
     {
         $table = DB::table('refresh_token_table');
         if ($exceptSession !== null && $exceptSession > 0 && self::hasFamilyColumn()) {
-            return DB::execute(
+            $revoked = DB::execute(
                 "UPDATE `{$table}` SET status = 'revoked', revoked_at = NOW()" . self::remoteMark() . "
                   WHERE mb_id = ? AND status = 'active' AND (session_family IS NULL OR session_family <> ?)",
                 [$mb_id, $exceptSession]
             );
+        } else {
+            $revoked = DB::execute(
+                "UPDATE `{$table}` SET status = 'revoked', revoked_at = NOW()" . self::remoteMark() . "
+                  WHERE mb_id = ? AND status = 'active'",
+                [$mb_id]
+            );
         }
-        return DB::execute(
-            "UPDATE `{$table}` SET status = 'revoked', revoked_at = NOW()" . self::remoteMark() . "
-              WHERE mb_id = ? AND status = 'active'",
-            [$mb_id]
-        );
+        self::revokeCoreAutoLogin($mb_id);
+        return $revoked;
+    }
+
+    /**
+     * 그누보드 원본의 자동 로그인 토큰도 지운다(5.6.41 부터 g5_member_auto_login 에 기기마다 31일짜리로 남는다).
+     * 원본은 그 기기에서 로그아웃할 때만 지워서, 전체 로그아웃 · 비밀번호 변경 뒤에도 다른 브라우저의 "자동로그인"이
+     * 살아 있을 수 있다. 표 이름이 등록되지 않은 판(5.6.30 등)은 건너뛰고, 표가 아직 없으면 로그만 남긴다.
+     */
+    private static function revokeCoreAutoLogin(string $mb_id): void
+    {
+        $table = isset($GLOBALS['g5']['member_auto_login_table']) ? (string) $GLOBALS['g5']['member_auto_login_table'] : '';
+        if ($mb_id === '' || $table === '' || !preg_match('/^[A-Za-z0-9_]+$/', $table)) {
+            return;
+        }
+        try {
+            DB::execute("DELETE FROM `{$table}` WHERE mb_id = ?", [$mb_id]);
+        } catch (\Throwable $e) {
+            error_log('[RefreshToken] core auto-login cleanup skipped: ' . $e->getMessage());
+        }
     }
 
     /** 서버가 끊는 UPDATE 에 붙이는 SET 조각 — 컬럼이 없는 설치본에서는 빈 문자열. */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { G5Link as Link } from "@/components/ui/g5-link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { HelpCircle, PenSquare, Settings, Trash2 } from "lucide-react";
@@ -14,7 +14,7 @@ import { deleteQa, getQaConfig, getQas } from "@/services/qas";
 import { useAuthStore } from "@/store/auth";
 import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
-import { SafeHtml } from "@/components/SafeHtml";
+import { QaConfigContent } from "@/components/qa/qa-content";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { MypagePanel } from "../MypagePanel";
 import { QaCategoryTabs, QaListRow, QaSearchForm, qaSearchField, type QaSearchField } from "./QaListParts";
@@ -52,7 +52,11 @@ export default function MyQasPage() {
       .catch(() => setConfig(null));
   }, []);
 
+  // 가장 마지막 요청의 응답만 쓴다. 관리자 여부가 늦게 확인되면 "내 문의"와 "전체 문의"를 차례로 부르는데,
+  // 앞 요청이 늦게 와서 관리자 화면을 "내 문의"로 덮으면 안 된다. 쪽 · 분류를 빠르게 바꿀 때도 같다.
+  const requestSeq = useRef(0);
   const loadQas = useCallback(async () => {
+    const request = ++requestSeq.current;
     setLoading(true);
     setSelected(new Set());
     try {
@@ -65,14 +69,16 @@ export default function MyQasPage() {
         sfl,
         stx,
       });
+      if (request !== requestSeq.current) return;
       setItems(result.items);
       setMeta(result.meta);
     } catch (error) {
+      if (request !== requestSeq.current) return;
       setItems([]);
       setMeta(undefined);
       toastError(error instanceof Error ? error.message : "1:1 문의를 불러오지 못했습니다.");
     } finally {
-      setLoading(false);
+      if (request === requestSeq.current) setLoading(false);
     }
   }, [isSuperAdmin, page, sca, sfl, status, stx]);
 
@@ -144,7 +150,7 @@ export default function MyQasPage() {
         </div>
       }
     >
-      <ContentBlock pc={config?.qa_content_head ?? ""} mobile={config?.qa_mobile_content_head ?? ""} />
+      <QaConfigContent pc={config?.qa_content_head} mobile={config?.qa_mobile_content_head} />
 
       <QaCategoryTabs categories={config?.categories ?? []} current={sca} onSelect={(category) => updateQuery({ sca: category })} />
 
@@ -252,18 +258,7 @@ export default function MyQasPage() {
         }}
       />
 
-      <ContentBlock pc={config?.qa_content_tail ?? ""} mobile={config?.qa_mobile_content_tail ?? ""} />
+      <QaConfigContent pc={config?.qa_content_tail} mobile={config?.qa_mobile_content_tail} />
     </MypagePanel>
-  );
-}
-
-/** 관리자가 1:1문의 설정에 넣은 목록 위 · 아래 내용. 그누보드처럼 작은 화면은 모바일용을 쓴다. */
-function ContentBlock({ pc, mobile }: { pc: string; mobile: string }) {
-  if (!pc && !mobile) return null;
-  return (
-    <>
-      {pc ? <SafeHtml html={pc} className="g5-content hidden md:block" /> : null}
-      {mobile ? <SafeHtml html={mobile} className="g5-content md:hidden" /> : null}
-    </>
   );
 }

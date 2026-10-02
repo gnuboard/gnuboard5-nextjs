@@ -13,6 +13,18 @@ if (!defined('_GNUBOARD_')) exit;
 // 아이디 → 키 방향만 알려 준다(아이디를 이미 아는 사람에게만 쓸모가 있다). 키가 없으면(표 미설치) mb_key 는 ''.
 // -------------------------------------------------------------------------
 if ($seg0 && $seg0 !== 'me' && isset($apiSegments[1]) && $apiSegments[1] === 'key' && $apiMethod === 'GET') {
+    // 200/404 로 그 아이디가 있는지도 드러난다. 아이디를 대량으로 확인하려면 대부분 없는 아이디를 묻게 되므로
+    // 없는 아이디(404)만 센다 — 사이드뷰처럼 있는 회원을 묻는 보통 사용은 걸리지 않는다(여럿이 IP 하나를 써도).
+    // 로그인한 회원은 회원 단위, 비회원은 IP 단위. 한도를 넘으면 있는 아이디도 429 로 막아 200/404 차이를 남기지 않는다.
+    $keyViewer = Auth::getUser();
+    $keySubject = $keyViewer && !empty($keyViewer['mb_id'])
+        ? 'mb:' . (string) $keyViewer['mb_id']
+        : 'ip:' . (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+    $keyQuotaMsg = Throttle::checkMemberQuota('memberkeymiss', $keySubject, 30, 300, false);
+    if ($keyQuotaMsg !== null) {
+        Response::error($keyQuotaMsg, 429);
+    }
+
     $keyMbId = api_member_id_from_ref($seg0);
     $keyTarget = $keyMbId === '' ? null : DB::fetch(
         "SELECT mb_id FROM " . DB::table('member_table') . "
@@ -21,6 +33,7 @@ if ($seg0 && $seg0 !== 'me' && isset($apiSegments[1]) && $apiSegments[1] === 'ke
         [$keyMbId]
     );
     if (!$keyTarget || empty($keyTarget['mb_id'])) {
+        Throttle::checkMemberQuota('memberkeymiss', $keySubject, 30, 300);
         Response::error('Member not found.', 404);
     }
 

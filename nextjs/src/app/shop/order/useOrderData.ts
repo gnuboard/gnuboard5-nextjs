@@ -9,7 +9,9 @@ import {
   type SavedAddress,
 } from "./orderAddressHelpers";
 import { type PaymentConfig } from "./orderPaymentHelpers";
+import { shownOrderCtIds } from "./orderDataHelpers";
 import { type MyCoupon } from "./orderPricingHelpers";
+import { useOrderCartReload } from "./useOrderCartReload";
 import { useOrderInitialData } from "./useOrderInitialData";
 import { useOrderShippingQuote } from "./useOrderShippingQuote";
 
@@ -64,18 +66,28 @@ export function useOrderData({
   const shippingZip = (
     addressSelection === "same" ? orderer.zip : recipient.zip
   ).replace(/[^0-9]/g, "");
+  // 이 주문서가 보여 준 줄 — 배송비 견적 · 주문 · 결제 준비가 모두 이 줄만 쓴다.
+  const orderCtIds = shownOrderCtIds(directCtIds, items);
+  const reloadItems = useOrderCartReload({
+    directCheckout,
+    directCtIds,
+    setItems,
+    setCartShippingCost,
+  });
 
   useOrderShippingQuote({
     itemCount: items.length,
     shippingZip,
     directCheckout,
-    directCtIds,
+    directCtIds: orderCtIds,
     setCartShippingCost,
     setShippingPolicy,
   });
 
   return {
     items,
+    orderCtIds,
+    reloadItems,
     loading,
     paymentMethod,
     setPaymentMethod,

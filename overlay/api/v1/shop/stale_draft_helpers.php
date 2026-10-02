@@ -87,6 +87,44 @@ if (!function_exists('shop_api_cancel_one_stale_draft')) {
     }
 }
 
+if (!function_exists('shop_api_restore_pending_order_cart_locked')) {
+    /**
+     * 결제 확인과 같은 잠금을 잡고 임시 주문(준비)을 장바구니로 되돌린다 — 결제 재시도 · 무통장으로 바꾼 주문 · 주문서
+     * 다시 열기(shop_api_restore_pending_cart_rows_by_ct_ids)가 쓴다. 결제 확인이 이 주문을 쥐고 있으면 건드리지 않는다
+     * — 확인이 '준비'를 본 바로 뒤에 취소하면 결제는 되고 상품 줄은 없는 주문이 된다. 잠근 뒤 다시 읽어 그사이 결제가
+     * 끝났으면(준비가 아니면) 그대로 둔다.
+     *
+     * @return int 되돌린 줄 수
+     */
+    function shop_api_restore_pending_order_cart_locked(array $order, $member, string $reason): int
+    {
+        $odId = (string) ($order['od_id'] ?? '');
+        if ($odId === '') {
+            return 0;
+        }
+        $lockName = shop_api_stale_draft_lock_name($odId);
+        try {
+            $lock = DB::fetch('SELECT GET_LOCK(?, 0) AS l', [$lockName]);
+        } catch (\Throwable $e) {
+            error_log('[restore-draft] lock failed ' . $odId . ': ' . $e->getMessage());
+            return 0;
+        }
+        if ((int) ($lock['l'] ?? 0) !== 1) {
+            return 0;
+        }
+        try {
+            $fresh = DB::fetch('SELECT * FROM ' . DB::table('g5_shop_order_table') . ' WHERE od_id = ? LIMIT 1', [$odId]);
+            return $fresh ? shop_api_restore_pending_order_cart($fresh, $member, $reason) : 0;
+        } finally {
+            try {
+                DB::fetch('SELECT RELEASE_LOCK(?) AS l', [$lockName]);
+            } catch (\Throwable $e) {
+                // 이름 락은 연결 단위 — 연결이 닫히면 풀린다.
+            }
+        }
+    }
+}
+
 if (!function_exists('shop_api_cancel_stale_payment_drafts')) {
     /** @return int 취소한 초안 수 */
     function shop_api_cancel_stale_payment_drafts(int $limit = 20): int

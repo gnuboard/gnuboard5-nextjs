@@ -13,9 +13,8 @@
 error_reporting(E_ERROR | E_PARSE);
 ini_set('display_errors', '0');
 
-if (!defined('_GNUBOARD_')) {
-    define('_GNUBOARD_', true);
-}
+// _GNUBOARD_ 는 여기서 정의하지 않는다 — 아래 common.php 가 읽는 원본 config.php 가 정의하므로,
+// 먼저 정의하면 요청마다 "Constant _GNUBOARD_ already defined" 경고가 로그에 쌓인다.
 
 // JSON API 요청 표시. 테마 런타임(plugin/webapp/bridge/runtime.php)이 테마 전용
 // 설정 누락으로 API 응답까지 중단하지 않도록, common.php 부트스트랩 전에 정의한다.
@@ -574,6 +573,11 @@ if (!function_exists('g5_api_send_deployment_status')) {
                 'social_signup_bridge' => true,
                 'social_existing_account_link' => true,
                 'shop_seo_short_url' => true,
+            ),
+            'configuration' => array(
+                // 비밀번호 재설정 · 메일 인증 메일의 링크 주소(NEXT_PUBLIC_APP_URL 또는 G5_DOMAIN)가 정해졌는지.
+                // false 면 이 메일들은 나가지 않는다(Host 헤더로 만든 주소는 쓰지 않는다).
+                'security_mail_link_configured' => function_exists('api_mail_link_base') && api_mail_link_base() !== '',
             ),
             'database' => array(
                 'ok' => $dbOk,

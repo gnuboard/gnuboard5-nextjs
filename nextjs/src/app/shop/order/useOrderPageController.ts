@@ -46,7 +46,8 @@ export function useOrderPageController() {
       orderData,
       discounts,
       directCheckout,
-      directCtIds,
+      // 주소의 ct_ids 가 없어도 주문서가 보여 준 줄을 보낸다 — 본 것만 주문된다.
+      directCtIds: orderData.orderCtIds,
     })
   );
 

@@ -248,7 +248,11 @@ if ($seg0 === 'me' && $apiMethod === 'PATCH') {
                 $emailChanged = strtolower(trim((string) $value)) !== strtolower(trim((string) ($member['mb_email'] ?? '')));
                 if ($emailChanged) {
                     api_member_require_current_password($input, $member);
-                    $emailVerifyToken = bin2hex(random_bytes(16));
+                    // 원본 register_form_update.php 처럼 메일 인증을 쓰는 사이트에서만 바뀐 주소를 다시 인증받는다.
+                    // 토큰은 원본(5.6.41+)과 같은 "무작위.발급시각" 모양 — 발급 시각이 없으면 가입 시각 기준이라
+                    // 원본 정리 작업이 이 회원을 곧바로 기한 넘긴 미인증 회원으로 보고 탈퇴 처리한다.
+                    $certifyConfig = api_get_config();
+                    $emailVerifyToken = !empty($certifyConfig['cf_use_email_certify']) ? api_email_certify_new_token() : '';
                     $changedEmail = trim((string) $value);
                 }
                 // Check duplicate email (excluding current member)
@@ -286,7 +290,7 @@ if ($seg0 === 'me' && $apiMethod === 'PATCH') {
             $setClauses[] = "{$field} = ?";
             $params[] = $value;
 
-            if ($field === 'mb_email' && $emailChanged) {
+            if ($field === 'mb_email' && $emailChanged && $emailVerifyToken !== '') {
                 $setClauses[] = "mb_email_certify = ?";
                 $params[] = '0000-00-00 00:00:00';
                 $setClauses[] = "mb_email_certify2 = ?";
@@ -363,8 +367,16 @@ if ($seg0 === 'me' && $apiMethod === 'PATCH') {
         }
     }
 
+    // 바뀐 주소를 다시 인증해야 하면 화면이 분명히 알리도록 응답에 싣는다(원본은 로그아웃시키고 다시 인증하라고 알린다).
+    // 인증 전에는 다시 로그인할 수 없고, 5.6.41 원본 정리 작업은 유효시간이 지난 미인증 회원을 탈퇴 처리한다.
+    $emailVerification = null;
     if ($emailChanged && $emailVerifyToken !== '' && $changedEmail !== '') {
-        api_member_send_email_verification_mail((string) $member['mb_id'], $changedEmail, $emailVerifyToken);
+        $emailVerification = [
+            'required'      => true,
+            'email'         => $changedEmail,
+            'mail_sent'     => api_member_send_email_verification_mail((string) $member['mb_id'], $changedEmail, $emailVerifyToken),
+            'valid_minutes' => api_email_certify_minutes(),
+        ];
     }
 
     // Fetch updated member
@@ -375,9 +387,11 @@ if ($seg0 === 'me' && $apiMethod === 'PATCH') {
 
     api_run_event('register_form_update_after', array((string) $member['mb_id'], 'u'), $updated ?: $member);
 
-    Response::success([
-        'member' => $safeData,
-    ]);
+    $result = ['member' => $safeData];
+    if ($emailVerification !== null) {
+        $result['email_verification'] = $emailVerification;
+    }
+    Response::success($result);
 }
 
 // -------------------------------------------------------------------------

@@ -84,6 +84,15 @@ if (!function_exists('api_hooks_on_alert')) {
         if (api_hooks_depth() === 0 || headers_sent()) {
             return;
         }
+        // 저장 전 검사 훅(api_run_before_replace)에서 끝났으면 그 요청이 저장한 파일 등을 치운다.
+        if (isset($GLOBALS['api_hooks_pending_cleanup']) && is_callable($GLOBALS['api_hooks_pending_cleanup'])) {
+            try {
+                ($GLOBALS['api_hooks_pending_cleanup'])();
+            } catch (\Throwable $e) {
+                error_log('[api hooks] cleanup at shutdown failed: ' . $e->getMessage());
+            }
+            unset($GLOBALS['api_hooks_pending_cleanup']);
+        }
         while (ob_get_level() > 0) {
             ob_end_clean();
         }
@@ -275,9 +284,12 @@ if (!function_exists('api_run_before_replace')) {
         if (!function_exists('run_replace')) {
             return $value;
         }
+        // 훅 함수가 exit 로 끝내도 정리하도록 종료 처리(api_hooks_on_shutdown)에 걸어 둔다.
+        $GLOBALS['api_hooks_pending_cleanup'] = $onBlock;
         list($result, $interrupted, $failed) = api_hooks_dispatch('run_replace', $tag, $actor, static function () use ($tag, $value, $extra) {
             return call_user_func_array('run_replace', array_merge(array($tag, $value), $extra));
         }, $value);
+        unset($GLOBALS['api_hooks_pending_cleanup']);
         if ($interrupted === null && !$failed) {
             return $result;
         }

@@ -392,11 +392,14 @@ function api_board_html_allowed(array $board, $member, $adminRole = '')
  * @param int         $wrId    새 글 · 답글이면 그 글, 댓글이면 댓글이 달린 글
  * @param array|null  $parent  답글이면 원글, 댓글이면 댓글이 달린 글(wr_subject · wr_email · wr_option), 새 글이면 null
  * @param array       $writer  쓴 사람 ['name' => , 'email' => ]
- * @param array       $item    ['subject' => 제목(댓글이면 빈 값), 'content' => 본문, 'wr_option' => , 'comment_id' => 댓글 번호]
+ * @param array       $item    ['subject' => 제목(댓글이면 빈 값), 'content' => 본문, 'wr_option' => , 'comment_id' => 댓글 번호,
+ *                              'secret' => 비밀 댓글이면 true(본문을 싣지 않음)]
+ *
+ * @param array|null  $actor   쓴 회원 행 — 수신자 훅(write_update_mail_list)이 원본처럼 그 회원 문맥에서 돈다. 비회원이면 null.
  *
  * 메일이 실패해도 글쓰기는 막지 않는다(error_log 만).
  */
-function api_send_board_write_mail(array $board, $w, $wrId, $parent, array $writer, array $item)
+function api_send_board_write_mail(array $board, $w, $wrId, $parent, array $writer, array $item, ?array $actor = null)
 {
     global $config;
 
@@ -431,8 +434,13 @@ function api_send_board_write_mail(array $board, $w, $wrId, $parent, array $writ
         $wr_name = get_text((string) $writer['name']);
         if ($isComment) {
             // 댓글은 원본처럼 "원글 제목 + 댓글" 을 글자로. 댓글 에디터의 HTML 은 글자로 풀어 넣는다.
-            $commentText = preg_replace('#<br\s*/?>|</p>#i', "\n", (string) $item['content']);
-            $commentText = html_entity_decode(strip_tags($commentText), ENT_QUOTES, 'UTF-8');
+            // 비밀 댓글은 본문을 싣지 않는다 — 화면에서 가리는 내용이 "댓글 쓴 모든 사람" 메일로 나가지 않게(원본은 싣는다).
+            if (!empty($item['secret'])) {
+                $commentText = '비밀댓글입니다.';
+            } else {
+                $commentText = preg_replace('#<br\s*/?>|</p>#i', "\n", (string) $item['content']);
+                $commentText = html_entity_decode(strip_tags($commentText), ENT_QUOTES, 'UTF-8');
+            }
             $wr_subject = get_text((string) ($parent['wr_subject'] ?? ''));
             $wr_content = nl2br(get_text("원글\n" . ($parent['wr_subject'] ?? '') . "\n\n\n댓글\n" . trim($commentText)));
         } else {
@@ -482,7 +490,7 @@ function api_send_board_write_mail(array $board, $w, $wrId, $parent, array $writ
         $emails = array_values(array_unique(array_filter(array_map('trim', $emails))));
         if (!$isComment) {
             // 그누보드 훅(bbs/write_update.php) — api_run_replace 로 불러 플러그인의 출력 · alert 가 응답을 깨지 않게.
-            $emails = (array) api_run_replace('write_update_mail_list', $emails, array($board, $wrId));
+            $emails = (array) api_run_replace('write_update_mail_list', $emails, array($board, $wrId), $actor);
         }
         foreach ($emails as $to) {
             api_call_core('mailer', array($wr_name, (string) $writer['email'], $to, $subject, $content, 1));
@@ -1036,6 +1044,48 @@ function api_get_config()
     $sql = "SELECT * FROM {$table} LIMIT 1";
     $config = DB::fetch($sql);
     return $config ?: [];
+}
+
+/**
+ * 그누보드 mailer() 를 쓸 수 있게 한다. 원본은 lib/mailer.lib.php 를 메일 보내는 화면에서만 따로 읽으므로
+ * API 도 보내기 직전에 읽어야 한다(읽지 않으면 mailer() 가 없어 메일이 조용히 안 나간다).
+ */
+function api_require_mailer(): bool
+{
+    if (!function_exists('mailer') && defined('G5_LIB_PATH') && is_file(G5_LIB_PATH . '/mailer.lib.php')) {
+        include_once G5_LIB_PATH . '/mailer.lib.php';
+    }
+    return function_exists('mailer');
+}
+
+/**
+ * 보안 메일(비밀번호 재설정 · 메일 인증) 링크의 기준 주소. 없으면 '' — 그때는 메일을 보내지 않는다.
+ * G5_DOMAIN 이 비면 그누보드는 G5_URL 을 요청의 Host 헤더로 만들므로, 그 주소를 쓰면 누가 Host 를 바꿔
+ * 요청해 진짜 사이트 메일에 자기 서버 링크(토큰 포함)를 실어 보낼 수 있다. 원본 5.6.41 도 같은 이유로
+ * G5_DOMAIN 없이는 이런 메일을 보내지 않는다(g5_security_mail_base_url).
+ *   1) 설정으로 정한 웹 화면 주소(G5_WEBAPP_APP_URL 등 — env · extend 에서만 온다)
+ *   2) 검증된 G5_DOMAIN (5.6.41+ 는 원본 함수로, 이전 버전은 같은 규칙으로)
+ */
+function api_mail_link_base(): string
+{
+    foreach (array('G5_WEBAPP_APP_URL', 'G5_WEBAPP_G5_URL', 'G5_NEXTJS25_APP_URL', 'G5_NEXTJS25_G5_URL') as $name) {
+        $url = defined($name) ? trim((string) constant($name)) : '';
+        if ($url !== '' && preg_match('#^https?://[^/\s?\#@]+#i', $url)) {
+            return rtrim($url, '/');
+        }
+    }
+    if (function_exists('g5_security_mail_base_url')) {
+        $base = g5_security_mail_base_url();
+        return $base === false ? '' : rtrim((string) $base, '/');
+    }
+    $domain = defined('G5_DOMAIN') ? trim((string) G5_DOMAIN) : '';
+    $parts = $domain !== '' ? @parse_url($domain) : false;
+    if (!$parts || empty($parts['host']) || !in_array(strtolower((string) ($parts['scheme'] ?? '')), array('http', 'https'), true)
+        || isset($parts['user']) || isset($parts['pass']) || isset($parts['query']) || isset($parts['fragment'])
+        || preg_match('/[\x00-\x20\x7f\\\\<>"\']/', $domain)) {
+        return '';
+    }
+    return rtrim($domain, '/');
 }
 
 require_once __DIR__ . '/board_access_helpers.php';

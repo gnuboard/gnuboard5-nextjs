@@ -24,7 +24,8 @@ import { deleteShopQa, getMyShopQas, updateShopQa } from "@/services/shop";
 import { getClientPublicSettings } from "@/services/settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextField, useSiteEditor } from "@/components/editor/RichTextField";
+import { contentForEditor } from "@/lib/editor-content";
 import { toastError, toastSuccess } from "@/lib/toast";
 
 type StatusFilter = "all" | "answered" | "unanswered";
@@ -66,6 +67,8 @@ export default function MyShopQasPage() {
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState(query);
   const [editing, setEditing] = useState<EditingState | null>(null);
+  // 사이트 에디터(cf_editor)가 있으면 웹 에디터로 고친다 — 그누보드 shop/itemqaform.php 와 같은 조건.
+  const siteEditor = useSiteEditor();
   const [processingId, setProcessingId] = useState<string>("");
   const [productRewriteMode, setProductRewriteMode] = useState<BbsRewriteMode>(0);
 
@@ -152,7 +155,8 @@ export default function MyShopQasPage() {
     setEditing({
       iq_id: item.iq_id,
       iq_subject: item.iq_subject,
-      iq_question: item.iq_question,
+      // 에디터로 고칠 때 글자 문의는 줄마다 문단으로 넣는다(그대로 넣으면 줄바꿈이 사라진다).
+      iq_question: siteEditor ? contentForEditor(item.iq_question) : item.iq_question,
       iq_secret: Number(item.iq_secret || 0) === 1,
       iq_email: item.iq_email || "",
       iq_hp: item.iq_hp || "",
@@ -165,7 +169,11 @@ export default function MyShopQasPage() {
 
     const subject = editing.iq_subject.trim();
     const question = editing.iq_question.trim();
-    if (subject.length < 2 || question.length < 5) {
+    // 에디터 글은 태그를 뺀 글자 수로 센다(<p></p> 만으로 5자를 넘기지 않게). 사진만 있는 글은 통과.
+    const questionLength = siteEditor
+      ? (/<img\b/i.test(question) ? 5 : htmlToText(question).length)
+      : question.length;
+    if (subject.length < 2 || questionLength < 5) {
       toastError("제목은 2자 이상, 내용은 5자 이상 입력해 주세요.");
       return;
     }
@@ -369,14 +377,14 @@ export default function MyShopQasPage() {
                       }
                       maxLength={255}
                     />
-                    <Textarea
+                    <RichTextField
                       value={editing.iq_question}
-                      onChange={(event) =>
-                        setEditing((prev) =>
-                          prev ? { ...prev, iq_question: event.target.value } : prev
-                        )
+                      onChange={(value) =>
+                        setEditing((prev) => (prev ? { ...prev, iq_question: value } : prev))
                       }
+                      useEditor={siteEditor}
                       rows={5}
+                      ariaLabel="문의 내용"
                     />
                     <div className="grid gap-3 md:grid-cols-2">
                       <div>

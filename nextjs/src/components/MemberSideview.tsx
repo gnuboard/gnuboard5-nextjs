@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils";
 import { g5PathForRuntime } from "@/lib/config";
 import { shouldBypassImageOptimization } from "@/lib/image";
 import { useAuthStore } from "@/store/auth";
-import { useMemberKey } from "@/hooks/useMemberKey";
-import { memberProfilePath, memberRecentPath } from "@/services/member";
+import { useMemberKey, type MemberKeyState } from "@/hooks/useMemberKey";
+import { memberProfilePath, memberRecentPath } from "@/lib/member-key";
 
 export interface MemberSideviewProps {
   /** g5_member.mb_id. 비회원이면 비어 있거나 undefined 입니다. */
@@ -95,7 +95,8 @@ export function MemberSideview({
 
 /**
  * 펼친 메뉴. 메뉴가 열릴 때만 그려지므로 회원 공개 키도 그때 묻는다 — 자기소개 · 전체게시물 주소에는
- * 아이디 대신 그 키를 쓴다(검색엔진 · 링크로 아이디가 퍼지지 않게). 없는 회원이면 두 항목을 숨긴다.
+ * 아이디 대신 그 키를 쓴다(검색엔진 · 링크로 아이디가 퍼지지 않게). 없는 회원이면 두 항목을 숨기고,
+ * 잠깐 묻지 못했으면(요청 한도 · 네트워크) 흐리게 두었다가 메뉴를 다시 열 때 다시 묻는다.
  */
 function SideviewMenu({
   mbId,
@@ -162,27 +163,35 @@ function SideviewMenu({
   );
 }
 
-/** 회원 공개 키로 주소를 만드는 항목. 키를 묻는 중에는 누를 수 없게, 없는 회원이면 숨긴다. */
+/** 회원 공개 키로 주소를 만드는 항목. 묻는 중 · 잠깐 실패면 누를 수 없게, 없는 회원이면 숨긴다. */
 function MemberKeyItem({
   memberKey,
   href,
   children,
 }: {
-  memberKey: string | null | undefined;
+  memberKey: MemberKeyState;
   href: (key: string) => string;
   children: React.ReactNode;
 }) {
-  if (memberKey === null) return null;
-  if (memberKey === undefined) {
-    return (
-      <li>
-        <span aria-disabled="true" className="block cursor-progress rounded px-2 py-1.5 text-muted-foreground">
-          {children}
-        </span>
-      </li>
-    );
+  if (memberKey.status === "missing") return null;
+  if (memberKey.status === "ready") {
+    return <SideviewItem href={href(memberKey.key)}>{children}</SideviewItem>;
   }
-  return <SideviewItem href={href(memberKey)}>{children}</SideviewItem>;
+  const failed = memberKey.status === "error";
+  return (
+    <li>
+      <span
+        aria-disabled="true"
+        title={failed ? "잠시 후 메뉴를 다시 열어 주세요." : undefined}
+        className={cn(
+          "block rounded px-2 py-1.5 text-muted-foreground",
+          failed ? "cursor-not-allowed" : "cursor-progress",
+        )}
+      >
+        {children}
+      </span>
+    </li>
+  );
 }
 
 function SideviewItem({

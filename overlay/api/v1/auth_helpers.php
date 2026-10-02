@@ -607,5 +607,150 @@ if (!function_exists('api_social_validate_signup_ticket')) {
 }
 
 // -------------------------------------------------------------------------
+// 메일 인증 토큰 — 그누보드 5.6.41 부터 원본이 토큰에 발급 시각을 붙여("무작위.시각") 유효시간
+// (cf_email_certify_minutes, 기본 60분)을 따지고, 기한을 넘긴 미인증 회원은 원본 정리 작업
+// (bbs/db_table.optimize.php)이 탈퇴 처리한다. 발급 시각이 없는 토큰은 가입 시각을 기준으로 보므로,
+// API 도 원본과 같은 모양으로 만들어야 이메일을 바꾼 기존 회원이 바로 기한 넘김으로 잡히지 않는다.
+// 그 함수가 없는 이전 버전(5.6.30 등)에서는 예전처럼 무작위 값만 쓰고 기한도 따지지 않는다.
+// -------------------------------------------------------------------------
+if (!function_exists('api_email_certify_new_token')) {
+    function api_email_certify_new_token(): string
+    {
+        if (function_exists('get_email_certify_token')) {
+            return (string) get_email_certify_token();
+        }
+        return bin2hex(random_bytes(16));
+    }
+}
+
+if (!function_exists('api_email_certify_minutes')) {
+    /** 인증 링크 유효시간(분). 0 이면 기한 없음. 기한을 따지지 않는 이전 버전 코어에서는 늘 0. */
+    function api_email_certify_minutes(): int
+    {
+        if (!function_exists('is_valid_email_certify_token')) {
+            return 0;
+        }
+        $config = api_get_config();
+        return isset($config['cf_email_certify_minutes']) ? max(0, (int) $config['cf_email_certify_minutes']) : 60;
+    }
+}
+
+if (!function_exists('api_email_certify_check')) {
+    /**
+     * 받은 토큰을 저장된 토큰과 견준다. 'ok' | 'invalid' | 'expired'.
+     * 일치 비교를 먼저 하므로 토큰을 모르는 사람은 'expired' 로 회원 상태를 떠볼 수 없다.
+     */
+    function api_email_certify_check(string $token, string $stored, string $mbDatetime): string
+    {
+        if ($token === '' || $stored === '' || !hash_equals($stored, $token)) {
+            return 'invalid';
+        }
+        $minutes = api_email_certify_minutes();
+        if ($minutes < 1) {
+            return 'ok';
+        }
+        return is_valid_email_certify_token($token, $stored, $mbDatetime, $minutes) ? 'ok' : 'expired';
+    }
+}
+
+if (!function_exists('api_email_certify_validity_note')) {
+    /** 인증 메일 본문 끝에 붙일 유효시간 안내. 기한이 없으면 ''. */
+    function api_email_certify_validity_note(): string
+    {
+        $minutes = api_email_certify_minutes();
+        return $minutes > 0 ? "\n\n인증 링크는 발송 후 {$minutes}분 동안 유효합니다." : '';
+    }
+}
+
+if (!function_exists('api_auth_email_verify_page_url')) {
+    /**
+     * 메일 인증 링크를 브라우저로 연 뒤 결과를 보여 줄 웹 로그인 화면 주소(?email_verify=ok|already|expired|invalid).
+     * 웹 화면(Next.js 테마나 따로 둔 앱 주소)이 없는 설치본이면 '' — 그때는 예전처럼 JSON 으로 답한다.
+     */
+    function api_auth_email_verify_page_url(string $status): string
+    {
+        $hasWebFront = defined('G5_WEBAPP_APP_URL') || defined('G5_NEXTJS25_APP_URL');
+        if (!$hasWebFront && function_exists('g5_nextjs_runtime_active_theme') && function_exists('g5_nextjs_runtime_theme_path')) {
+            $themePath = g5_nextjs_runtime_theme_path(g5_nextjs_runtime_active_theme());
+            $hasWebFront = $themePath !== '' && is_file($themePath . '/route.php');
+        }
+        if (!$hasWebFront || !function_exists('api_auth_public_app_url')) {
+            return '';
+        }
+        return api_auth_public_app_url('/login?email_verify=' . rawurlencode($status));
+    }
+}
+
+if (!function_exists('api_auth_mask_email')) {
+    /** "abcd@example.com" → "ab**@example.com". 어느 메일로 보냈는지만 알린다. */
+    function api_auth_mask_email(string $email): string
+    {
+        $at = strrpos($email, '@');
+        if ($at === false || $at < 1) {
+            return '';
+        }
+        $local = substr($email, 0, $at);
+        $keep = strlen($local) <= 2 ? 1 : 2;
+        return substr($local, 0, $keep) . str_repeat('*', max(1, strlen($local) - $keep)) . substr($email, $at);
+    }
+}
+
+if (!function_exists('api_email_certify_is_done')) {
+    /** 메일 인증을 마쳤는지 — 원본과 같이 mb_email_certify 에 0 아닌 숫자가 있으면(인증 시각) 마친 것. */
+    function api_email_certify_is_done(string $mbEmailCertify): bool
+    {
+        return (bool) preg_match('/[1-9]/', $mbEmailCertify);
+    }
+}
+
+if (!function_exists('api_auth_resend_verification_quietly')) {
+    /**
+     * 앱 계약(SC-17)의 "인증 메일 다시 보내기" { mb_id, mb_email } — 아이디와 메일 주소가 맞는 미인증 회원에게만
+     * 새 링크를 보내고 결과는 알려 주지 않는다(부른 쪽은 늘 같은 200 을 낸다 — 가입 여부를 떠볼 수 없게).
+     * 메일은 회원 정보에 있는 주소로만 가고, 회원별 한도는 비밀번호로 부르는 다시 보내기와 같은 칸을 쓴다.
+     * members_helpers.php(api_member_send_email_verification_mail)를 읽은 뒤에 부른다.
+     */
+    function api_auth_resend_verification_quietly(string $mbId, string $mbEmail, array $config): void
+    {
+        if (empty($config['cf_use_email_certify']) || empty($config['cf_email_use'])) {
+            return;
+        }
+        $member = DB::fetch(
+            "SELECT mb_id, mb_email, mb_email_certify, mb_email_certify2, mb_leave_date, mb_intercept_date
+               FROM " . DB::table('member_table') . " WHERE mb_id = ? LIMIT 1",
+            [$mbId]
+        );
+        if (!$member || empty($member['mb_id'])) {
+            return;
+        }
+        $email = trim((string) $member['mb_email']);
+        if ($email === '' || strcasecmp($email, $mbEmail) !== 0
+            || !empty($member['mb_leave_date']) || !empty($member['mb_intercept_date'])
+            || api_email_certify_is_done((string) $member['mb_email_certify'])) {
+            return;
+        }
+        if (!api_require_mailer() || api_mail_link_base() === '') {
+            error_log('[api/auth] resend-verification skipped — mailer or site URL (G5_DOMAIN) unavailable mb_id=' . $mbId);
+            return;
+        }
+        if (Throttle::checkMemberQuota('verifymail', (string) $member['mb_id'], 1, 5, true, true) !== null) {
+            return;
+        }
+        $token = api_email_certify_new_token();
+        DB::execute(
+            "UPDATE " . DB::table('member_table') . " SET mb_email_certify2 = ? WHERE mb_id = ?",
+            [$token, (string) $member['mb_id']]
+        );
+        if (!api_member_send_email_verification_mail((string) $member['mb_id'], $email, $token, false)) {
+            // 발송에 실패하면 먼저 받아 둔 링크가 계속 쓰이도록 토큰을 되돌린다(그 사이 바뀌지 않았을 때만).
+            DB::execute(
+                "UPDATE " . DB::table('member_table') . " SET mb_email_certify2 = ? WHERE mb_id = ? AND mb_email_certify2 = ?",
+                [(string) $member['mb_email_certify2'], (string) $member['mb_id'], $token]
+            );
+        }
+    }
+}
+
+// -------------------------------------------------------------------------
 // GET /v1/auth/check-id?mb_id=xxx - Check mb_id availability for registration
 // -------------------------------------------------------------------------

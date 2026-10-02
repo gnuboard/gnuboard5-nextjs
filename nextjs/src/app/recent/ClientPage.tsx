@@ -75,7 +75,7 @@ export default function ClientPage() {
         )}
       </div>
 
-      <RecentSearchPanel groups={groups} view={view} grId={grId} mbId={mbId} />
+      <RecentSearchPanel groups={groups} view={view} grId={grId} mbId={mbId} mbKey={mbKey} />
 
       {displayError && <ErrorState title="새글을 불러오지 못했습니다" description={displayError} actionHref="/recent" />}
 

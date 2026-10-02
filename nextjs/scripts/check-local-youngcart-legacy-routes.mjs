@@ -71,7 +71,7 @@ const legacyNextRedirects = parseRedirects(
       '/bbs/memo.php?kind=send&page=2=>/mypage/memos?page=2&type=send',
       '/bbs/memo_form.php?me_recv_mb_id=demo=>/mypage/memos/new?recv=demo',
       '/bbs/memo_view.php?me_id=9&kind=send=>/mypage/memos/9?type=send',
-      '/bbs/profile.php?mb_id=demo=>/members/demo',
+      '/bbs/profile.php?mb_id=zz_no_member=>/members/zz_no_member',
       '/bbs/point.php=>/mypage/points',
       '/bbs/scrap.php=>/mypage/scraps',
       '/mobile/shop=>/shop',
@@ -112,7 +112,8 @@ const originalPhpPassthroughs = parseCsv(
       '/shop/taxsave.php',
       '/shop/inicis/inistdpay_return.php?oid=demo',
       '/shop/kcp/pp_ax_hub.php',
-      '/shop/kakaopay/kakaopay_result.php',
+      // 그누보드 5.6.30 · 5.6.41 둘 다 있는 카카오페이 복귀 주소(kakaopay_result.php 는 5.6.41 에서 빠졌다)
+      '/shop/kakaopay/mobile_pay_return.php',
       '/shop/lg/returnurl.php',
       '/shop/nicepay/nicepay_result.php',
       '/shop/toss/returnurl.php?orderId=demo',

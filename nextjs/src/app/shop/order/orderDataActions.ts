@@ -68,6 +68,18 @@ export async function loadOrderInitialData({
   };
 }
 
+/** 주문서의 상품 줄만 다시 받는다 — 주문 · 결제 준비가 장바구니가 바뀌었다고(CART_CHANGED) 멈췄을 때. */
+export async function loadOrderCartData({
+  directCheckout,
+  directCtIds,
+}: LoadOrderInitialDataInput): Promise<ShopCartResponse | undefined> {
+  const cartRes = await api.get<ShopCartResponse>(
+    "/shop/cart",
+    buildCartRequestOptions(directCheckout, directCtIds)
+  );
+  return cartRes.data;
+}
+
 export async function loadMemberOrderBenefits(): Promise<{
   coupons?: MyCoupon[];
   pointBalance?: number;

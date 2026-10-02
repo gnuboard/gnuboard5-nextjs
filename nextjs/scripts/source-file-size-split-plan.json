@@ -24,11 +24,6 @@
     "targetLines": 650,
     "nextStep": "Split provider config, cookie/session handling, and redirect helpers into bridge submodules."
   },
-  "../overlay/api/v1/qas.php": {
-    "priority": "medium",
-    "targetLines": 650,
-    "nextStep": "Separate list, detail, write, update, and delete handlers for board Q&A routes."
-  },
   "scripts/package-live-deploy.mjs": {
     "priority": "medium",
     "targetLines": 650,

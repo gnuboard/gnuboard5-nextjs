@@ -258,29 +258,37 @@ class Throttle
     /**
      * 회원별 동작 횟수 한도(메일 보내기 등 셀 테이블이 따로 없는 동작). 통과하면 이번 한 번을 센다.
      * PHP 세션이 아니라 회원 id 로 세므로, 세션 쿠키 없이 Bearer 토큰으로 보내도 같은 한도를 쓴다.
-     * 셀 테이블(login_attempt)이 없는 설치본에서는 막지 않는다.
+     * 셀 테이블(login_attempt)이 없는 설치본에서는 막지 않는다 — $failClosed 면 그 동작만 막는다(메일 발송처럼
+     * 한도 없이 열어 두면 안 되는 동작). 기록은 사용자가 지울 수 없는 곳에 남아 쪽지를 지워 한도를 되돌리지 못한다.
+     * $record = false 면 한도만 보고 세지 않는다(실패한 시도만 셀 때 먼저 막혔는지 확인하는 용도).
      */
-    public static function checkMemberQuota(string $bucket, string $mb_id, int $perMinute, int $perHour): ?string
+    public static function checkMemberQuota(string $bucket, string $mb_id, int $perMinute, int $perHour, bool $record = true, bool $failClosed = false): ?string
     {
         if ($mb_id === '') return null;
         $table = self::loginAttemptTable();
-        if ($table === null) return null;
+        if ($table === null) {
+            return $failClosed ? '지금은 이 기능을 쓸 수 없습니다. 잠시 후 다시 시도해주세요.' : null;
+        }
 
         $key = '__q_' . substr(preg_replace('/[^a-z0-9]/i', '', $bucket), 0, 16) . '_' . substr(hash('sha256', $mb_id), 0, 16);
         foreach (array(array('1 MINUTE', $perMinute), array('1 HOUR', $perHour)) as $window) {
+            // ip = '' 인 행(아래에서 이 함수가 넣은 것)만 센다. 로그인 실패 기록은 ip 가 늘 채워지므로, 누가 이 키를
+            // 아이디로 넣어 로그인을 틀려도 남의 한도를 채울 수 없다.
             $count = DB::count(
                 "SELECT COUNT(*) FROM `{$table}`
-                  WHERE mb_id = ? AND last_attempt_at > DATE_SUB(NOW(), INTERVAL {$window[0]})",
+                  WHERE mb_id = ? AND ip = '' AND last_attempt_at > DATE_SUB(NOW(), INTERVAL {$window[0]})",
                 [$key]
             );
             if ($count >= $window[1]) {
                 return '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.';
             }
         }
-        DB::execute(
-            "INSERT INTO `{$table}` (mb_id, ip, fail_count, last_attempt_at) VALUES (?, '', 0, NOW())",
-            [$key]
-        );
+        if ($record) {
+            DB::execute(
+                "INSERT INTO `{$table}` (mb_id, ip, fail_count, last_attempt_at) VALUES (?, '', 0, NOW())",
+                [$key]
+            );
+        }
         return null;
     }
 

@@ -387,6 +387,10 @@ export interface ShopReview {
   product_image_url?: string;
   /** 후기 카드 사진 — 후기 본문의 첫 사진, 없으면 상품 사진(그누보드 get_itemuselist_thumbnail). */
   thumbnail_url?: string;
+  /** 관리자 답변 — 사용후기 목록의 "내용보기" 겹창에 함께 보인다(전체 목록 API 가 낸다). */
+  is_reply_subject?: string;
+  is_reply_content?: string;
+  is_reply_name?: string;
 }
 
 export interface ShopReviewScoreSummary {

@@ -12,6 +12,7 @@
  *   POST   /v1/auth/sessions/revoke - Revoke one login session
  *   POST   /v1/auth/password-reset - Password reset (step=request|reset)
  *   GET|POST /v1/auth/verify-email - Confirm email certify token (mb_id+token)
+ *   POST   /v1/auth/resend-verification - Resend the email certify link (mb_id+mb_password)
  *   GET    /v1/auth/register-result - Get last registration result from ss_mb_reg
  *   GET    /v1/auth/check-id?mb_id=...       - Check whether mb_id is available
  *   GET    /v1/auth/check-email?mb_email=... - Check whether mb_email is available
@@ -77,8 +78,14 @@ if (!function_exists('api_auth_member_payload')) {
 if (!function_exists('api_auth_send_password_reset_mail')) {
     function api_auth_send_password_reset_mail(array $member, string $resetToken): bool
     {
-        if (!function_exists('mailer')) {
+        if (!api_require_mailer()) {
             error_log('[api/auth] mailer() unavailable for password reset mb_id=' . (string) ($member['mb_id'] ?? ''));
+            return false;
+        }
+        // 재설정 링크는 설정으로 정한 사이트 주소로만 만든다 — Host 헤더로 만든 주소면 토큰이 남의 서버로 샐 수 있다.
+        $base = api_mail_link_base();
+        if ($base === '') {
+            error_log('[api/auth] password reset mail skipped — set G5_DOMAIN (or the web app URL) mb_id=' . (string) ($member['mb_id'] ?? ''));
             return false;
         }
 
@@ -91,12 +98,12 @@ if (!function_exists('api_auth_send_password_reset_mail')) {
             return false;
         }
 
-        $resetUrl = api_auth_public_app_url('/forgot-password?reset_token=' . rawurlencode($resetToken));
-        $subject = '[' . $siteName . '] Password reset instructions';
-        $body = "A password reset was requested for your account.\n\n"
-            . "Open the link below within 10 minutes to set a new password.\n\n"
+        $resetUrl = $base . '/forgot-password?reset_token=' . rawurlencode($resetToken);
+        $subject = '[' . $siteName . '] 비밀번호 재설정 안내';
+        $body = "회원님의 계정에 비밀번호 재설정 요청이 있었습니다.\n\n"
+            . "아래 링크를 10분 안에 열어 새 비밀번호를 정해주세요.\n\n"
             . $resetUrl . "\n\n"
-            . "If you did not request this, you can ignore this email.";
+            . "직접 요청하지 않으셨다면 이 메일은 무시하셔도 됩니다.";
 
         api_call_core('mailer', array($siteName, $fromMail, $toMail, $subject, $body, 0)); // 안의 mailer · mail_options · mail_send_result 훅도 보호해서
         return true;

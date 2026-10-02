@@ -13,7 +13,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useRuntimeRouteParam } from "@/hooks/use-runtime-route-param";
 import { ApiError } from "@/lib/api";
 import { runtimeRouterPush, runtimeRouterReplace } from "@/lib/runtime-router";
-import { getMemberKey, getMemberProfile, isMemberKey } from "@/services/member";
+import { getMemberKey, getMemberProfile } from "@/services/member";
+import { isMemberKey } from "@/lib/member-key";
 import { useAuthStore } from "@/store/auth";
 import type { MemberProfile } from "@/lib/types";
 import { memberAvatarUrl, memberInitial } from "@/lib/member-avatar";
@@ -39,17 +40,23 @@ export default function ClientPage({ mbId: fallbackMbId }: { mbId: string }) {
     // 키를 만들 수 없는 설치본("")은 예전 주소 그대로 연다.
     let ignore = false;
     setProfileRef("");
-    getMemberKey(mbId).then((key) => {
-      if (ignore) return;
-      if (key) {
-        runtimeRouterReplace(router, `/members/${encodeURIComponent(key)}`);
-      } else if (key === "") {
-        setProfileRef(mbId);
-      } else {
+    getMemberKey(mbId)
+      .then((key) => {
+        if (ignore) return;
+        if (key) {
+          runtimeRouterReplace(router, `/members/${encodeURIComponent(key)}`);
+        } else if (key === "") {
+          setProfileRef(mbId);
+        } else {
+          setLoading(false);
+          setError("회원을 찾을 수 없습니다.");
+        }
+      })
+      .catch(() => {
+        if (ignore) return;
         setLoading(false);
-        setError("회원을 찾을 수 없습니다.");
-      }
-    });
+        setError("회원 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      });
     return () => {
       ignore = true;
     };

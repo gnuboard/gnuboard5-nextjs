@@ -9,6 +9,8 @@ export interface RecentQuery {
   mbId?: string;
   /** 작성자 공개 키(사이드뷰 "전체게시물" — 주소에 아이디를 남기지 않는다). */
   mbKey?: string;
+  /** "latest": 새글 표에 맞는 줄이 없으면 게시판 글 표에서 채운다(홈 위젯 — 원본 latest() 처럼). 새글 화면은 쓰지 않는다. */
+  fallback?: "latest";
   page?: number;
   limit?: number;
 }
@@ -27,6 +29,7 @@ function recentParams(query: RecentQuery): URLSearchParams {
   if (query.grId) params.set("gr_id", query.grId);
   if (query.mbId) params.set("mb_id", query.mbId);
   else if (query.mbKey) params.set("mb_key", query.mbKey);
+  if (query.fallback) params.set("fallback", query.fallback);
   params.set("page", String(query.page ?? 1));
   params.set("limit", String(query.limit ?? 20));
   return params;

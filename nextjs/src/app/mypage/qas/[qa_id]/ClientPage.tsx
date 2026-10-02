@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
 import { useRuntimeRouteParam } from "@/hooks/use-runtime-route-param";
 import { runtimeRouterPush } from "@/lib/runtime-router";
 import type { QaConfig, QaItem } from "@/lib/types";
@@ -13,14 +13,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  QaAttachmentList,
-  QaAttachments,
-  QaRelatedQuestions,
-} from "@/components/qa/qa-detail-extras";
+import { QaContentInput, qaContentForEditor, useQaEditor } from "@/components/qa/qa-editor";
+import { QaAttachments, QaRelatedQuestions } from "@/components/qa/qa-detail-extras";
+import { QaBody, QaConfigContent } from "@/components/qa/qa-content";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { useAuthStore } from "@/store/auth";
+import { QaAnswerSection } from "./QaAnswerSection";
 
 interface QaDetailPageProps {
   qaId?: string;
@@ -52,12 +50,18 @@ export default function QaDetailPage({
 }: QaDetailPageProps) {
   const router = useRouter();
   const { isInitialized, user } = useAuthStore();
+  const isSuperAdmin = user?.is_super_admin === true;
+  const [reloadKey, setReloadKey] = useState(0);
+  // 다른 문의로 갈 주소 — 마이페이지(/mypage/qas/:qa_id)와 쇼핑몰(/shop/qas/my/:qa_id)이 이 화면을 함께 쓴다.
+  const detailPattern = Array.isArray(routePattern) ? routePattern[0] : routePattern;
+  const detailHref = (id: number) => detailPattern.replace(":qa_id", String(id));
   const qaId = Math.max(
     0,
     Number(useRuntimeRouteParam("qa_id", routePattern, fallbackQaId)) || 0
   );
   const [item, setItem] = useState<QaItem | null>(null);
   const [config, setConfig] = useState<QaConfig | null>(null);
+  const useEditor = useQaEditor(config);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -80,10 +84,16 @@ export default function QaDetailPage({
 
     if (!qaId) return;
 
+    // 다른 문의로 넘어오면(이전글 · 다음글, 브라우저 뒤로가기) 수정 폼을 닫는다 — 열린 채면 다른 문의가 수정 상태로
+    // 뜨고, 에디터 변환(qaContentForEditor)을 거치지 않은 본문이 폼에 들어간다.
+    setEditing(false);
+    // 늦게 온 앞 문의의 응답이 지금 문의를 덮지 않게 한다(빠르게 넘길 때).
+    let alive = true;
     (async () => {
       setLoading(true);
       try {
         const [nextItem, nextConfig] = await Promise.all([getQa(qaId), getQaConfig()]);
+        if (!alive) return;
         setItem(nextItem);
         setConfig(nextConfig);
         setForm({
@@ -98,13 +108,17 @@ export default function QaDetailPage({
         setFiles([null, null]);
         setDeleteFiles([]);
       } catch (error) {
+        if (!alive) return;
         toastError(error instanceof Error ? error.message : "문의 내용을 불러오지 못했습니다.");
         runtimeRouterPush(router, listHref);
       } finally {
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     })();
-  }, [isInitialized, listHref, loginHref, qaId, router, user]);
+    return () => {
+      alive = false;
+    };
+  }, [isInitialized, listHref, loginHref, qaId, reloadKey, router, user]);
 
   useEffect(() => {
     if (loginHref && isInitialized && !user) {
@@ -119,10 +133,13 @@ export default function QaDetailPage({
     setSaving(true);
     try {
       const hasAttachmentChanges = files.some(Boolean) || deleteFiles.length > 0;
+      // 에디터로 고치면 HTML(1). 글자 입력칸이면 원래 형식(qa_html)을 지킨다 — 보내지 않으면 API 가 0 으로 저장해
+      // 에디터로 쓴 글의 태그가 글자로 보인다.
+      const payload = { ...form, qa_html: useEditor ? 1 : item.qa_html };
       const updated = hasAttachmentChanges
-        ? await updateQaWithFiles(item.qa_id, form, { files, deleteFiles })
-        : await updateQa(item.qa_id, form);
-      setItem(updated);
+        ? await updateQaWithFiles(item.qa_id, payload, { files, deleteFiles })
+        : await updateQa(item.qa_id, payload);
+      setItem({ ...updated, prev: item.prev, next: item.next });
       setEditing(false);
       setFiles([null, null]);
       setDeleteFiles([]);
@@ -151,6 +168,7 @@ export default function QaDetailPage({
 
   return (
     <div className="space-y-5">
+      <QaConfigContent pc={config?.qa_content_head} mobile={config?.qa_mobile_content_head} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button variant="outline" size="sm" onClick={() => runtimeRouterPush(router, listHref)}>
           <ArrowLeft className="mr-2 size-4" />
@@ -158,7 +176,19 @@ export default function QaDetailPage({
         </Button>
         <div className="flex gap-2">
           {item.can_edit && !editing && (
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={useEditor === null}
+              onClick={() => {
+                // 에디터면 저장된 본문을 에디터용 HTML 로(글자 글은 줄마다 문단으로) 바꿔 채운다.
+                setForm((prev) => ({
+                  ...prev,
+                  qa_content: useEditor ? qaContentForEditor(item.qa_content, item.qa_html) : item.qa_content,
+                }));
+                setEditing(true);
+              }}
+            >
               <Pencil className="mr-2 size-4" />
               수정
             </Button>
@@ -196,6 +226,15 @@ export default function QaDetailPage({
             </span>
           </div>
           <CardTitle className="break-words">{item.qa_subject}</CardTitle>
+          {/* 그누보드 view.skin.php 처럼 작성자 · 연락처 — 답변하는 관리자가 누구에게 어떻게 알릴지 본다. */}
+          <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span>
+              {item.qa_name || item.mb_id}
+              {isSuperAdmin && item.mb_id && item.qa_name !== item.mb_id ? ` (${item.mb_id})` : ""}
+            </span>
+            {item.qa_email ? <span>{item.qa_email}</span> : null}
+            {item.qa_hp ? <span>{item.qa_hp}</span> : null}
+          </p>
         </CardHeader>
         <CardContent>
           {editing ? (
@@ -279,14 +318,11 @@ export default function QaDetailPage({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="qa_content">내용</Label>
-                <Textarea
+                <QaContentInput
                   id="qa_content"
                   value={form.qa_content}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, qa_content: event.target.value }))
-                  }
-                  rows={10}
-                  required
+                  onChange={(value) => setForm((prev) => ({ ...prev, qa_content: value }))}
+                  useEditor={Boolean(useEditor)}
                 />
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -342,47 +378,49 @@ export default function QaDetailPage({
               </div>
             </form>
           ) : (
-            <p className="whitespace-pre-wrap break-words text-sm leading-7">
-              {item.qa_content}
-            </p>
+            <QaBody content={item.qa_content} html={item.qa_html} />
           )}
         </CardContent>
       </Card>
 
       {!editing && <QaAttachments item={item} />}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>답변</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {item.answer ? (
-            <div className="space-y-3">
-              <div>
-                <p className="font-medium">{item.answer.qa_subject}</p>
-                <p className="text-xs text-muted-foreground">
-                  {item.answer.qa_name} · {formatDate(item.answer.qa_datetime)}
-                </p>
-              </div>
-              <p className="whitespace-pre-wrap break-words text-sm leading-7">
-                {item.answer.qa_content}
-              </p>
-              <QaAttachmentList item={item.answer} />
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              아직 등록된 답변이 없습니다.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      {!editing && (item.prev || item.next) ? (
+        <nav aria-label="이전글 다음글" className="flex flex-wrap justify-between gap-2">
+          {item.prev ? (
+            <Button variant="outline" size="sm" className="max-w-full" onClick={() => runtimeRouterPush(router, detailHref(item.prev!.qa_id))}>
+              <ChevronLeft className="mr-1 size-4" aria-hidden />
+              <span className="truncate">이전글 · {item.prev.qa_subject}</span>
+            </Button>
+          ) : <span />}
+          {item.next ? (
+            <Button variant="outline" size="sm" className="max-w-full" onClick={() => runtimeRouterPush(router, detailHref(item.next!.qa_id))}>
+              <span className="truncate">다음글 · {item.next.qa_subject}</span>
+              <ChevronRight className="ml-1 size-4" aria-hidden />
+            </Button>
+          ) : null}
+        </nav>
+      ) : null}
+
+      {item.qa_type === 0 && (
+        <QaAnswerSection
+          question={item}
+          isAdmin={isSuperAdmin}
+          useEditor={useEditor}
+          onChanged={(updated) =>
+            updated ? setItem({ ...updated, prev: item.prev, next: item.next }) : setReloadKey((key) => key + 1)
+          }
+        />
+      )}
 
       {!editing && (
         <QaRelatedQuestions
           items={item.related_questions}
-          onSelect={(nextQaId) => runtimeRouterPush(router, `/mypage/qas/${nextQaId}`)}
+          onSelect={(nextQaId) => runtimeRouterPush(router, detailHref(nextQaId))}
         />
       )}
+
+      <QaConfigContent pc={config?.qa_content_tail} mobile={config?.qa_mobile_content_tail} />
     </div>
   );
 }

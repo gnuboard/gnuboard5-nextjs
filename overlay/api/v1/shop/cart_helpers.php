@@ -44,6 +44,76 @@ function shop_api_item_has_base_options($it_id) {
     ) > 0;
 }
 
+/** 영카트식 결제가 시작된 장바구니를 모으기에서 빼 두는 시간(초) — 결제창이 열려 있을 만한 동안. */
+if (!defined('SHOP_API_CART_ADOPT_PG_HOLD_SECONDS')) {
+    define('SHOP_API_CART_ADOPT_PG_HOLD_SECONDS', 3600);
+}
+
+/**
+ * 이 회원의 장바구니 상품을 지금 장바구니로 모은다 — 그누보드 set_cart_id()(bbs/login_check.php 가 로그인 때 부른다)와
+ * 같은 일. 그누보드 화면 · 다른 기기 · 앱에서 담은 상품이 다른 장바구니 번호에 있으면, 이 브라우저는 자기 번호(쿠키)만
+ * 보므로 장바구니가 비어 보였다. 같은 DB 를 쓰는 그누보드 화면에서 로그인하면 그쪽 번호로 상품이 옮겨 가기 때문이다.
+ *
+ * 부르는 곳: 장바구니 목록(GET /shop/cart)을 줄 지정 · 바로구매 없이 받을 때 — 장바구니 화면, 모든 화면 머리의
+ * 미니 장바구니, 줄 지정 없이 연 주문서. 그래서 회원이 어느 화면을 열어도 모인다. 쿠폰 · 배송비 · 주문 · 결제 준비
+ * 요청에서는 부르지 않는다. 주문서를 띄운 뒤 다른 탭 · 기기에서 모여 장바구니가 바뀌어도, 주문서는 보여 준 줄(ct_ids)만
+ * 보내고 서버는 그 줄이 하나라도 없으면 멈추므로(shop_api_cart_require_shown_rows) 본 것과 다른 주문은 생기지 않는다.
+ *
+ * 옮기는 것: 이 회원의 쇼핑 중 줄(ct_status 쇼핑 · 빈 값), 바로구매가 아닌 것(ct_direct = 0).
+ * 옮기지 않는 것: 주문서가 이미 만들어진 장바구니 번호의 줄(결제 대기 · 실패 등 — 그 주문이 쓰는 줄이다),
+ * 영카트식 결제(ajax.orderdatasave.php)가 막 시작된 장바구니 번호의 줄 — 그 결제는 결제창을 닫은 뒤에야 주문을 만드므로
+ * 그동안 주문 행이 없다. 결제창이 열려 있을 만한 동안(SHOP_API_CART_ADOPT_PG_HOLD_SECONDS)은 건드리지 않고, 지금
+ * 장바구니로 그 결제가 시작됐으면 그동안 아무것도 모으지 않는다(결제가 끝날 때 그 장바구니의 줄로 주문을 만든다).
+ *
+ * @return int 옮긴 줄 수
+ */
+function shop_api_cart_adopt_member_items($cart_id, $mb_id) {
+    $cart_id = (string) $cart_id;
+    $mb_id = (string) $mb_id;
+    if ($cart_id === '' || $mb_id === '') {
+        return 0;
+    }
+
+    $table = DB::table('g5_shop_cart_table');
+    $adoptable = "c.mb_id = ?
+            AND c.ct_direct = 0
+            AND " . shop_api_cart_active_status_sql('c.ct_status') . "
+            AND c.od_id <> ?
+            AND NOT EXISTS (
+                SELECT 1 FROM " . DB::table('g5_shop_order_table') . " o WHERE o.od_id = c.od_id
+            )
+            AND NOT EXISTS (
+                SELECT 1 FROM " . DB::table('g5_shop_order_data_table') . " d
+                 WHERE d.cart_id = c.od_id AND d.cart_id <> 0 AND d.dt_time >= ?
+            )";
+    // dt_time 은 PHP 시각으로 적힌다(orders.php legacy-data) — DB 의 NOW() 와 시간대가 다를 수 있어 같은 시계로 잰다.
+    $pgHoldSince = date('Y-m-d H:i:s', time() - SHOP_API_CART_ADOPT_PG_HOLD_SECONDS);
+    $params = array_merge([$mb_id], shop_api_cart_active_statuses(), [$cart_id, $pgHoldSince]);
+
+    // 옮길 줄이 있을 때만 쓴다 — 장바구니를 열 때마다 UPDATE 하면 옮길 것이 없어도 쇼핑 중 줄들을 잠근다.
+    $ids = array_map('intval', array_column(DB::fetchAll("SELECT c.ct_id FROM {$table} c WHERE {$adoptable}", $params), 'ct_id'));
+    if (!$ids) {
+        return 0;
+    }
+    // 이 장바구니로 영카트식 결제가 막 시작됐어도 지금은 모으지 않는다 — 그 결제는 결제창을 닫은 뒤 이 장바구니의
+    // 줄로 주문을 만든다. (옮길 줄이 있을 때만 본다 — order_data 는 cart_id 색인이 없어 화면마다 훑지 않게.)
+    $pgInProgress = DB::fetch(
+        "SELECT 1 AS hit FROM " . DB::table('g5_shop_order_data_table') . " WHERE cart_id = ? AND dt_time >= ? LIMIT 1",
+        [$cart_id, $pgHoldSince]
+    );
+    if ($pgInProgress) {
+        return 0;
+    }
+
+    // 고른 뒤 바뀐 줄(그사이 주문 · 바로구매 처리)은 조건을 다시 보아 건너뛴다.
+    return DB::execute(
+        "UPDATE {$table} c SET c.od_id = ?
+          WHERE c.ct_id IN (" . implode(',', array_fill(0, count($ids), '?')) . ")
+            AND {$adoptable}",
+        array_merge([$cart_id], $ids, $params)
+    );
+}
+
 /** 이 장바구니에 본품(선택옵션 · 옵션 없는 본품) 줄이 담겨 있나. 바로구매 · 일반을 가리지 않는다. */
 function shop_api_cart_has_active_base($cart_id, $it_id) {
     $row = DB::fetch(

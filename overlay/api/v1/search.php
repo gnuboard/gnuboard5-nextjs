@@ -201,7 +201,7 @@ foreach ($targetBoards as $board) {
     // Fetch matching posts (limited per board)
     $boardLimit = (int) $perPage;
     $sql = "SELECT wr_id, wr_subject, wr_seo_title, wr_content, wr_name, mb_id,
-                   wr_datetime, wr_hit, wr_good, wr_comment, ca_name, wr_option
+                   wr_datetime, wr_hit, wr_good, wr_comment, ca_name, wr_option, wr_ip
             FROM {$write_table}
             {$where}
             ORDER BY (CASE WHEN wr_subject LIKE ? THEN 0 ELSE 1 END), wr_id DESC
@@ -212,12 +212,14 @@ foreach ($targetBoards as $board) {
     $orderParams = array_merge($params, [$likeValue]);
     $rows = DB::readFetchAll($sql, $orderParams);
     $posts = [];
+    // 본문 요약을 낼 수 있는 글 — 목록 발췌와 같은 판정(그룹 · 본인확인 · 읽기 레벨, 읽기 포인트를 받는 게시판은
+    // 이미 포인트를 낸 글 · 내 글만). 요약으로 유료 글 본문을 공짜로 보이지 않게.
+    $excerptAllowed = api_board_excerpt_allowed_ids($viewer ?: null, (string) $board['bo_table'], $board, $rows);
 
     foreach ($rows as $post) {
         // Truncate content for search preview
         $isSecret = api_is_secret_option($post['wr_option'] ?? '');
-        // 본문 요약은 글을 읽을 수 있을 때만 — 읽기 레벨뿐 아니라 그룹 접근 · 본인확인 제한까지(api_can_read_board).
-        if (!api_can_read_board($viewer ?: null, (string) $board['bo_table'], $board)) {
+        if (!isset($excerptAllowed[(int) $post['wr_id']])) {
             $content = '';
         } elseif ($isSecret) {
             $content = json_decode('"\uBE44\uBC00\uAE00\uC785\uB2C8\uB2E4."');
@@ -229,7 +231,7 @@ foreach ($targetBoards as $board) {
         }
         $post['wr_content_preview'] = $content;
         $post['is_secret'] = $isSecret;
-        unset($post['wr_content']);
+        unset($post['wr_content'], $post['wr_ip']);
 
         $posts[] = $post;
     }

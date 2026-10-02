@@ -252,9 +252,10 @@ async function verifyBoardPostAndComment(page, token, state) {
 
   await page.goto(`${appUrl}/${smokeBoard}/write`, { waitUntil: 'networkidle' });
   await page.locator('#wr_subject').fill(subject);
-  // 에디터 화면인지 — 그누보드처럼 에디터로 쓴 글은 wr_option 에 html1 이 남아야 한다(아래에서 확인).
-  const usedEditor = (await page.locator('.ProseMirror').count()) > 0;
   await fillRichTextOrTextarea(page, 'textarea#wr_content', content);
+  // 에디터로 썼는지 — 그누보드처럼 에디터로 쓴 글은 wr_option 에 html1 이 남아야 한다(아래에서 확인).
+  // 에디터는 늦게 실리므로 내용을 채운 뒤(채우기가 에디터를 기다린다) 판단한다.
+  const usedEditor = (await page.locator('.tiptap[contenteditable="true"]').count()) > 0;
   const writeForm = page.locator('form').filter({ has: page.locator('#wr_subject') }).first();
 
   const [postResponse] = await Promise.all([
@@ -389,7 +390,8 @@ async function verifyQaCreate(page, token, state) {
   }
 
   await page.locator('#qa_subject').fill(subject);
-  await page.locator('#qa_content').fill(content);
+  // 1:1 문의는 사이트 에디터 · 문의 "에디터 사용" 이면 에디터, 아니면 글자 상자(cc88487a9).
+  await fillRichTextOrTextarea(page, 'textarea#qa_content', content);
   const qaForm = page.locator('form').filter({ has: page.locator('#qa_subject') }).first();
 
   const [qaResponse] = await Promise.all([
@@ -413,7 +415,8 @@ async function verifyQaCreate(page, token, state) {
   });
   if (
     createdQa.data?.qa_subject !== subject ||
-    createdQa.data?.qa_content !== content ||
+    // 에디터 본문은 HTML 이라 & 가 &amp; 로 저장된다.
+    !String(createdQa.data?.qa_content || '').replace(/&amp;/g, '&').includes(content) ||
     createdQa.data?.mb_id !== smokeMemberId
   ) {
     fail('Q&A create did not persist through the API', createdQa.data);

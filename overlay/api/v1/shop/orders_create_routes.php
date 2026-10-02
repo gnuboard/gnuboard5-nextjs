@@ -85,10 +85,20 @@ if ($apiMethod === 'POST' && $od_id === '') {
 
     $existingClientOrder = shop_orders_find_by_client_uid($clientUid, $mb_id);
     // 비회원 재시도는 그 주문의 비밀번호를 다시 낸 사람에게만 돌려준다 — 재시도 키만으로는 남의 주문을 받지 못하게.
-    if ($existingClientOrder && !$member
-        && !shop_api_guest_order_password_matches($guestOrderPassword, (string) ($existingClientOrder['od_pwd'] ?? ''))) {
-        shop_orders_release_create_lock($createLockName);
-        Response::error('이미 접수된 주문 요청입니다. 주문 조회에서 확인해 주세요.', 409, ['code' => 'duplicate_client_uid']);
+    // 비밀번호 대조에는 주문 조회(orders.php lookup)와 같은 키로 실패 횟수를 센다 — 두 길이 한도를 나눠 쓰지 못하게.
+    if ($existingClientOrder && !$member) {
+        $retryIp = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+        $retryKey = '__order__' . substr((string) $existingClientOrder['od_id'], 0, 40);
+        if (Throttle::checkLoginAttempt($retryKey, $retryIp) !== null) {
+            shop_orders_release_create_lock($createLockName);
+            Response::error('주문 확인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.', 429);
+        }
+        if (!shop_api_guest_order_password_matches($guestOrderPassword, (string) ($existingClientOrder['od_pwd'] ?? ''))) {
+            Throttle::recordLoginFailure($retryKey, $retryIp);
+            shop_orders_release_create_lock($createLockName);
+            Response::error('이미 접수된 주문 요청입니다. 주문 조회에서 확인해 주세요.', 409, ['code' => 'duplicate_client_uid']);
+        }
+        Throttle::resetLoginAttempts($retryKey, $retryIp);
     }
     if ($existingClientOrder) {
         $guestUid = '';
@@ -108,6 +118,15 @@ if ($apiMethod === 'POST' && $od_id === '') {
             'saved_address' => null,
             'duplicate' => true,
         ], 200);
+    }
+
+    // 카드 결제 창을 닫고 무통장으로 바꿔 주문하면 줄이 아직 결제 준비(임시 주문)에 묶여 있다 — 결제 준비와 같이 먼저 되돌린다.
+    if (!empty($filterCtIds)) {
+        shop_api_restore_pending_cart_rows_by_ct_ids(
+            $member,
+            $filterCtIds,
+            '결제 취소: 무통장 주문으로 임시 주문 복구'
+        );
     }
 
     // Get current cart items (not yet ordered) — ct_point / cp_price / ct_history 도 함께.
@@ -134,6 +153,8 @@ if ($apiMethod === 'POST' && $od_id === '') {
             array_merge($cartParams, shop_api_cart_active_statuses())
         );
     }
+
+    shop_api_cart_require_shown_rows($cartItems, $filterCtIds);
 
     if (empty($cartItems)) {
         Response::error('Cart is empty. Add items before placing an order.', 400);

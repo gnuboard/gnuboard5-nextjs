@@ -16,6 +16,7 @@ import {
   type PostDetail,
 } from "@/services/boards";
 import PostViewClient from "./ClientPage";
+import { commentEditorOn } from "@/lib/editor-content";
 
 export const dynamicParams = true;
 export const dynamic = "force-static";
@@ -181,7 +182,7 @@ export default async function PostViewPage({ params }: PageProps) {
         initialPost={initialPost}
         initialBoardName={board?.bo_subject ?? ""}
         initialBbsRewriteMode={bbsRewriteMode}
-        initialCommentEditorEnabled={!!settings?.comment_editor}
+        initialCommentEditorEnabled={commentEditorOn(settings?.cf_editor, settings?.comment_editor)}
         isStaticFallbackShell={bo_table === "__g5_static__" || wr_id === "0"}
       />
     </>

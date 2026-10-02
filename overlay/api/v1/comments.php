@@ -324,7 +324,13 @@ if ($apiMethod === 'POST') {
         $wr_id,
         $parentPost,
         array('name' => (string) $member['mb_nick'], 'email' => (string) $member['mb_email']),
-        array('subject' => '', 'content' => (string) $wr_content, 'comment_id' => $commentId)
+        array(
+            'subject'    => '',
+            'content'    => (string) $wr_content,
+            'comment_id' => $commentId,
+            'secret'     => api_is_secret_option($wr_option),
+        ),
+        $member
     );
 
     // 그누보드 latest() 위젯 캐시를 비운다(원본과 같이 훅 앞에서). 안의 delete_cache_latest 훅도 보호해서 부른다.

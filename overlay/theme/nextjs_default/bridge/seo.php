@@ -605,7 +605,7 @@ function nextjs_default_seo_robots_txt()
 
     $base = nextjs_default_g5_url();
     $prefix = rtrim((string) parse_url($base, PHP_URL_PATH), '/');
-    $private = array('/login', '/register', '/forgot-password', '/mypage', '/admin', '/api', '/search', '/shop/cart', '/shop/order', '/shop/orders', '/shop/payment', '/shop/personalpay', '/shop/search', '/shop/wishlist');
+    $private = array('/login', '/register', '/forgot-password', '/mypage', '/members', '/admin', '/api', '/search', '/shop/cart', '/shop/order', '/shop/orders', '/shop/payment', '/shop/personalpay', '/shop/search', '/shop/wishlist'); // nextjs/src/app/robots.ts 와 같은 목록(/members = 회원 자기소개)
 
     $lines = array('User-agent: *', 'Allow: ' . ($prefix !== '' ? $prefix . '/' : '/'));
     foreach ($private as $path) {

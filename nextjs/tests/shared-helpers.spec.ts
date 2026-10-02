@@ -9,6 +9,7 @@ import {
 } from "../src/lib/shop-product-state";
 import { isSecretPost } from "../src/lib/post-flags";
 import { memberAvatarUrl, memberInitial } from "../src/lib/member-avatar";
+import { isMemberKey, memberProfilePath, memberRecentPath } from "../src/lib/member-key";
 
 // 여러 화면이 함께 쓰는 공용 판정 · 표기 함수. 화면마다 따로 계산하던 것을 모았으므로 규칙이 바뀌지 않게 묶어 둔다.
 
@@ -93,5 +94,21 @@ test.describe("member-avatar (아바타 원)", () => {
     expect(memberInitial(" admin")).toBe("A");
     expect(memberInitial("")).toBe("?");
     expect(memberInitial(null)).toBe("?");
+  });
+});
+
+test.describe("member-key (회원 주소에 아이디 대신 공개 키)", () => {
+  test("키 모양은 7자-7자 — 아이디(하이픈 없음)와 섞이지 않는다", () => {
+    expect(isMemberKey("MNhJgOD-6LSNqA5")).toBe(true);
+    expect(isMemberKey("admin")).toBe(false);
+    expect(isMemberKey("MNhJgO-D6LSNqA5")).toBe(false);
+    expect(isMemberKey("MNhJgOD-6LSNqA5/x")).toBe(false);
+  });
+
+  test("키가 있으면 주소에 키만, 키를 만들 수 없는 설치본이면 예전처럼 아이디", () => {
+    expect(memberProfilePath("admin", "MNhJgOD-6LSNqA5")).toBe("/members/MNhJgOD-6LSNqA5");
+    expect(memberRecentPath("admin", "MNhJgOD-6LSNqA5")).toBe("/recent?mb=MNhJgOD-6LSNqA5");
+    expect(memberProfilePath("admin", "")).toBe("/members/admin");
+    expect(memberRecentPath("admin", "")).toBe("/recent?mb_id=admin");
   });
 });

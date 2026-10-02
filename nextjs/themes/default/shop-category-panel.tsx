@@ -16,6 +16,12 @@ import { formatProductPrice } from "@/lib/shop-product-state";
 /** 레퍼런스 solune_shop_category_picks() 와 같은 네 개. */
 const PICK_COUNT = 4;
 
+/**
+ * 패널 오른쪽 아래 "SOLUNE PICK — {분류} 추천 상품" 칸. 2026-10-02 요청으로 잠시 감춘다(다시 넣거나 다른
+ * 모양으로 바꿀 수 있어 코드는 그대로 둔다). true 로 바꾸면 돌아온다 — 끄는 동안은 추천 상품도 받지 않는다.
+ */
+const SHOW_CATEGORY_PICKS = false;
+
 /** 단추에서 패널로 내려가는 순간 포인터가 잠깐 둘 다에서 벗어난다. 그 틈에 닫히지 않게 기다린다(레퍼런스 180ms). */
 const HOVER_CLOSE_DELAY_MS = 180;
 
@@ -207,8 +213,8 @@ export function SoluneShopCategoryPanel({
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const safeIndex = Math.min(activeIndex, Math.max(0, categories.length - 1));
   const active = categories[safeIndex];
-  const picks = useCategoryPicks(active?.ca_id, open);
-  const rewriteMode = useRewriteMode(open);
+  const picks = useCategoryPicks(active?.ca_id, open && SHOW_CATEGORY_PICKS);
+  const rewriteMode = useRewriteMode(open && SHOW_CATEGORY_PICKS);
 
   // 세로 탭 목록의 키보드: 위/아래 · Home/End 로 옮기고 바로 고른다(WAI-ARIA 탭 패턴).
   const onRailKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
@@ -310,7 +316,7 @@ export function SoluneShopCategoryPanel({
                     ) : (
                       <p className="solune-shop-category-none">하위 분류가 없습니다.</p>
                     )}
-                    {isActive ? (
+                    {SHOW_CATEGORY_PICKS && isActive ? (
                       <CategoryPicks root={root} state={picks} rewriteMode={rewriteMode} onNavigate={onClose} />
                     ) : null}
                   </section>

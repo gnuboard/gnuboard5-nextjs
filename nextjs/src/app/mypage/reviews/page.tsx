@@ -24,7 +24,8 @@ import { deleteShopReview, getMyShopReviews, updateShopReview } from "@/services
 import { getClientPublicSettings } from "@/services/settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextField, useSiteEditor } from "@/components/editor/RichTextField";
+import { contentForEditor, hasContent } from "@/lib/editor-content";
 import { toastError, toastSuccess } from "@/lib/toast";
 
 type StatusFilter = "all" | "confirmed" | "pending";
@@ -113,6 +114,8 @@ export default function MyShopReviewsPage() {
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState(query);
   const [editing, setEditing] = useState<EditingState | null>(null);
+  // 사이트 에디터(cf_editor)가 있으면 웹 에디터로 고친다 — 그누보드 shop/itemuseform.php 와 같은 조건.
+  const siteEditor = useSiteEditor();
   const [processingId, setProcessingId] = useState<string>("");
   const [productRewriteMode, setProductRewriteMode] = useState<BbsRewriteMode>(0);
 
@@ -199,7 +202,8 @@ export default function MyShopReviewsPage() {
     setEditing({
       is_id: item.is_id,
       is_subject: item.is_subject,
-      is_content: item.is_content,
+      // 에디터로 고칠 때 글자 후기는 줄마다 문단으로 넣는다(그대로 넣으면 줄바꿈이 사라진다).
+      is_content: siteEditor ? contentForEditor(item.is_content) : item.is_content,
       is_score: Math.min(5, Math.max(1, Number(item.is_score || 5))),
     });
   }
@@ -212,7 +216,7 @@ export default function MyShopReviewsPage() {
     const content = editing.is_content.trim();
     const score = Math.min(5, Math.max(1, Number(editing.is_score || 0)));
 
-    if (!subject || !content) {
+    if (!subject || !hasContent(content, Boolean(siteEditor))) {
       toastError("제목과 내용을 입력해주세요.");
       return;
     }
@@ -406,14 +410,14 @@ export default function MyShopReviewsPage() {
                         setEditing((prev) => (prev ? { ...prev, is_score: score } : prev))
                       }
                     />
-                    <Textarea
+                    <RichTextField
                       value={editing.is_content}
-                      onChange={(event) =>
-                        setEditing((prev) =>
-                          prev ? { ...prev, is_content: event.target.value } : prev
-                        )
+                      onChange={(value) =>
+                        setEditing((prev) => (prev ? { ...prev, is_content: value } : prev))
                       }
+                      useEditor={siteEditor}
                       rows={5}
+                      ariaLabel="후기 내용"
                     />
                     <div className="flex justify-end gap-2">
                       <Button

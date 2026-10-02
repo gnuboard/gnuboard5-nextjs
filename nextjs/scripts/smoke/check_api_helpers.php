@@ -2,7 +2,7 @@
 /**
  * API 공용 함수(api/lib/helpers.php) 검사 — DB 없이 함수 입출력만 본다.
  *   php scripts/smoke/check_api_helpers.php   (npm run check:api-helpers)
- * 쪽 번호 · 비밀글 판정 · 상품 이미지 주소의 경로 막기를 여러 핸들러가 함께 쓰므로 규칙이 바뀌지 않게 묶어 둔다.
+ * 쪽 번호 · 비밀글 판정 · 상품 이미지 주소의 경로 막기 · 회원 공개 키 모양을 여러 핸들러가 함께 쓰므로 규칙이 바뀌지 않게 묶어 둔다.
  */
 declare(strict_types=1);
 if (PHP_SAPI !== 'cli') {
@@ -20,6 +20,7 @@ $_SERVER['HTTP_HOST'] = 'localhost';
 $apiLib = dirname(__DIR__, 3) . '/api/lib';
 require_once $apiLib . '/request_helpers.php';
 require_once $apiLib . '/helpers.php';
+require_once $apiLib . '/member_key_helpers.php';
 
 $failures = 0;
 $count = 0;
@@ -77,6 +78,26 @@ file_put_contents(G5_DATA_PATH . '/member_image/me/member1.gif', 'x');
 expect_same('cached (no re-check)', api_member_media_urls('member1')['mb_image_path'], null);
 expect_same('fresh re-checks', is_string(api_member_media_urls('member1', true)['mb_image_path']), true);
 expect_same('guest gets nulls', api_member_media_urls(''), ['mb_icon_path' => null, 'mb_image_path' => null]);
+
+// --- 회원 공개 키(member_key_helpers.php): 모양 판정, 새 키, 표가 없을 때 물러서기 ----------
+expect_same('key shape', api_is_member_key('MNhJgOD-6LSNqA5'), true);
+expect_same('key without hyphen', api_is_member_key('MNhJgOD6LSNqA5x'), false);
+expect_same('key wrong lengths', api_is_member_key('MNhJgO-D6LSNqA5'), false);
+expect_same('member id is not a key', api_is_member_key('admin'), false);
+expect_same('id shape', api_is_member_id_format('Admin_01'), true);
+expect_same('id with hyphen', api_is_member_id_format('a-b'), false);
+expect_same('id over 20', api_is_member_id_format(str_repeat('a', 21)), false);
+$keys = [];
+for ($i = 0; $i < 200; $i++) {
+    $keys[api_member_new_key()] = true;
+}
+expect_same('new keys have key shape', count(array_filter(array_keys($keys), 'api_is_member_key')), count($keys));
+expect_same('new keys do not repeat', count($keys), 200);
+// 표가 등록되지 않은 설치본: 키를 만들지 못하고 '' — 부르는 쪽이 예전 주소(아이디)로 물러선다.
+expect_same('no table: no key', api_member_public_key('admin'), '');
+expect_same('no table: key ref unresolved', api_member_id_from_ref('MNhJgOD-6LSNqA5'), '');
+expect_same('legacy id ref passes through', api_member_id_from_ref('admin'), 'admin');
+expect_same('bad ref', api_member_id_from_ref('../etc'), '');
 
 // 정리
 foreach (['/item/IT1/a.png', '/secret.txt', '/member_image/me/member1.gif'] as $f) {

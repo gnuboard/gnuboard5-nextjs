@@ -25,7 +25,8 @@ if (!function_exists('api_apple_provider_enabled')) {
             return false;
         }
         $list = array_map('strtolower', array_map('trim', explode(',', (string) ($g5Config['cf_social_servicelist'] ?? ''))));
-        return in_array('apple', $list, true);
+        // 관리자 소셜 목록에 apple 이 있거나(예전 수정본 관리자 화면) api/.env 의 APPLE_LOGIN_ENABLED=on
+        return in_array('apple', $list, true) || AppleClient::enabledByEnv();
     }
 
     /** 검증된 클레임. 실패는 이유를 로그에만 남기고 한 가지 401 로 답한다. */

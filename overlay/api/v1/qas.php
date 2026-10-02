@@ -24,6 +24,9 @@ $qaConfigTable  = DB::table('qa_config_table');
 $qaContentTable = DB::table('qa_content_table');
 
 require_once __DIR__ . '/qas_attachments.php';
+require_once __DIR__ . '/qas_content.php';
+require_once __DIR__ . '/qas_notify.php';
+require_once __DIR__ . '/qas_payload.php';
 
 $seg0 = isset($apiSegments[0]) ? $apiSegments[0] : '';
 $seg1 = isset($apiSegments[1]) ? $apiSegments[1] : '';
@@ -66,26 +69,6 @@ function api_qa_clean_text($value, $maxLength = 255)
     return substr($value, 0, $maxLength);
 }
 
-function api_qa_clean_content($value)
-{
-    $value = trim((string) $value);
-    if (substr_count($value, '&#') > 50) {
-        Response::error('Invalid content.', 422);
-    }
-
-    if (function_exists('clean_xss_tags')) {
-        $value = clean_xss_tags($value, 1, 1);
-    } else {
-        $value = strip_tags($value);
-    }
-
-    if (function_exists('mb_substr')) {
-        return mb_substr($value, 0, 65536, 'UTF-8');
-    }
-
-    return substr($value, 0, 65536);
-}
-
 function api_qa_normalize_config($qaConfig)
 {
     return [
@@ -97,6 +80,8 @@ function api_qa_normalize_config($qaConfig)
         'qa_use_hp'             => (int) ($qaConfig['qa_use_hp'] ?? 0),
         'qa_req_hp'             => (int) ($qaConfig['qa_req_hp'] ?? 0),
         'qa_use_sms'            => (int) ($qaConfig['qa_use_sms'] ?? 0),
+        // 그누보드처럼 사이트 에디터(cf_editor)가 있고 이 값이 1 일 때 질문 · 답변을 웹 에디터로 쓴다.
+        'qa_use_editor'         => (int) ($qaConfig['qa_use_editor'] ?? 0),
         'qa_subject_len'        => (int) ($qaConfig['qa_subject_len'] ?? 60),
         'qa_page_rows'          => (int) ($qaConfig['qa_page_rows'] ?? 15),
         'qa_mobile_page_rows'   => (int) ($qaConfig['qa_mobile_page_rows'] ?? 15),
@@ -128,7 +113,7 @@ function api_qa_normalize_row($row, $viewer, $includeAnswer = false, $includeRel
         'qa_sms_recv'    => (int) ($row['qa_sms_recv'] ?? 0),
         'qa_html'        => (int) ($row['qa_html'] ?? 0),
         'qa_subject'     => isset($row['qa_subject']) ? (string) $row['qa_subject'] : '',
-        'qa_content'     => isset($row['qa_content']) ? (string) $row['qa_content'] : '',
+        'qa_content'     => api_qa_content_for_output($row),
         'qa_status'      => (int) ($row['qa_status'] ?? 0),
         'qa_file1'       => isset($row['qa_file1']) ? (string) $row['qa_file1'] : '',
         'qa_source1'     => isset($row['qa_source1']) ? (string) $row['qa_source1'] : '',
@@ -162,6 +147,40 @@ function api_qa_normalize_row($row, $viewer, $includeAnswer = false, $includeRel
     }
 
     return $item;
+}
+
+/**
+ * 질문의 이전글 · 다음글 — 그누보드 bbs/qaview.php 와 같다. 이전글은 qa_num 이 작은 쪽(더 최근 질문),
+ * 다음글은 큰 쪽이고, 최고관리자가 아니면 자기 질문 안에서만 찾는다. 답변 글이면 둘 다 null.
+ */
+function api_qa_neighbors($row, $viewer)
+{
+    $neighbors = ['prev' => null, 'next' => null];
+    if ((int) ($row['qa_type'] ?? 0) !== 0) {
+        return $neighbors;
+    }
+
+    $table = DB::table('qa_content_table');
+    $where = 'qa_type = 0';
+    $params = [];
+    if (!api_qa_is_admin($viewer)) {
+        $where .= ' AND mb_id = ?';
+        $params[] = $viewer['mb_id'];
+    }
+    $num = (int) ($row['qa_num'] ?? 0);
+
+    $queries = [
+        'prev' => "SELECT qa_id, qa_subject FROM {$table} WHERE {$where} AND qa_num < ? ORDER BY qa_num DESC LIMIT 1",
+        'next' => "SELECT qa_id, qa_subject FROM {$table} WHERE {$where} AND qa_num > ? ORDER BY qa_num ASC LIMIT 1",
+    ];
+    foreach ($queries as $key => $sql) {
+        $found = DB::fetch($sql, array_merge($params, [$num]));
+        if ($found) {
+            $neighbors[$key] = ['qa_id' => (int) $found['qa_id'], 'qa_subject' => (string) $found['qa_subject']];
+        }
+    }
+
+    return $neighbors;
 }
 
 function api_qa_related_questions($row, $viewer, $limit = 10)
@@ -233,114 +252,6 @@ function api_qa_find_reply_source($qaId, $viewer)
 
     $sql .= " LIMIT 1";
     return DB::fetch($sql, $params);
-}
-
-function api_qa_validate_category($category, $qaConfig, $required = true)
-{
-    $categories = api_qa_categories($qaConfig);
-
-    if (!$categories) {
-        return '';
-    }
-
-    if ($category === '' && $required) {
-        Response::error('Please select a category.', 422);
-    }
-
-    if ($category !== '' && !in_array($category, $categories, true)) {
-        Response::error('Invalid Q&A category.', 422);
-    }
-
-    return $category;
-}
-
-function api_qa_question_payload($input, $qaConfig, $member)
-{
-    $category = api_qa_clean_text(isset($input['qa_category']) ? $input['qa_category'] : '', 255);
-    $category = api_qa_validate_category($category, $qaConfig, true);
-
-    $email = '';
-    if (!empty($input['qa_email'])) {
-        $email = function_exists('get_email_address')
-            ? get_email_address(trim((string) $input['qa_email']))
-            : trim((string) $input['qa_email']);
-    }
-    if ((int) ($qaConfig['qa_req_email'] ?? 0) === 1 && $email === '') {
-        Response::error('Please enter an email address.', 422);
-    }
-
-    $hp = isset($input['qa_hp']) ? preg_replace('/[^0-9\-]/', '', (string) $input['qa_hp']) : '';
-    if ((int) ($qaConfig['qa_req_hp'] ?? 0) === 1 && $hp === '') {
-        Response::error('Please enter a mobile phone number.', 422);
-    }
-
-    $subject = api_qa_clean_text(isset($input['qa_subject']) ? $input['qa_subject'] : '', 255);
-    $content = api_qa_clean_content(isset($input['qa_content']) ? $input['qa_content'] : '');
-
-    if ($subject === '') {
-        Response::error('Please enter a subject.', 422);
-    }
-    if ($content === '') {
-        Response::error('Please enter content.', 422);
-    }
-
-    return [
-        'qa_category'   => $category,
-        'qa_email'      => $email,
-        'qa_hp'         => $hp,
-        'qa_subject'    => $subject,
-        'qa_content'    => $content,
-        'qa_email_recv' => !empty($input['qa_email_recv']) ? 1 : 0,
-        'qa_sms_recv'   => !empty($input['qa_sms_recv']) ? 1 : 0,
-        'qa_html'       => isset($input['qa_html']) ? (int) $input['qa_html'] : 0,
-        'qa_name'       => isset($member['mb_nick']) && $member['mb_nick'] !== ''
-            ? $member['mb_nick']
-            : (isset($member['mb_name']) ? $member['mb_name'] : $member['mb_id']),
-    ];
-}
-
-function api_qa_answer_payload($input)
-{
-    $subject = api_qa_clean_text(isset($input['qa_subject']) ? $input['qa_subject'] : '', 255);
-    $content = api_qa_clean_content(isset($input['qa_content']) ? $input['qa_content'] : '');
-
-    if ($subject === '') {
-        Response::error('Please enter an answer subject.', 422);
-    }
-    if ($content === '') {
-        Response::error('Please enter answer content.', 422);
-    }
-
-    return [
-        'qa_subject' => $subject,
-        'qa_content' => $content,
-        'qa_html'    => isset($input['qa_html']) ? (int) $input['qa_html'] : 0,
-    ];
-}
-
-function api_qa_push_answer_notification($question, $answerPayload, $answerId = 0)
-{
-    $mbId = isset($question['mb_id']) ? trim((string) $question['mb_id']) : '';
-    if ($mbId === '' || !class_exists('Notify')) {
-        return;
-    }
-
-    $qaId = (int) ($question['qa_id'] ?? 0);
-    $subject = trim((string) ($question['qa_subject'] ?? ''));
-    $body = $subject !== ''
-        ? $subject
-        : trim((string) ($answerPayload['qa_subject'] ?? '고객센터 답변을 확인해 주세요.'));
-
-    try {
-        Notify::emit('qa.answered', $mbId, '1:1 문의 답변이 등록되었어요', $body, [
-            'qa_id' => (string) $qaId,
-            'qa_answer_id' => (string) ((int) $answerId),
-            'qa_category' => (string) ($question['qa_category'] ?? ''),
-            'link' => '/mypage/qas/' . (int) $qaId,
-        ]);
-    } catch (\Throwable $e) {
-        error_log('[api_qa_push_answer_notification] ' . $e->getMessage());
-    }
 }
 
 // -------------------------------------------------------------------------
@@ -485,6 +396,12 @@ if (!$seg0 && $apiMethod === 'POST') {
     $created = api_qa_find($qaId, $me);
     // 그누보드 훅(bbs/qawrite_update.php 와 같은 인자) — 새 글은 $w = '', 답글 문의는 $w = 'r'(원글이 $write)
     api_run_event('qawrite_update', array($qaId, $replySource ?: array(), $replySource ? 'r' : '', $qaConfig, null), $me);
+    // 관리자에게 새 문의 메일 · 문자 — 그누보드 qawrite_update.php 와 같은 조건(qas_notify.php)
+    $siteConfig = isset($GLOBALS['config']) && is_array($GLOBALS['config']) ? $GLOBALS['config'] : [];
+    api_qa_send_notifications(
+        api_qa_notification_plan($replySource ? 'r' : '', $created ?: [], $payload['qa_content'], $payload['qa_html'], $qaConfig, $siteConfig),
+        $siteConfig
+    );
     Response::success(api_qa_normalize_row($created, $me, true), 201);
 }
 
@@ -500,7 +417,7 @@ if ($qaId > 0 && !$seg1 && $apiMethod === 'GET') {
         Response::error('Q&A item not found.', 404);
     }
 
-    Response::success(api_qa_normalize_row($row, $me, true, true));
+    Response::success(api_qa_normalize_row($row, $me, true, true) + api_qa_neighbors($row, $me));
 }
 
 // -------------------------------------------------------------------------
@@ -528,7 +445,7 @@ if ($qaId > 0 && !$seg1 && ($apiMethod === 'PATCH' || $isMultipartPatch)) {
         if (!$isAdmin) {
             Response::error('Administrator privileges required.', 403);
         }
-        $payload = api_qa_answer_payload($input);
+        $payload = api_qa_answer_payload($input, (int) $row['qa_html']);
         $qaConfig = api_qa_config();
         $attachments = api_qa_process_attachments($row, $qaConfig, $isAdmin);
         DB::execute(
@@ -549,7 +466,7 @@ if ($qaId > 0 && !$seg1 && ($apiMethod === 'PATCH' || $isMultipartPatch)) {
         );
     } else {
         $qaConfig = api_qa_config();
-        $payload = api_qa_question_payload($input, $qaConfig, $me);
+        $payload = api_qa_question_payload($input, $qaConfig, $me, (int) $row['qa_html']);
         $attachments = api_qa_process_attachments($row, $qaConfig, $isAdmin);
         DB::execute(
             "UPDATE {$qaContentTable}
@@ -601,10 +518,15 @@ if ($qaId > 0 && $seg1 === 'answer' && $apiMethod === 'POST') {
     }
 
     $input = get_request_body();
-    $payload = api_qa_answer_payload($input);
     $now = defined('G5_TIME_YMDHIS') ? G5_TIME_YMDHIS : date('Y-m-d H:i:s');
     $ip = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '';
     $adminName = isset($me['mb_nick']) && $me['mb_nick'] !== '' ? $me['mb_nick'] : $me['mb_id'];
+
+    // 같은 질문에 답변이 동시에 두 번 들어오면(두 탭 · 두 번 누름) 둘 다 "답변 없음"을 보고 답변 2개 · 메일 2통이
+    // 생긴다. 확인부터 저장까지를 MySQL 이름 잠금으로 한 줄로 세운다 — 표 엔진(MyISAM 포함)과 상관없고,
+    // 중간에 응답이 끝나도 DB 연결과 함께 풀린다.
+    $answerLock = substr('g5qa:' . $qaContentTable . ':' . $qaId, 0, 64);
+    DB::fetch('SELECT GET_LOCK(?, 10) AS locked', [$answerLock]);
 
     $answer = DB::fetch(
         "SELECT * FROM {$qaContentTable}
@@ -613,6 +535,8 @@ if ($qaId > 0 && $seg1 === 'answer' && $apiMethod === 'POST') {
          LIMIT 1",
         [$qaId]
     );
+    // 답변을 고칠 때 qa_html 을 보내지 않으면 원래 형식을 지킨다(api_qa_html_flag).
+    $payload = api_qa_answer_payload($input, $answer ? (int) $answer['qa_html'] : 0);
     $answerId = 0;
     $qaConfig = api_qa_config();
 
@@ -672,10 +596,20 @@ if ($qaId > 0 && $seg1 === 'answer' && $apiMethod === 'POST') {
          WHERE qa_id = ?",
         [$qaId]
     );
+    DB::fetch('SELECT RELEASE_LOCK(?) AS released', [$answerLock]);
 
-    api_qa_push_answer_notification($question, $payload, $answerId);
     // 그누보드 훅 — 답변은 $w = 'a', $write 는 질문, 마지막 인자가 답변 글 번호
     api_run_event('qawrite_update', array($qaId, $question, 'a', api_qa_config(), $answerId), $me);
+    // 질문자에게 알림(앱 푸시 · 메일 · 문자) — 새 답변일 때만. 답변을 고칠 때마다 "답변이 등록되었어요"가
+    // 다시 가지 않게(그누보드도 답변 수정은 알리지 않는다).
+    if (!$answer) {
+        api_qa_push_answer_notification($question, $payload, $answerId);
+        $siteConfig = isset($GLOBALS['config']) && is_array($GLOBALS['config']) ? $GLOBALS['config'] : [];
+        api_qa_send_notifications(
+            api_qa_notification_plan('a', $question, $payload['qa_content'], $payload['qa_html'], $qaConfig, $siteConfig),
+            $siteConfig
+        );
+    }
 
     $updated = DB::fetch(
         "SELECT * FROM {$qaContentTable}

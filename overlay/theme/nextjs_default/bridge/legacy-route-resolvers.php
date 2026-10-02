@@ -295,8 +295,12 @@ function nextjs_default_legacy_gnuboard_php_short_path($path, $search, $hash)
 
     if ($path === '/bbs/profile.php') {
         $mb_id = nextjs_default_first_query_param($search, array('mb_id'));
+        // 있는 회원이면 아이디 대신 회원 공개 키 주소로(plugin/webapp/bridge/runtime.php). 없으면 예전처럼 아이디.
+        $member_key = preg_match('/^[0-9A-Za-z_]+$/', $mb_id) && function_exists('g5_webapp_member_key_for_url')
+            ? g5_webapp_member_key_for_url($mb_id)
+            : '';
         $profile_path = preg_match('/^[0-9A-Za-z_]+$/', $mb_id)
-            ? '/members/' . rawurlencode($mb_id)
+            ? '/members/' . rawurlencode($member_key !== '' ? $member_key : $mb_id)
             : '/';
 
         return $profile_path

@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/api";
+import { ApiError, apiClient } from "@/lib/api";
 import * as z from "zod";
 import type { ApiMeta } from "@/lib/api-response";
 import { validateApiData } from "@/lib/api-response";
@@ -78,8 +78,24 @@ const loginSessionSchema = z.object({
 
 const loginSessionListSchema = z.array(loginSessionSchema);
 
+/** 메일 인증을 쓰는 사이트에서 이메일을 바꿨을 때 — 새 주소로 다시 인증해야 한다. */
+export interface EmailVerificationNotice {
+  required: boolean;
+  email: string;
+  mail_sent: boolean;
+  /** 인증 링크 유효시간(분). 0 이면 기한 없음. */
+  valid_minutes: number;
+}
+
 export function updateMyProfile(payload: MyProfilePayload) {
-  return apiClient.patch("/members/me", payload);
+  return apiClient.patch<{ email_verification?: EmailVerificationNotice }>("/members/me", payload);
+}
+
+/**
+ * 인증 메일 다시 보내기(아이디 + 메일 주소). 결과는 늘 같은 답이라(가입 여부 비노출) 보냈는지는 알 수 없다.
+ */
+export function resendVerificationByEmail(mb_id: string, mb_email: string) {
+  return apiClient.post<{ sent?: boolean; message?: string }>("/auth/resend-verification", { mb_id, mb_email });
 }
 
 export function updateMyPassword(payload: MyPasswordPayload) {
@@ -111,8 +127,9 @@ const memberKeyRequests = new Map<string, Promise<string | null>>();
 
 /**
  * 주소에 쓸 회원 공개 키(GET /members/{mb_id}/key) — /members/{키}, /recent?mb={키} 처럼 주소에 아이디를 남기지 않는다.
- * 없는 회원이거나 묻지 못하면 null, 키를 만들 수 없는 설치본(확장 미설치)이면 "" — 부르는 쪽이 예전 주소로 물러선다.
- * 같은 회원은 한 번만 묻는다(실패는 다음에 다시 묻는다).
+ * 없는 회원(404)이면 null, 키를 만들 수 없는 설치본(확장 미설치)이면 "" — 부르는 쪽이 예전 주소로 물러선다.
+ * 잠깐의 실패(요청 한도 429 · 네트워크)는 그대로 던진다 — 기억하지 않으므로 다음에 다시 묻는다.
+ * 같은 회원은 한 번만 묻는다.
  */
 export function getMemberKey(mbId: string): Promise<string | null> {
   const cached = memberKeyRequests.get(mbId);
@@ -121,28 +138,13 @@ export function getMemberKey(mbId: string): Promise<string | null> {
   const request = apiClient
     .get<{ mb_key?: unknown }>(`/members/${encodeURIComponent(mbId)}/key`)
     .then((response) => (typeof response.data?.mb_key === "string" ? response.data.mb_key : ""))
-    .catch(() => {
+    .catch((error: unknown) => {
+      if (error instanceof ApiError && error.status === 404) return null;
       memberKeyRequests.delete(mbId);
-      return null;
+      throw error;
     });
   memberKeyRequests.set(mbId, request);
   return request;
-}
-
-/** 회원 공개 키 모양(7자-7자). 아이디에는 하이픈이 올 수 없어 예전 주소(/members/아이디)와 섞이지 않는다. */
-export function isMemberKey(value: string): boolean {
-  return /^[A-Za-z0-9]{7}-[A-Za-z0-9]{7}$/.test(value);
-}
-
-/**
- * 자기소개 · 전체게시물 주소. 키가 있으면 키로, 키를 만들 수 없는 설치본("")이면 예전처럼 아이디로.
- */
-export function memberProfilePath(mbId: string, key: string): string {
-  return `/members/${encodeURIComponent(key || mbId)}`;
-}
-
-export function memberRecentPath(mbId: string, key: string): string {
-  return key ? `/recent?mb=${encodeURIComponent(key)}` : `/recent?mb_id=${encodeURIComponent(mbId)}`;
 }
 
 export async function getMemberProfile(mbId: string): Promise<MemberProfile> {

@@ -130,6 +130,7 @@ if (!function_exists('api_board_category_counts_query')) {
                 "SELECT ca_name, COUNT(*) AS cnt
                  FROM " . DB::writeTable($bo_table) . "
                  WHERE wr_is_comment = 0 AND ca_name <> ''
+                   AND (wr_10 IS NULL OR wr_10 <> 'report_hidden')
                  GROUP BY ca_name"
             );
             foreach ($rows as $row) {
@@ -146,6 +147,10 @@ if ($bo_table && $subResource === 'category-counts' && $apiMethod === 'GET') {
     $board = api_get_board($bo_table);
     if (!$board) {
         Response::error('Board not found.', 404);
+    }
+    // 글 목록과 같은 권한(bo_list_level · 본인인증) — 목록을 못 보는 사람에게 분류별 글 수도 주지 않는다.
+    if (!api_can_access_board_list(Auth::getUser(), $bo_table, $board)) {
+        Response::error('You do not have permission to list this board.', 403);
     }
     if ((int) ($board['bo_use_category'] ?? 0) !== 1) {
         Response::success(array('counts' => null, 'reason' => 'no_category'));
@@ -697,7 +702,8 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'POST') {
         $wr_id,
         $replyParent ?: null,
         array('name' => (string) $member['mb_nick'], 'email' => (string) $member['mb_email']),
-        array('subject' => (string) $wr_subject, 'content' => (string) $wr_content, 'wr_option' => $wr_option)
+        array('subject' => (string) $wr_subject, 'content' => (string) $wr_content, 'wr_option' => $wr_option),
+        $member
     );
 
     // 그누보드 latest() 위젯 캐시를 비운다(원본과 같이 훅 앞에서). 안의 delete_cache_latest 훅도 보호해서 부른다.

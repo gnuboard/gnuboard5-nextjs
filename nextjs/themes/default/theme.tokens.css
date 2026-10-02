@@ -210,6 +210,12 @@ body[data-g5-theme-source="default"] {
   background-color: var(--solune-surface-soft);
   border-color: var(--solune-border);
 }
+/* 카드(ui/card.tsx)도 테두리를 밝은 border-[#e9ebee] 로 못박아 두어 다크에서는 흰 줄로 보인다(게시판 목록 카드의
+   좌우 · 댓글 카드 둘레). 다크에서만 테마 테두리 색으로 — 밝은 모드는 원래 색 그대로 둔다. */
+:root.dark body[data-g5-theme-source="default"] :is([data-slot="card"], .card-surface),
+:root[data-solune-theme="dark"] body[data-g5-theme-source="default"] :is([data-slot="card"], .card-surface) {
+  border-color: var(--solune-border);
+}
 /* 로그인·가입 폼이 제목 글자를 text-[#202124] 로 못박는다(7곳). 다크에선 검정 위 검정. */
 :root.dark body[data-g5-theme-source="default"] .text-\[\#202124\],
 :root[data-solune-theme="dark"] body[data-g5-theme-source="default"] .text-\[\#202124\] {

@@ -151,7 +151,9 @@ if (!$id && $apiMethod === 'POST') {
 
     // 보내기 횟수 한도 — 원본 쪽지 화면의 캡차 대신. 관리자는 공지 쪽지를 보내므로 빼 준다.
     if (!$isAdmin) {
-        $memoLimit = Throttle::checkMemoSend((string) $me['mb_id']);
+        // 쪽지 테이블로 세는 간격 검사 + 지울 수 없는 발송 기록(보낸 쪽지를 지워 한도를 되돌리지 못하게).
+        $memoLimit = Throttle::checkMemoSend((string) $me['mb_id'])
+            ?? Throttle::checkMemberQuota('memo', (string) $me['mb_id'], Throttle::MEMO_PER_MINUTE, Throttle::MEMO_PER_HOUR);
         if ($memoLimit !== null) {
             Response::error($memoLimit, 429);
         }

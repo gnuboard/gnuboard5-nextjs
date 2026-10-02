@@ -11,6 +11,8 @@ interface RecentSearchPanelProps {
   view: "" | "w" | "c";
   grId: string;
   mbId: string;
+  /** 사이드뷰 "전체게시물"로 온 회원 공개 키(?mb=). 아이디 칸이 비어 있는 동안 검색해도 이 회원 조건을 지킨다. */
+  mbKey: string;
 }
 
 /**
@@ -18,7 +20,7 @@ interface RecentSearchPanelProps {
  * 그룹 · 검색대상(전체게시물 · 원글만 · 코멘트만) · 회원 아이디를 고르고 [검색]을 누르면 주소가 바뀐다.
  * 레퍼런스는 회원 아이디가 필수라 그룹만으로는 거를 수 없었는데, 여기서는 빈 칸이면 그 조건을 뺀다.
  */
-export function RecentSearchPanel({ groups, view, grId, mbId }: RecentSearchPanelProps) {
+export function RecentSearchPanel({ groups, view, grId, mbId, mbKey }: RecentSearchPanelProps) {
   const router = useRouter();
   const formId = useId();
   const [open, setOpen] = useState(true);
@@ -29,15 +31,23 @@ export function RecentSearchPanel({ groups, view, grId, mbId }: RecentSearchPane
     setDraft({ grId, view, mbId });
   }, [grId, view, mbId]);
 
-  const submit = (event: React.FormEvent) => {
-    event.preventDefault();
+  const go = (keepMemberKey: boolean) => {
     const params = new URLSearchParams();
     if (draft.grId) params.set("gr_id", draft.grId);
     if (draft.view) params.set("view", draft.view);
     if (draft.mbId.trim()) params.set("mb_id", draft.mbId.trim());
+    else if (keepMemberKey && mbKey) params.set("mb", mbKey);
     const qs = params.toString();
     runtimeRouterPush(router, qs ? `/recent?${qs}` : "/recent");
   };
+
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    go(true);
+  };
+
+  // 회원 키로 거른 목록이면 아이디 칸은 비어 있다 — 무엇으로 걸렀는지 알리고 풀 수 있게 한다.
+  const showMemberKeyFilter = Boolean(mbKey) && !draft.mbId.trim();
 
   return (
     <fieldset className="recent-search rounded-lg border bg-card">
@@ -105,6 +115,14 @@ export function RecentSearchPanel({ groups, view, grId, mbId }: RecentSearchPane
               검색
             </button>
           </div>
+          {showMemberKeyFilter ? (
+            <p className="recent-search-member text-xs text-muted-foreground">
+              선택한 회원의 글만 보는 중 ·{" "}
+              <button type="button" className="font-semibold text-foreground underline" onClick={() => go(false)}>
+                해제
+              </button>
+            </p>
+          ) : null}
         </div>
       </form>
     </fieldset>

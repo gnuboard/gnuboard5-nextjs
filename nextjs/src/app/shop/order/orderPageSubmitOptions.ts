@@ -50,5 +50,6 @@ export function buildOrderSubmitOptions({
     directCtIds,
     setSubmitting: formState.setSubmitting,
     setPaymentNotice: formState.paymentNoticeState.setPaymentNotice,
+    onCartChanged: orderData.reloadItems,
   };
 }

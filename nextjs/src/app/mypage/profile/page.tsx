@@ -16,11 +16,14 @@ import type { PublicSettings } from "@/lib/schemas";
 import {
   deleteMyIcon,
   deleteMyImage,
+  resendVerificationByEmail,
   updateMyProfile,
   uploadMyIcon,
   uploadMyImage,
+  type EmailVerificationNotice,
 } from "@/services/member";
 import { getClientPublicSettings } from "@/services/settings";
+import { toastError, toastSuccess } from "@/lib/toast";
 import { MemberMediaField } from "./MemberMediaField";
 
 type MemberMedia = NonNullable<PublicSettings["member_media"]>;
@@ -42,6 +45,10 @@ export default function ProfilePage() {
   const [msg, setMsg] = useState({ type: "", text: "" });
   const [loading, setLoading] = useState(false);
   const [media, setMedia] = useState<MemberMedia | undefined>(undefined);
+  // 메일 인증을 쓰는 사이트 — 이메일을 바꾸면 새 주소로 다시 인증해야 한다(원본 회원정보 수정과 같음).
+  const [emailCertify, setEmailCertify] = useState(false);
+  const [verifyNotice, setVerifyNotice] = useState<EmailVerificationNotice | null>(null);
+  const [resending, setResending] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -58,7 +65,9 @@ export default function ProfilePage() {
     let alive = true;
     getClientPublicSettings()
       .then((settings) => {
-        if (alive) setMedia(settings.member_media);
+        if (!alive) return;
+        setMedia(settings.member_media);
+        setEmailCertify(Number(settings.cf_use_email_certify ?? 0) === 1);
       })
       .catch(() => {
         // 설정을 못 읽으면 아이콘만 예전처럼 보인다.
@@ -98,12 +107,14 @@ export default function ProfilePage() {
     }
     setLoading(true);
     try {
-      await updateMyProfile({
+      const res = await updateMyProfile({
         ...form,
         ...(emailChanged ? { mb_password_current: currentPassword } : {}),
       });
       await fetchUser();
       setCurrentPassword("");
+      const notice = res.data?.email_verification;
+      setVerifyNotice(notice?.required ? notice : null);
       setMsg({ type: "success", text: "프로필이 수정되었습니다." });
     } catch (err: unknown) {
       const message =
@@ -111,6 +122,20 @@ export default function ProfilePage() {
       setMsg({ type: "error", text: message });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!user?.mb_id || !verifyNotice) return;
+    setResending(true);
+    try {
+      // 서버는 결과를 알려 주지 않는다(늘 같은 답) — "보냈다"가 아니라 "요청했다"로 알린다.
+      await resendVerificationByEmail(user.mb_id, verifyNotice.email);
+      toastSuccess(`${verifyNotice.email} 주소로 인증 메일을 다시 요청했습니다. 잠시 뒤 메일함을 확인해주세요.`);
+    } catch (err: unknown) {
+      toastError(err instanceof Error ? err.message : "인증 메일을 보내지 못했습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setResending(false);
     }
   };
 
@@ -124,6 +149,26 @@ export default function ProfilePage() {
           {msg.text && (
             <Alert variant={msg.type === "error" ? "destructive" : "default"}>
               <AlertDescription>{msg.text}</AlertDescription>
+            </Alert>
+          )}
+
+          {verifyNotice && (
+            <Alert className="profile-email-verify-notice">
+              <AlertDescription className="space-y-2">
+                <p>
+                  {verifyNotice.mail_sent
+                    ? `${verifyNotice.email} 주소로 인증 메일을 보냈습니다.`
+                    : "새 주소로 인증 메일을 보내지 못했습니다. 아래 단추로 다시 받아보세요."}{" "}
+                  {verifyNotice.valid_minutes > 0 ? `${verifyNotice.valid_minutes}분 안에 ` : ""}
+                  메일의 링크를 눌러 인증해야 다음에 다시 로그인할 수 있습니다.
+                </p>
+                {verifyNotice.valid_minutes > 0 && (
+                  <p>유효시간 안에 인증하지 않으면 사이트 정책에 따라 계정이 탈퇴 처리될 수 있습니다.</p>
+                )}
+                <Button type="button" variant="outline" size="sm" onClick={handleResendVerification} disabled={resending}>
+                  {resending ? "보내는 중..." : "인증 메일 다시 보내기"}
+                </Button>
+              </AlertDescription>
             </Alert>
           )}
 
@@ -193,6 +238,12 @@ export default function ProfilePage() {
               required
             />
           </div>
+          {emailChanged && emailCertify && (
+            <p className="text-sm text-muted-foreground">
+              이메일을 바꾸면 새 주소로 받은 메일의 링크를 눌러 다시 인증해야 합니다. 인증 전에는 다시 로그인할 수
+              없습니다.
+            </p>
+          )}
           {emailChanged && (
             <div className="space-y-2">
               <Label htmlFor="mb_password_current">현재 비밀번호</Label>

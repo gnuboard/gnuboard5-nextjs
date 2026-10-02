@@ -197,6 +197,7 @@ export const qaConfigSchema = z
     qa_use_hp: numberValue,
     qa_req_hp: numberValue,
     qa_use_sms: numberValue,
+    qa_use_editor: numberValue,
     qa_subject_len: numberValue,
     qa_page_rows: numberValue,
     qa_mobile_page_rows: numberValue,
@@ -207,6 +208,8 @@ export const qaConfigSchema = z
     qa_mobile_content_tail: stringValue,
   })
   .passthrough() as unknown as z.ZodType<QaConfig>;
+
+const qaNeighborSchema = z.object({ qa_id: numberValue, qa_subject: stringValue });
 
 export const qaItemSchema: z.ZodType<QaItem> = z.lazy(() =>
   z
@@ -238,6 +241,8 @@ export const qaItemSchema: z.ZodType<QaItem> = z.lazy(() =>
       can_delete: booleanValue,
       answer: qaItemSchema.nullable(),
       related_questions: z.array(qaItemSchema).default([]),
+      prev: qaNeighborSchema.nullable().optional(),
+      next: qaNeighborSchema.nullable().optional(),
     })
     .passthrough()
 ) as z.ZodType<QaItem>;

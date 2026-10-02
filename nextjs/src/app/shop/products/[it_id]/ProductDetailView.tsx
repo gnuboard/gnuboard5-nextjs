@@ -126,6 +126,12 @@ interface ProductDetailViewProps {
   onQaSubmitted: () => void;
   reviews: ShopReview[];
   reviewSummary: ShopReviewSummary | null;
+  reviewPage: number;
+  reviewLastPage: number;
+  onReviewPageChange: (page: number) => void;
+  qaPage: number;
+  qaLastPage: number;
+  onQaPageChange: (page: number) => void;
   qas: ShopQA[];
   onQaChanged: () => void;
   shippingFreeThreshold: number;
@@ -206,6 +212,12 @@ export function ProductDetailView({
   onQaSubmitted,
   reviews,
   reviewSummary,
+  reviewPage,
+  reviewLastPage,
+  onReviewPageChange,
+  qaPage,
+  qaLastPage,
+  onQaPageChange,
   qas,
   onQaChanged,
   shippingFreeThreshold,
@@ -362,6 +374,12 @@ export function ProductDetailView({
         onQaSubmitted={onQaSubmitted}
         reviews={reviews}
         reviewSummary={reviewSummary}
+        reviewPage={reviewPage}
+        reviewLastPage={reviewLastPage}
+        onReviewPageChange={onReviewPageChange}
+        qaPage={qaPage}
+        qaLastPage={qaLastPage}
+        onQaPageChange={onQaPageChange}
         reviewAverage={reviewAverage}
         reviewTotal={reviewTotal}
         reviewScores={reviewScores}

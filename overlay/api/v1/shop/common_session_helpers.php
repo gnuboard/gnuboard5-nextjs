@@ -370,13 +370,15 @@ if (!function_exists('shop_api_new_guest_cart_id')) {
     function shop_api_new_guest_cart_id(): string
     {
         $table = DB::table('g5_shop_cart_table');
-        for ($i = 0; $i < 5; $i++) {
+        // 겹치면 다시 뽑는다 — 시각 기반 id 로 돌아가면 짐작할 수 있는 id 가 다시 생긴다(겹칠 확률은 사실상 0).
+        $id = '';
+        for ($i = 0; $i < 20; $i++) {
             $id = (string) random_int(1000000000000000, 8999999999999999);
             if (!DB::fetch("SELECT ct_id FROM {$table} WHERE od_id = ? LIMIT 1", [$id])) {
                 return $id;
             }
         }
-        return (string) shop_api_new_cart_id();
+        return $id;
     }
 }
 
@@ -793,7 +795,7 @@ if (!function_exists('shop_api_restore_pending_cart_rows_by_ct_ids')) {
             if ($mbId === '' && !shop_api_can_view_guest_order($order)) {
                 continue;
             }
-            $restored += shop_api_restore_pending_order_cart($order, $member, $reason);
+            $restored += shop_api_restore_pending_order_cart_locked($order, $member, $reason);
         }
 
         return $restored;

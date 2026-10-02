@@ -115,6 +115,56 @@ if (!function_exists('g5_nextjs_runtime_load_env_file')) {
     }
 }
 
+if (!function_exists('g5_webapp_member_key_for_url')) {
+    /**
+     * 예전 회원 주소(bbs/profile.php?mb_id=)를 넘길 때 쓸 회원 공개 키(api/lib/member_key_helpers.php).
+     * 서버가 먼저 /members/아이디 로 넘기면 그 주소가 검색엔진에 남으므로 처음부터 /members/{키} 로 넘긴다.
+     * 없는 회원 · 키 표나 API 파일이 없는 설치본은 '' — 부르는 쪽이 예전처럼 아이디 주소로 넘긴다.
+     * 넘기는 주소(키 / 아이디)로 그 아이디가 있는지 드러나므로 GET /v1/members/{id}/key 와 같은 한도를 건다 —
+     * 없는 아이디만 세고, 한도를 넘으면 모든 아이디를 아이디 주소로 넘겨 차이를 남기지 않는다.
+     */
+    function g5_webapp_member_key_for_url($mb_id)
+    {
+        global $member;
+
+        $mb_id = (string) $mb_id;
+        $root = defined('G5_PATH') ? G5_PATH : dirname(__DIR__, 3);
+        if (!preg_match('/^[A-Za-z0-9_]{1,20}$/', $mb_id)
+            || !is_file($root . '/api/lib/DB.php')
+            || !is_file($root . '/api/lib/member_key_helpers.php')) {
+            return '';
+        }
+        try {
+            require_once $root . '/api/lib/DB.php';
+            require_once $root . '/api/lib/member_key_helpers.php';
+            $throttle = is_file($root . '/api/lib/Throttle.php');
+            if ($throttle) {
+                require_once $root . '/api/lib/Throttle.php';
+            }
+            $subject = !empty($member['mb_id'])
+                ? 'mb:' . (string) $member['mb_id']
+                : 'ip:' . (string) (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '');
+            if ($throttle && Throttle::checkMemberQuota('memberkeymiss', $subject, 30, 300, false) !== null) {
+                return '';
+            }
+            $target = DB::fetch(
+                "SELECT mb_id FROM " . DB::table('member_table') . "
+                  WHERE mb_id = ? AND mb_leave_date = '' AND mb_intercept_date = '' LIMIT 1",
+                array($mb_id)
+            );
+            if (!$target) {
+                if ($throttle) {
+                    Throttle::checkMemberQuota('memberkeymiss', $subject, 30, 300);
+                }
+                return '';
+            }
+            return api_member_public_key((string) $target['mb_id']);
+        } catch (Throwable $e) {
+            return '';
+        }
+    }
+}
+
 if (!function_exists('g5_nextjs_runtime_env_value')) {
     function g5_nextjs_runtime_env_value(array $env, $key)
     {

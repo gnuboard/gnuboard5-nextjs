@@ -5,7 +5,10 @@ import type {
   PayMethodDef,
 } from "../src/app/shop/order/orderPaymentHelpers";
 import { PAYMENT_NOTICE_AUTO_DISMISS_MS } from "../src/app/shop/order/orderPaymentHelpers";
-import { PAYMENT_PREPARING_NOTICE } from "../src/app/shop/order/orderSubmitFeedback";
+import {
+  CART_CHANGED_MESSAGE,
+  PAYMENT_PREPARING_NOTICE,
+} from "../src/app/shop/order/orderSubmitFeedback";
 import {
   submitBankOrder,
   submitPaymentOrder,
@@ -155,6 +158,36 @@ test.describe("order submit flow", () => {
     expect(setSubmittingCalls).toEqual([false]);
   });
 
+  test("reloads the shown rows when the cart changed under a bank order", async () => {
+    const setSubmittingCalls: boolean[] = [];
+    let reloads = 0;
+    const deps = buildDeps({
+      createBankOrder: async () => {
+        throw Object.assign(new Error("장바구니가 바뀌었습니다."), { code: "CART_CHANGED" });
+      },
+    });
+
+    await submitBankOrder({
+      orderBody: { od_name: "Buyer", ct_ids: "1,2" },
+      bankAccount: "Bank 123",
+      depositName: "Buyer",
+      router: {
+        push: () => undefined,
+        replace: () => undefined,
+      },
+      setSubmitting: (submitting) => setSubmittingCalls.push(submitting),
+      onCartChanged: () => {
+        reloads += 1;
+      },
+      deps,
+    });
+
+    expect(reloads).toBe(1);
+    expect(deps.toastErrors).toEqual([{ message: CART_CHANGED_MESSAGE }]);
+    expect(deps.routerCalls).toEqual([]);
+    expect(setSubmittingCalls).toEqual([false]);
+  });
+
   test("rejects bank order responses without an order id", async () => {
     const setSubmittingCalls: boolean[] = [];
     const routerPushes: string[] = [];
@@ -262,6 +295,38 @@ test.describe("order submit flow", () => {
     expect(notices).toEqual([PAYMENT_PREPARING_NOTICE, progressNotice]);
     expect(deps.toastErrors).toEqual([]);
     expect(setSubmittingCalls).toEqual([]);
+  });
+
+  test("reloads the shown rows when the cart changed before the payment window", async () => {
+    const notices: Array<PaymentNotice | null> = [];
+    const setSubmittingCalls: boolean[] = [];
+    let reloads = 0;
+    const deps = buildDeps({
+      requestPreparedOrderPayment: async () => {
+        throw Object.assign(new Error("장바구니가 바뀌었습니다."), { code: "CART_CHANGED" });
+      },
+    });
+
+    await submitPaymentOrder({
+      orderBody: { od_name: "Buyer", ct_ids: "1,2" },
+      paymentConfig: paymentConfig(),
+      methodDef: paymentMethod(),
+      origin: "https://example.com",
+      setSubmitting: (submitting) => setSubmittingCalls.push(submitting),
+      setPaymentNotice: (notice) => notices.push(notice),
+      onCartChanged: () => {
+        reloads += 1;
+      },
+      deps,
+    });
+
+    expect(reloads).toBe(1);
+    // 준비 중 안내를 걷는다 — 결제창은 열리지 않았다.
+    expect(notices).toEqual([PAYMENT_PREPARING_NOTICE, null]);
+    expect(deps.toastErrors).toEqual([
+      { message: CART_CHANGED_MESSAGE, duration: PAYMENT_NOTICE_AUTO_DISMISS_MS },
+    ]);
+    expect(setSubmittingCalls).toEqual([false]);
   });
 
   test("reports prepared payment failures and clears submitting state", async () => {

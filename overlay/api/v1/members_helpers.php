@@ -143,37 +143,35 @@ function api_member_require_current_password(array $input, array $member): void
     }
 }
 
-function api_member_public_app_url(string $path): string
+/**
+ * 메일 인증 링크 보내기. $isEmailChange: 회원정보에서 이메일을 바꾼 경우(기본) / false 면 로그인 화면의 "다시 보내기".
+ * 링크 주소는 설정으로 정한 사이트 주소만 쓴다(api_mail_link_base) — 없거나 발송에 실패하면 false.
+ */
+function api_member_send_email_verification_mail(string $mbId, string $email, string $token, bool $isEmailChange = true): bool
 {
-    $base = '';
-    if (defined('G5_WEBAPP_APP_URL')) {
-        $base = (string) G5_WEBAPP_APP_URL;
-    } elseif (defined('G5_WEBAPP_G5_URL')) {
-        $base = (string) G5_WEBAPP_G5_URL;
-    } elseif (defined('G5_NEXTJS25_APP_URL')) {
-        $base = (string) G5_NEXTJS25_APP_URL;
-    } elseif (defined('G5_NEXTJS25_G5_URL')) {
-        $base = (string) G5_NEXTJS25_G5_URL;
-    } elseif (defined('G5_URL')) {
-        $base = (string) G5_URL;
-    }
-    return rtrim($base, '/') . '/' . ltrim($path, '/');
-}
-
-function api_member_send_email_verification_mail(string $mbId, string $email, string $token): void
-{
-    if (!function_exists('mailer')) {
+    if (!api_require_mailer()) {
         error_log('[api/members] mailer() unavailable for email verification mb_id=' . $mbId);
-        return;
+        return false;
+    }
+    $base = api_mail_link_base();
+    if ($base === '') {
+        error_log('[api/members] email verification mail skipped — set G5_DOMAIN (or the web app URL) mb_id=' . $mbId);
+        return false;
     }
 
     $config = api_get_config();
     $siteName = (string) ($config['cf_title'] ?? '');
     $fromMail = (string) ($config['cf_admin_email'] ?? '');
-    $verifyUrl = api_member_public_app_url('/api/v1/auth/verify-email?mb_id=' . rawurlencode($mbId) . '&token=' . rawurlencode($token));
-    $subject = '[' . $siteName . '] Email verification';
-    $body = "Please verify your new email address.\n\n" . $verifyUrl;
-    api_call_core('mailer', array($siteName, $fromMail, $email, $subject, $body, 0)); // 안의 mailer · mail_options · mail_send_result 훅도 보호해서
+    $verifyUrl = $base . '/api/v1/auth/verify-email?mb_id=' . rawurlencode($mbId) . '&token=' . rawurlencode($token);
+    $subject = '[' . $siteName . '] 이메일 인증';
+    $body = ($isEmailChange
+            ? '회원정보의 이메일 주소가 바뀌었습니다. 아래 링크를 클릭해 새 주소 인증을 완료해주세요.'
+            : '아래 링크를 클릭해 이메일 인증을 완료해주세요.')
+        . "\n\n" . $verifyUrl
+        . (function_exists('api_email_certify_validity_note') ? api_email_certify_validity_note() : '');
+    // mailer() 는 보냈으면 true, 실패 false, 메일 사용이 꺼져 있으면 null — 실제로 나갔을 때만 true.
+    $result = api_call_core('mailer', array($siteName, $fromMail, $email, $subject, $body, 0)); // 안의 mailer · mail_options · mail_send_result 훅도 보호해서
+    return $result !== false && $result !== null;
 }
 
 /**

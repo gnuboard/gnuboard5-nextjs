@@ -7,3 +7,75 @@
 .solune-shop-page .ondam-card-add:disabled,
 .solune-shop-page .ondam-card-add:disabled:hover { cursor: not-allowed; background: var(--solune-surface-soft); color: var(--solune-muted); }
 .solune-shop-page .ondam-card-add[aria-busy="true"] { cursor: progress; }
+
+/* --- 옵션 고르기 창 (앱 ProductQuickAddDialog, 상점 화면에서 연 것) -------------------
+   창은 body 바로 아래에 그려지므로 .solune-shop-page 안이 아니다 — 상점 토큰은 theme.shop.tokens.css 가
+   이 창에도 준다. 모양은 상품 상세 구매 상자와 같은 말씨: 큰 썸네일과 이름 · 가격 머리, 높이 44 · 모서리 8
+   고르기 칸, 수량 · 고른 옵션 · 총액을 옅은 회색 상자 하나로, 아래 단추는 높이 50 · 모서리 10
+   (상세보기 = 초록 테두리, 담기 = 초록 채움). 폰에서는 아래에서 올라오는 시트에 손잡이를 단다. */
+body[data-g5-theme-source="default"]:has(.solune-shop-page) .product-quick-add-dialog {
+  border: 0;
+  border-radius: 16px;
+  background: var(--solune-surface);
+  color: var(--solune-text);
+  box-shadow: 0 0 0 1px var(--solune-border), 0 24px 60px -16px rgb(20 20 15 / 0.38);
+
+  @media (min-width: 640px) { max-width: 440px; }
+  @media (max-width: 639px) {
+    border-radius: 18px 18px 0 0;
+    &::before { content: ""; position: absolute; top: 8px; left: 50%; width: 40px; height: 4px; margin-left: -20px; border-radius: 999px; background: var(--solune-border-strong); }
+    .product-quick-add-head { padding-top: 26px; }
+    .product-quick-add-foot { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+  }
+
+  /* 머리: 썸네일 64 · 분류 · 이름 · 가격(할인이면 정가 줄긋기와 할인율) */
+  .product-quick-add-head { gap: 14px; border-bottom: 1px solid var(--solune-border); padding: 20px 56px 18px 20px; }
+  .product-quick-add-thumb { width: 64px; height: 64px; border: 0; border-radius: 10px; background: var(--solune-surface-soft); }
+  .product-quick-add-kicker { margin-bottom: 2px; color: var(--solune-muted); font-size: 11.5px; font-weight: 600; }
+  .product-quick-add-name { color: var(--solune-text); font-size: 15px; font-weight: 700; line-height: 1.4; letter-spacing: -0.02em; }
+  .product-quick-add-price { margin-top: 6px; column-gap: 6px; }
+  .product-quick-add-price-now { color: var(--solune-text); font-size: 17px; font-weight: 800; letter-spacing: -0.02em; }
+  .product-quick-add-price-was { color: var(--solune-muted); font-size: 12.5px; }
+  .product-quick-add-discount { color: var(--ondam-sale); font-size: 12.5px; font-weight: 800; }
+
+  /* 닫기: 둥근 34px. 열릴 때 생기던 회색 바탕 · 초점 테두리는 없애고, 키보드 초점일 때만 테두리. */
+  [data-slot="dialog-close"] { top: 14px; right: 14px; display: grid; width: 34px; height: 34px; place-items: center; border-radius: 999px; background: transparent; color: var(--solune-muted); opacity: 1; box-shadow: none; }
+  [data-slot="dialog-close"]:hover { background: var(--solune-surface-soft); color: var(--solune-text); }
+  [data-slot="dialog-close"]:focus-visible { outline: 2px solid var(--solune-primary); outline-offset: 2px; }
+  [data-slot="dialog-close"] svg { width: 18px; height: 18px; }
+
+  /* 본문: 유틸리티 간격(space-y-4)을 끄고 직접 둔다. */
+  .product-quick-add-body { padding: 20px 20px 4px; }
+  .product-quick-add-body > * { margin-block: 0; }
+  .product-quick-add-body > * + * { margin-top: 14px; }
+  .product-options label,
+  .product-quick-add-body > .space-y-2 > label { margin-bottom: 6px; color: var(--solune-text-soft); font-size: 12.5px; font-weight: 600; }
+  .product-quick-add-body select { height: 44px; border-radius: 8px; border-color: var(--solune-border-strong); background-color: var(--solune-surface); color: var(--solune-text); font-size: 14px; }
+  .product-quick-add-body > .space-y-2 button { height: 44px; min-width: 64px; border-radius: 8px; border-color: var(--solune-border-strong); }
+
+  /* 수량 · 고른 옵션 · 총액: 이어 붙여 옅은 회색 둥근 상자 하나(상세 구매 상자와 같다). */
+  .product-quick-add-body > .product-quantity { margin-top: 18px; border-radius: 12px 12px 0 0; padding: 16px 16px 12px; background: var(--solune-surface-soft); }
+  .product-quantity > label { margin-bottom: 8px; color: var(--solune-muted); font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; }
+  /* 수량 단추 셋을 붙여 하나의 조절기로. */
+  .product-quantity-controls { gap: 0; }
+  .product-quantity-controls > * { height: 36px; border: 1px solid var(--solune-border-strong); border-radius: 0; background: var(--solune-surface); box-shadow: none; }
+  .product-quantity-controls > button { width: 36px; }
+  .product-quantity-controls > button:first-child { border-radius: 8px 0 0 8px; }
+  .product-quantity-controls > button:last-child { border-radius: 0 8px 8px 0; }
+  .product-quantity-controls > input { width: 52px; border-inline: 0; color: var(--solune-text); font-weight: 600; }
+  .product-quick-add-body > .product-selected { margin-top: 0; padding: 0 16px 4px; background: var(--solune-surface-soft); }
+  .product-selected > button { height: 34px; border-radius: 8px; border-color: var(--solune-border-strong); background: var(--solune-surface); color: var(--solune-text-soft); font-size: 12.5px; }
+  .product-selected .rounded-lg { border-radius: 10px; border-color: var(--solune-border); background: var(--solune-surface); }
+  .product-quick-add-body > .product-total { margin-top: 0; border: 0; border-radius: 0 0 12px 12px; padding: 12px 16px 16px; background: var(--solune-surface-soft); }
+  .product-total > div { border-top: 1px solid var(--solune-border); padding-top: 12px; }
+  .product-total-label { color: var(--solune-text-soft); font-size: 13px; font-weight: 500; }
+  .product-total-value { color: var(--solune-text); font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+
+  /* 아래 단추: 상세보기 = 초록 테두리, 장바구니 담기 = 초록 채움. */
+  .product-quick-add-foot { gap: 8px; border-top: 1px solid var(--solune-border); padding: 16px 20px 20px; }
+  .product-quick-add-foot :is(a, button) { height: 50px; border-radius: 10px; font-size: 14.5px; font-weight: 700; }
+  .product-quick-add-detail { border-color: var(--solune-primary); background: var(--solune-surface); color: var(--solune-primary); }
+  .product-quick-add-detail:hover { background: var(--solune-primary-soft); color: var(--solune-primary); }
+  .product-quick-add-submit { background: var(--solune-primary); color: var(--solune-primary-ink); }
+  .product-quick-add-submit:hover:not(:disabled) { background: var(--solune-primary-hover); }
+}

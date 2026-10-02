@@ -201,6 +201,9 @@ body[data-g5-theme-source="default"] nav[aria-label="페이지 이동"] button {
    머리가 위 모서리, 도구줄이 아래 모서리를 둥글린다. 이 테마는 BoardViewHeader
    슬롯을 늘 채우므로 카드 클래스만으로 충분하다(:has 불필요). */
 body[data-g5-theme-source="default"] .solune-inner-shell .board-view-card {
+  /* 안쪽 좌우 여백 — 머리 · 작성자 줄 · 본문 · 추천 · 도구줄이 같은 선에 맞춘다. 레퍼런스는 44px 였지만
+     옆 칸(로그인 · 최근 댓글)이 붙은 본문 폭(약 900px)에서는 글 폭이 너무 좁아 보여 32px 로 줄였다. */
+  --solune-view-inset: 32px;
   overflow: visible;
   border: 0;
   border-radius: 0;
@@ -222,12 +225,12 @@ body[data-g5-theme-source="default"] .board-view-card > .board-view-toolbar {
   border-top: 1px solid var(--solune-border);
   border-bottom: 1px solid var(--solune-border);
   border-radius: 0 0 var(--solune-radius-md) var(--solune-radius-md);
-  padding: 18px 44px;
+  padding: 16px var(--solune-view-inset, 32px);
   background: var(--solune-surface-soft);
 }
 body[data-g5-theme-source="default"] .board-view-card > [data-slot="separator"] { display: none; }
-body[data-g5-theme-source="default"] .solune-inner-shell .board-view-card > .board-view-content { padding: 1.75rem 44px 2rem; }
-body[data-g5-theme-source="default"] .solune-inner-shell .board-view-card > .board-view-vote { padding: 0.5rem 44px 2.25rem; }
+body[data-g5-theme-source="default"] .solune-inner-shell .board-view-card > .board-view-content { padding: 1.5rem var(--solune-view-inset, 32px) 1.75rem; }
+body[data-g5-theme-source="default"] .solune-inner-shell .board-view-card > .board-view-vote { padding: 0.5rem var(--solune-view-inset, 32px) 1.75rem; }
 body[data-g5-theme-source="default"] .board-view-vote button {
   min-width: 5.6rem;
   height: 40px;
@@ -298,11 +301,11 @@ body[data-g5-theme-source="default"] .solune-view-listbtn {
 body[data-g5-theme-source="default"] .solune-view-listbtn:hover { border-color: var(--solune-primary); color: var(--solune-primary); }
 
 /* BoardViewHeader 슬롯(board-view-header.tsx)이 그리는 머리·작성자 바. 레퍼런스
-   view.skin(.cv-head) 2026-09 실측: 안쪽 40px 44px 28px, 분류는 옅은 파랑 알약
+   view.skin(.cv-head) 2026-09 실측: 안쪽 40px 44px 28px(여기서는 32px · 좌우 --solune-view-inset 로 줄였다), 분류는 옅은 파랑 알약
    (12px 700, 높이 24), 글 번호는 옅은 글자(12.5px), 제목 34px 700, 제목과 작성자 사이
    가는 줄은 좌우 여백 안쪽에 긋는다. 작성자는 40px 사진 + 14.5px 700 이름 + 12.5px 날짜. */
 body[data-g5-theme-source="default"] .solune-view-head {
-  padding: 40px 44px 28px;
+  padding: 32px var(--solune-view-inset, 32px) 24px;
 }
 body[data-g5-theme-source="default"] .solune-view-kicker-row {
   display: flex;
@@ -342,11 +345,11 @@ body[data-g5-theme-source="default"] .solune-view-info {
   gap: 1rem 1.25rem;
   border-top: 0;
   border-bottom: 0;
-  padding: 0 44px 8px;
+  padding: 0 var(--solune-view-inset, 32px) 8px;
   background: var(--solune-surface);
 }
 body[data-g5-theme-source="default"] .solune-view-info::before { content: ""; flex-basis: 100%; height: 1px; margin-bottom: 1.1rem; background: var(--solune-border); }
-body[data-g5-theme-source="default"] .solune-view-head:has(+ .solune-view-info) { padding-bottom: 28px; }
+body[data-g5-theme-source="default"] .solune-view-head:has(+ .solune-view-info) { padding-bottom: 24px; }
 body[data-g5-theme-source="default"] .solune-view-author { display: flex; min-width: 0; align-items: center; gap: 10px; }
 body[data-g5-theme-source="default"] .solune-view-avatar {
   width: 40px;
@@ -413,6 +416,9 @@ body[data-g5-theme-source="default"] .solune-inner-shell [data-slot="card-conten
   gap: 0.5rem;
   margin: -1.5rem -2rem 1.25rem;
   border-bottom: 1px solid var(--solune-border);
+  /* 띠가 카드 위 모서리까지 닿으므로 카드 모서리(--solune-radius-md)에서 테두리 1px 을 뺀 만큼 위쪽을 둥글린다 —
+     카드에 overflow: hidden 을 주면 편집기의 펼침 메뉴가 잘린다. */
+  border-radius: calc(var(--solune-radius-md) - 1px) calc(var(--solune-radius-md) - 1px) 0 0;
   padding: 1rem 2rem;
   background: var(--solune-surface-soft);
   color: var(--solune-text);

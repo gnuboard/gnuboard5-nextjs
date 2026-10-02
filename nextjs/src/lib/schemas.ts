@@ -268,6 +268,8 @@ export const publicSettingsSchema = z
     cf_editor: z.string().optional(),
     /** 메일 사용(0 · 1) — 게시판 bo_use_email 과 함께 켜졌을 때만 "답변메일받기" 를 보인다. */
     cf_email_use: numberValue.optional(),
+    /** 메일 인증 사용(0 · 1) — 켜져 있으면 이메일을 바꿀 때 새 주소로 다시 인증해야 한다. */
+    cf_use_email_certify: numberValue.optional(),
     pwa_enabled: booleanValue.optional(),
     visit: visitStatsSchema.optional(),
     /** 회원아이콘 · 회원이미지 설정(관리자 > 기본환경설정 > 회원가입). size 는 바이트, width · height 는 px. */

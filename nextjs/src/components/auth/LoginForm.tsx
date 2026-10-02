@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { SocialLoginButtons } from "@/components/auth/SocialLoginButtons";
-import { toastError } from "@/lib/toast";
+import { api, ApiError } from "@/lib/api";
+import { toastError, toastSuccess } from "@/lib/toast";
 
 interface LoginFormProps {
   redirectAfterLogin?: string | null;
@@ -57,6 +58,9 @@ export function LoginForm({
     auto_login: false,
   });
   const [loading, setLoading] = useState(false);
+  // 아이디 · 비밀번호는 맞았지만 메일 인증 전(403 EMAIL_NOT_VERIFIED) — 인증 메일 다시 보내기 단추를 낸다.
+  const [needsEmailVerify, setNeedsEmailVerify] = useState(false);
+  const [resending, setResending] = useState(false);
 
   const finishLogin = useCallback(() => {
     if (onSuccess) {
@@ -87,10 +91,45 @@ export function LoginForm({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { checked, name, type, value } = e.target;
+    if (name === "mb_id") setNeedsEmailVerify(false);
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
+  };
+
+  const handleResendVerification = async () => {
+    if (!formData.mb_id || !formData.mb_password) {
+      toastError("아이디와 비밀번호를 입력해주세요.");
+      return;
+    }
+
+    setResending(true);
+    try {
+      const res = await api.post<{ message?: string; email?: string; already_verified?: boolean }>(
+        "/auth/resend-verification",
+        { mb_id: formData.mb_id, mb_password: formData.mb_password }
+      );
+      if (res.data?.already_verified) {
+        setNeedsEmailVerify(false);
+        toastSuccess("이미 인증된 이메일입니다. 다시 로그인해주세요.");
+        return;
+      }
+      toastSuccess(
+        res.data?.email
+          ? `${res.data.email} 주소로 인증 메일을 다시 보냈습니다. 메일함을 확인해주세요.`
+          : "인증 메일을 다시 보냈습니다. 메일함을 확인해주세요."
+      );
+    } catch (err: unknown) {
+      toastError(
+        localizedLoginError(
+          err instanceof Error ? err.message : undefined,
+          "인증 메일을 보내지 못했습니다. 잠시 후 다시 시도해주세요."
+        )
+      );
+    } finally {
+      setResending(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -106,6 +145,7 @@ export function LoginForm({
       await login(formData.mb_id, formData.mb_password, formData.auto_login);
       finishLogin();
     } catch (err: unknown) {
+      setNeedsEmailVerify(err instanceof ApiError && err.code === "EMAIL_NOT_VERIFIED");
       const message = localizedLoginError(
         err instanceof Error ? err.message : undefined,
         "로그인에 실패했습니다. 잠시 후 다시 시도해주세요."
@@ -115,6 +155,24 @@ export function LoginForm({
       setLoading(false);
     }
   };
+
+  const emailVerifyNotice = needsEmailVerify ? (
+    <div className="login-verify-notice space-y-2 rounded-[4px] border border-border bg-muted/50 p-3 text-sm" role="status">
+      <p className={variant === "compact" ? "text-xs leading-5" : "leading-6"}>
+        가입할 때 받은 인증 메일의 링크를 눌러야 로그인할 수 있습니다. 메일이 없거나 링크 유효시간이 지났다면 다시 받으세요.
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-full"
+        onClick={handleResendVerification}
+        disabled={resending || loading}
+      >
+        {resending ? "보내는 중..." : "인증 메일 다시 보내기"}
+      </Button>
+    </div>
+  ) : null;
 
   const usernameId = `${idPrefix}-mb-id`;
   const passwordId = `${idPrefix}-mb-password`;
@@ -151,6 +209,7 @@ export function LoginForm({
           <Button type="submit" className="login-submit w-full" disabled={loading}>
             {loading ? "로그인 중..." : "로그인"}
           </Button>
+          {emailVerifyNotice}
           <div className="login-form-links flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <label htmlFor={autoLoginId} className="flex cursor-pointer items-center gap-1.5">
               <input
@@ -235,6 +294,8 @@ export function LoginForm({
         <Button type="submit" className="login-submit w-full" disabled={loading}>
           {loading ? "로그인 중..." : "로그인"}
         </Button>
+
+        {emailVerifyNotice}
 
         <SocialLoginButtons redirectAfterLogin={redirectAfterLogin} />
 

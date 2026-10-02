@@ -52,6 +52,8 @@ export type UseOrderSubmitOptions = {
   directCtIds: string;
   setSubmitting: SetSubmitting;
   setPaymentNotice: SetPaymentNotice;
+  /** 서버가 장바구니가 바뀌었다고 멈추면(CART_CHANGED) 주문서의 상품 줄을 다시 불러온다. */
+  onCartChanged?: () => void;
 };
 
 type SubmitOrderInput = UseOrderSubmitOptions & {
@@ -113,6 +115,7 @@ export async function submitOrder({
   directCtIds,
   setSubmitting,
   setPaymentNotice,
+  onCartChanged,
   router,
   origin,
   clientUid,
@@ -166,6 +169,8 @@ export async function submitOrder({
     clientUid,
   });
 
+  const cartChanged = onCartChanged ? { onCartChanged } : {};
+
   if (methodDef.value === "bank") {
     await handlerDeps.submitBankOrder({
       orderBody,
@@ -173,6 +178,7 @@ export async function submitOrder({
       depositName,
       router,
       setSubmitting,
+      ...cartChanged,
     });
     return;
   }
@@ -185,5 +191,6 @@ export async function submitOrder({
     setSubmitting,
     setPaymentNotice,
     ...(methodDef.value === "easy_pay" && easyPayService ? { easyPayService } : {}),
+    ...cartChanged,
   });
 }

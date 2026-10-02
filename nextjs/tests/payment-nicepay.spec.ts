@@ -9,6 +9,7 @@ import { api } from "../src/lib/api";
 import {
   createNicepayConfirmPayload,
   createNicepayFields,
+  installNicepayMessageBridge,
   requestNicepayPayment,
   shouldUseNicepayMobile,
 } from "../src/lib/payment.nicepay";
@@ -535,5 +536,54 @@ test.describe("Nicepay payment helpers", () => {
         orderId: "order-1",
       });
     });
+  });
+});
+
+test.describe("Nicepay message bridge (CSP 가 eval 을 막아도 결제창 메시지를 처리)", () => {
+  // nicepay-3.0.js 처럼 bubble 단계에서 메시지를 받는 듣는이. 받은 data 를 모은다.
+  function listen(target: EventTarget) {
+    const received: unknown[] = [];
+    target.addEventListener("message", (event) => received.push((event as MessageEvent).data));
+    return received;
+  }
+
+  test("나이스페이에서 온 JSON 문자열은 객체로 다시 보내고, 문자열 원본은 막는다", () => {
+    const target = new EventTarget();
+    const remove = installNicepayMessageBridge(target as unknown as Window);
+    const received = listen(target);
+
+    target.dispatchEvent(
+      new MessageEvent("message", {
+        origin: "https://web.nicepay.co.kr",
+        data: '{"code":"11","width":"660","height":"825","scroll":"Y"}',
+      })
+    );
+
+    expect(received).toEqual([{ code: "11", width: "660", height: "825", scroll: "Y" }]);
+    remove();
+  });
+
+  test("다른 곳에서 온 메시지 · JSON 이 아닌 문자열 · 이미 객체인 메시지는 그대로 둔다", () => {
+    const target = new EventTarget();
+    const remove = installNicepayMessageBridge(target as unknown as Window);
+    const received = listen(target);
+
+    target.dispatchEvent(new MessageEvent("message", { origin: "https://evil.example", data: '{"code":"0"}' }));
+    target.dispatchEvent(new MessageEvent("message", { origin: "https://web.nicepay.co.kr", data: "{code:'0'}" }));
+    target.dispatchEvent(new MessageEvent("message", { origin: "https://web.nicepay.co.kr", data: { code: "2" } }));
+    target.dispatchEvent(new MessageEvent("message", { origin: "https://web.nicepay.co.kr", data: '{"type":"x"}' }));
+
+    expect(received).toEqual(['{"code":"0"}', "{code:'0'}", { code: "2" }, '{"type":"x"}']);
+    remove();
+  });
+
+  test("떼어 낸 뒤에는 문자열을 그대로 넘긴다", () => {
+    const target = new EventTarget();
+    installNicepayMessageBridge(target as unknown as Window)();
+    const received = listen(target);
+
+    target.dispatchEvent(new MessageEvent("message", { origin: "https://web.nicepay.co.kr", data: '{"code":"11"}' }));
+
+    expect(received).toEqual(['{"code":"11"}']);
   });
 });

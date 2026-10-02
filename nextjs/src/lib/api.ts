@@ -134,6 +134,7 @@ class ApiClient {
       '/auth/register',
       '/auth/password-reset',
       '/auth/verify-email',
+      '/auth/resend-verification',
       '/auth/check-id',
       '/auth/check-email',
     ].some((authPath) => pathname === authPath || pathname.startsWith(`${authPath}/`));
@@ -293,11 +294,14 @@ class ApiClient {
         }
       }
       // API 는 오류를 영어로 준다. 화면(토스트 등)에는 한국어로 내고 원문은 rawMessage 로 남긴다.
+      // errors.code(EMAIL_NOT_VERIFIED 등)는 번역하면 사라지므로 원문 그대로 따로 싣는다.
+      const rawCode = (data.errors as Record<string, unknown> | undefined)?.code;
       throw new ApiError(
         koreanApiErrorMessage(data.message, res.status),
         res.status,
         koreanApiFieldErrors(data.errors as Record<string, string | string[]> | undefined, res.status),
-        data.message
+        data.message,
+        typeof rawCode === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(rawCode) ? rawCode : undefined
       );
     }
 
@@ -371,12 +375,15 @@ export class ApiError extends Error {
   errors?: Record<string, string>;
   /** 서버가 보낸 원래 메시지(영어일 수 있다). message 는 화면에 낼 한국어. */
   rawMessage?: string;
+  /** 서버가 errors.code 로 준 기계용 오류 코드(예: EMAIL_NOT_VERIFIED). */
+  code?: string;
 
-  constructor(message: string, status: number, errors?: Record<string, string>, rawMessage?: string) {
+  constructor(message: string, status: number, errors?: Record<string, string>, rawMessage?: string, code?: string) {
     super(message);
     this.status = status;
     this.errors = errors;
     this.rawMessage = rawMessage;
+    this.code = code;
   }
 }
 

@@ -41,3 +41,15 @@ export function getPaymentProgressNotice(pgService: PgService): PaymentNotice {
 export function isPaymentCancelMessage(message: string): boolean {
   return message.includes("취소");
 }
+
+/** 주문서를 띄운 뒤 다른 탭 · 기기에서 장바구니가 바뀌어 다시 불러올 때의 안내. */
+export const CART_CHANGED_MESSAGE =
+  "장바구니가 바뀌어 주문할 상품을 다시 불러왔습니다. 확인한 뒤 다시 주문해 주세요.";
+
+/**
+ * 주문 · 결제 준비가 주문서가 보여 준 줄이 없어 멈췄는가(서버 409, errors.code CART_CHANGED —
+ * shop_api_cart_require_shown_rows). 그러면 입력한 내용은 두고 상품 줄만 다시 불러온다.
+ */
+export function isCartChangedError(err: unknown): boolean {
+  return err instanceof Error && (err as Error & { code?: unknown }).code === "CART_CHANGED";
+}

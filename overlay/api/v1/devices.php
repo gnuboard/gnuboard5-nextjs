@@ -56,12 +56,16 @@ if ($seg0 === 'sign' && $apiMethod === 'POST') {
 
         // 이미 등록된 기기 ID 는 다시 서명해 주지 않는다 — 서명은 ID 의 HMAC 이라 누구에게 다시 내주든 같은 값이고,
         // 남의 기기 ID 만 알면 그 기기의 알림을 읽고 지우거나 자기 계정으로 가져갈 수 있다.
-        // 앱은 처음 한 번 받아 기기 저장소에 보관한다. 저장이 실패해 곧바로 다시 묻는 경우만 10분 동안 허용한다.
+        // 앱은 처음 한 번 받아 기기 저장소에 보관한다. 저장이 실패해 곧바로 다시 묻는 경우만 — 등록 10분 안이고
+        // 처음 등록한 IP 와 같을 때만 — 다시 내준다. 시간만 보면 그 10분 동안 ID 를 아는 남도 받아 갈 수 있다.
         $existingDevice = DB::fetch(
-            "SELECT first_signed_at FROM {$deviceTable} WHERE device_id = ? LIMIT 1",
+            "SELECT first_signed_at, first_ip FROM {$deviceTable} WHERE device_id = ? LIMIT 1",
             [$device_id]
         );
-        if ($existingDevice && strtotime((string) $existingDevice['first_signed_at']) < time() - 600) {
+        if ($existingDevice && (
+            strtotime((string) $existingDevice['first_signed_at']) < time() - 600
+            || !hash_equals((string) $existingDevice['first_ip'], (string) $ip)
+        )) {
             Response::error('This device is already registered.', 409, ['code' => 'device_already_registered']);
         }
 
@@ -72,8 +76,9 @@ if ($seg0 === 'sign' && $apiMethod === 'POST') {
             [$device_id, $now, $now, $ip, $ip, $ua]
         );
     } catch (\Throwable $e) {
-        // 발급 자체는 stateless 라 DB 실패해도 sig 는 그대로 발급 — log 만 남김
-        error_log('[devices/sign] device row upsert 실패: ' . $e->getMessage());
+        // 등록 이력을 확인 · 기록하지 못하면 서명을 내주지 않는다 — 그냥 내주면 위의 '이미 등록된 기기' 검사를 건너뛴다.
+        error_log('[devices/sign] device row check/upsert 실패: ' . $e->getMessage());
+        Response::error('Device registration is temporarily unavailable. Please try again later.', 503);
     }
 
     Response::success([

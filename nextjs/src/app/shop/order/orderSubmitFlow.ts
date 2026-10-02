@@ -11,8 +11,10 @@ import type {
 } from "./orderPaymentHelpers";
 import { PAYMENT_NOTICE_AUTO_DISMISS_MS } from "./orderPaymentHelpers";
 import {
+  CART_CHANGED_MESSAGE,
   PAYMENT_PREPARING_NOTICE,
   getCreatedOrderPath,
+  isCartChangedError,
   isPaymentCancelMessage,
 } from "./orderSubmitFeedback";
 import {
@@ -32,6 +34,8 @@ type SubmitBankOrderInput = {
   depositName: string;
   router: RouterLike;
   setSubmitting: (submitting: boolean) => void;
+  /** 서버가 장바구니가 바뀌었다고 멈추면(CART_CHANGED) — 주문서의 상품 줄을 다시 불러온다. */
+  onCartChanged?: () => void;
   deps?: Partial<OrderSubmitFlowDeps>;
 };
 
@@ -44,6 +48,7 @@ type SubmitPaymentOrderInput = {
   origin: string;
   setSubmitting: (submitting: boolean) => void;
   setPaymentNotice: (notice: PaymentNotice | null) => void;
+  onCartChanged?: () => void;
   deps?: Partial<OrderSubmitFlowDeps>;
 };
 
@@ -75,6 +80,7 @@ export async function submitBankOrder({
   depositName,
   router,
   setSubmitting,
+  onCartChanged,
   deps,
 }: SubmitBankOrderInput): Promise<void> {
   const flowDeps = resolveOrderSubmitFlowDeps(deps);
@@ -92,6 +98,11 @@ export async function submitBankOrder({
     toastSuccess("주문이 완료되었습니다. 입금을 진행해주세요.");
     runtimeRouterPush(router, createdOrderPath);
   } catch (err: unknown) {
+    if (isCartChangedError(err)) {
+      toastError(CART_CHANGED_MESSAGE);
+      onCartChanged?.();
+      return;
+    }
     const message = err instanceof Error ? err.message : "주문에 실패했습니다.";
     toastError(message);
   } finally {
@@ -107,6 +118,7 @@ export async function submitPaymentOrder({
   origin,
   setSubmitting,
   setPaymentNotice,
+  onCartChanged,
   deps,
 }: SubmitPaymentOrderInput): Promise<void> {
   const flowDeps = resolveOrderSubmitFlowDeps(deps);
@@ -135,6 +147,14 @@ export async function submitPaymentOrder({
       ...(easyPayService ? { easyPayService } : {}),
     });
   } catch (err: unknown) {
+    if (isCartChangedError(err)) {
+      // 결제 준비가 멈췄다 — 결제창은 열리지 않았다. 준비 중 안내를 걷고 상품 줄을 다시 불러온다.
+      setPaymentNotice(null);
+      toastError(CART_CHANGED_MESSAGE, { duration: PAYMENT_NOTICE_AUTO_DISMISS_MS });
+      onCartChanged?.();
+      setSubmitting(false);
+      return;
+    }
     // PG 결제 창은 영어 문구("KCP payment cancelled" 등)로 끝나기도 한다. 화면에는 한국어로.
     const message = koreanApiErrorMessage(
       err instanceof Error ? err.message : "결제 요청에 실패했습니다.",

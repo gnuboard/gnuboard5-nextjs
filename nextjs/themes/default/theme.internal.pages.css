@@ -232,15 +232,17 @@ body[data-g5-theme-source="default"] .board-list-page .gallery-grid { order: 5; 
    안에 44px 입력칸(모서리 10), 필수 칸 이름 뒤 빨간 *, 링크는 이름을 왼쪽 칸에, 맨 아래
    옅은 바탕 띠에 [취소] [작성완료]. */
 body[data-g5-theme-source="default"] .board-write-page { padding-top: 0; }
-body[data-g5-theme-source="default"] .board-write-card { overflow: hidden; gap: 0; border: 1px solid var(--solune-border); border-radius: 16px; padding: 0; box-shadow: none; }
-body[data-g5-theme-source="default"] .board-write-head { border-bottom: 1px solid var(--solune-border); padding: 22px 2rem; } /* 본문은 안쪽 카드 공통 규칙(.solune-inner-shell card-content)의 2rem 을 따른다 */
+/* 안쪽 좌우 여백 — 머리 · 본문 · 아래 띠가 같은 선. 입력칸 · 편집기가 저마다 테두리를 가져 카드 여백이 더 넓어 보이므로
+   글보기 카드(32px)보다 조금 좁게 24px. 안쪽 카드 공통 규칙(card-content 2rem)보다 앞서도록 이 카드에서만 쓴다. */
+body[data-g5-theme-source="default"] .board-write-card { --solune-write-inset: 24px; overflow: hidden; gap: 0; border: 1px solid var(--solune-border); border-radius: 16px; padding: 0; box-shadow: none; }
+body[data-g5-theme-source="default"] .board-write-head { border-bottom: 1px solid var(--solune-border); padding: 18px var(--solune-write-inset, 24px); }
 body[data-g5-theme-source="default"] .board-write-title { color: var(--solune-text); font-size: 1.5rem; font-weight: 800; letter-spacing: -0.03em; }
 body[data-g5-theme-source="default"] .board-write-head button { height: 36px; border-radius: 9px; border-color: var(--solune-border); background: var(--solune-surface); font-size: 13px; }
-body[data-g5-theme-source="default"] .board-write-body { padding-top: 26px; padding-bottom: 0; }
+body[data-g5-theme-source="default"] .solune-inner-shell .board-write-card .board-write-body { padding: 22px var(--solune-write-inset, 24px) 0; }
 body[data-g5-theme-source="default"] .board-write-body > * + * { margin-top: 0; }
 body[data-g5-theme-source="default"] .board-write-body > * { margin-bottom: 0; }
 body[data-g5-theme-source="default"] .board-write-field + .board-write-field,
-body[data-g5-theme-source="default"] .board-write-field + .board-write-options { margin-top: 20px; }
+body[data-g5-theme-source="default"] .board-write-field + .board-write-options { margin-top: 18px; }
 body[data-g5-theme-source="default"] .board-write-field > label { color: var(--solune-text); font-size: 13px; font-weight: 600; }
 /* 필수 칸: 제목·내용(레퍼런스는 분류도 필수지만 앱은 분류를 비워도 보낸다 — 앱 규칙을 따른다). */
 body[data-g5-theme-source="default"] :is(.board-write-subject, .board-write-content) > label::after { content: " *"; color: var(--solune-danger); }
@@ -248,7 +250,7 @@ body[data-g5-theme-source="default"] .board-write-field :is(input:not([type="che
 body[data-g5-theme-source="default"] .board-write-field textarea { border-color: var(--solune-border-strong); border-radius: 10px; }
 body[data-g5-theme-source="default"] .board-write-content .tiptap-editor, body[data-g5-theme-source="default"] .board-write-content > div:last-child { border-radius: 10px; }
 /* 첨부 칸부터는 "링크와 첨부" 구역 — 위와 가는 줄로 나눈다. */
-body[data-g5-theme-source="default"] .board-write-files { margin-top: 28px !important; border-top: 1px solid var(--solune-border); padding-top: 24px; }
+body[data-g5-theme-source="default"] .board-write-files { margin-top: 24px !important; border-top: 1px solid var(--solune-border); padding-top: 20px; }
 @media (min-width: 768px) {
   body[data-g5-theme-source="default"] .board-write-link { display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: center; column-gap: 14px; }
   /* space-y-2 는 Tailwind v4 에서 아래 여백을 주므로 격자 칸에서는 둘 다 끈다. */
@@ -259,13 +261,12 @@ body[data-g5-theme-source="default"] .board-write-files { margin-top: 28px !impo
 body[data-g5-theme-source="default"] .board-write-options { padding-top: 0; }
 body[data-g5-theme-source="default"] .board-write-options label { color: var(--solune-text-soft); font-size: 13px; }
 /* 맨 아래 띠: 카드 폭 끝까지 옅은 바탕, 위에 가는 줄. */
-body[data-g5-theme-source="default"] .board-write-actions { margin: 28px -2rem 0; border-top: 1px solid var(--solune-border); padding: 16px 2rem; background: var(--solune-surface-soft); }
+body[data-g5-theme-source="default"] .board-write-actions { margin: 24px calc(-1 * var(--solune-write-inset, 24px)) 0; border-top: 1px solid var(--solune-border); padding: 14px var(--solune-write-inset, 24px); background: var(--solune-surface-soft); }
 body[data-g5-theme-source="default"] .board-write-actions button { height: 44px; min-width: 88px; border-radius: 10px; font-size: 14px; font-weight: 700; }
 body[data-g5-theme-source="default"] .board-write-actions button[type="button"] { border-color: var(--solune-border); background: var(--solune-surface); color: var(--solune-text-soft); }
 @media (max-width: 767px) {
-  body[data-g5-theme-source="default"] .board-write-head { padding: 18px 1.25rem; }
-  body[data-g5-theme-source="default"] .board-write-body { padding-top: 20px; }
-  body[data-g5-theme-source="default"] .board-write-actions { margin-inline: -1.25rem; padding: 14px 1.25rem; }
+  body[data-g5-theme-source="default"] .board-write-card { --solune-write-inset: 1.25rem; }
+  body[data-g5-theme-source="default"] .solune-inner-shell .board-write-card .board-write-body { padding-top: 20px; }
   body[data-g5-theme-source="default"] .board-write-actions button { flex: 1; }
 }
 

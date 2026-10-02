@@ -63,7 +63,8 @@ export function loadSoluneHomeExtraParts(options: { runtime?: boolean } = {}): S
   const loadSettings = options.runtime === true ? getClientPublicSettings : getPublicSettings;
 
   return {
-    comments: getRecentItems({ view: "c", limit: COMMENT_LIMIT })
+    // 원본 홈의 최신 댓글(latest)처럼 — 새글 표가 비어도 글 표에서 채운다.
+    comments: getRecentItems({ view: "c", limit: COMMENT_LIMIT, fallback: "latest" })
       .then((result) => result.items)
       .catch(() => [] as RecentItem[]),
     faqs: getFaqs({ perPage: FAQ_LIMIT })

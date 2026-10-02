@@ -610,6 +610,8 @@ export interface QaConfig {
   qa_content_tail: string;
   qa_mobile_content_head: string;
   qa_mobile_content_tail: string;
+  /** 1 이면 사이트 에디터(cf_editor)로 질문 · 답변을 쓴다. 예전 API 에는 없다(0 으로 읽는다). */
+  qa_use_editor?: number;
 }
 
 export interface QaItem {
@@ -640,6 +642,14 @@ export interface QaItem {
   can_delete: boolean;
   answer: QaItem | null;
   related_questions: QaItem[];
+  /** 상세 응답에만 — 그누보드 qaview.php 의 이전글(더 최근 질문) · 다음글. */
+  prev?: QaNeighbor | null;
+  next?: QaNeighbor | null;
+}
+
+export interface QaNeighbor {
+  qa_id: number;
+  qa_subject: string;
 }
 
 // 새글/새댓글 (g5_board_new join, /v1/recent)

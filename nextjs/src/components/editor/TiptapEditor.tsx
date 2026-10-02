@@ -15,9 +15,9 @@ import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
 import { common, createLowlight } from "lowlight";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { api } from "@/lib/api";
+import { EDITOR_IMAGE_ACCEPT, useEditorImageUpload } from "./useEditorImageUpload";
 import {
   Bold,
   Italic,
@@ -54,6 +54,17 @@ interface TiptapEditorProps {
   onChange: (content: string) => void;
   placeholder?: string;
   className?: string;
+  /**
+   * 댓글 · 후기 · 상품문의처럼 짧은 글 — 예전 댓글 전용 에디터처럼 가볍게(아이콘 14px · 단추 22px · 얇은 도구 모음 ·
+   * 입력칸 80px), 도구 모음은 저장 · 표시 후에도 남는 서식만(굵게 · 기울임 · 밑줄 · 취소선 · 목록 · 링크 · 사진 · 되돌리기).
+   * 이 글들은 저장할 때 style 속성을(정렬 · 색),
+   * 보여 줄 때 제목 · 표 · 구분선을 지우므로 그 기능은 아예 켜지 않는다(단축 입력 "# " · "---" 로도 생기지 않게).
+   */
+  compact?: boolean;
+  /** 본문 안에 박힌 사진(data: base64)을 받을지. 기본은 짧은 글이 아닐 때만 — 후기 · 상품문의 API 는 data: 주소를 지워 빈 사진이 된다. */
+  allowBase64Images?: boolean;
+  /** 화면 낭독기용 입력칸 이름. 없으면 placeholder. (contenteditable 이라 <label htmlFor> 가 닿지 않는다) */
+  ariaLabel?: string;
 }
 
 const COLORS = [
@@ -96,71 +107,92 @@ function ToolbarSeparator() {
   return <div className="w-px h-6 bg-border mx-1" />;
 }
 
-// SmartEditor2 규격 상수
-const UPLOAD_MAX_SIZE = 20 * 1024 * 1024; // 20MB
-const UPLOAD_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp", "image/x-ms-bmp"];
-const UPLOAD_ALLOWED_EXTS = ["jpg", "jpeg", "png", "gif", "webp", "bmp"];
-
 export function TiptapEditor({
   content,
   onChange,
   placeholder = "내용을 입력하세요",
   className,
+  compact = false,
+  allowBase64Images,
+  ariaLabel,
 }: TiptapEditorProps) {
   const [showSource, setShowSource] = useState(false);
   const [sourceHtml, setSourceHtml] = useState(content);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showImageMenu, setShowImageMenu] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const lowlight = createLowlight(common);
 
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
-        codeBlock: false, // replaced by CodeBlockLowlight
-      }),
+      StarterKit.configure(
+        compact
+          ? { heading: false, horizontalRule: false, codeBlock: false, blockquote: false }
+          : {
+              heading: { levels: [1, 2, 3] },
+              codeBlock: false, // replaced by CodeBlockLowlight
+            }
+      ),
       Underline,
       LinkExtension.configure({
         openOnClick: false,
         HTMLAttributes: { class: "text-primary underline" },
       }),
       Image.configure({
-        allowBase64: true,
+        allowBase64: allowBase64Images ?? !compact,
         HTMLAttributes: { class: "max-w-full h-auto rounded" },
       }),
       Placeholder.configure({ placeholder }),
-      TextAlign.configure({
-        types: ["heading", "paragraph"],
-      }),
-      TextStyle,
-      Color,
-      Table.configure({
-        resizable: true,
-        HTMLAttributes: { class: "tiptap-table" },
-      }),
-      TableRow,
-      TableCell,
-      TableHeader,
-      CodeBlockLowlight.configure({
-        lowlight,
-        HTMLAttributes: { class: "tiptap-code-block" },
-      }),
+      ...(compact
+        ? []
+        : [
+            TextAlign.configure({
+              types: ["heading", "paragraph"],
+            }),
+            TextStyle,
+            Color,
+            Table.configure({
+              resizable: true,
+              HTMLAttributes: { class: "tiptap-table" },
+            }),
+            TableRow,
+            TableCell,
+            TableHeader,
+            CodeBlockLowlight.configure({
+              lowlight,
+              HTMLAttributes: { class: "tiptap-code-block" },
+            }),
+          ]),
     ],
     content,
     immediatelyRender: false,
+    editorProps: {
+      attributes: { role: "textbox", "aria-multiline": "true", "aria-label": ariaLabel || placeholder },
+    },
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
   });
+  const {
+    uploading,
+    error: uploadError,
+    clearError: clearUploadError,
+    fileInputRef,
+    openFilePicker,
+    handleFileInputChange,
+    handleDrop,
+    handleDragOver,
+    handlePaste,
+  } = useEditorImageUpload(editor);
 
-  // Sync external content changes (e.g. edit mode loading)
+  // Sync external content changes (e.g. edit mode loading). 빈 값도 따라간다 — 댓글을 등록한 뒤 입력칸을 비울 때.
+  // 에디터가 이미 비어 있으면(<p></p>) 다시 넣지 않는다.
   useEffect(() => {
-    if (editor && content && editor.getHTML() !== content) {
-      editor.commands.setContent(content);
+    if (!editor) return;
+    if (content) {
+      if (editor.getHTML() !== content) editor.commands.setContent(content);
+    } else if (!editor.isEmpty) {
+      editor.commands.setContent("");
     }
   }, [content, editor]);
 
@@ -199,63 +231,6 @@ export function TiptapEditor({
     }
   }, [editor]);
 
-  const uploadImageFile = useCallback(
-    async (file: File) => {
-      if (!editor) return;
-
-      // Validate file type
-      if (!UPLOAD_ALLOWED_TYPES.includes(file.type)) {
-        const ext = file.name.split(".").pop()?.toLowerCase() || "";
-        if (!UPLOAD_ALLOWED_EXTS.includes(ext)) {
-          setUploadError(`허용되지 않는 파일 형식입니다. (${UPLOAD_ALLOWED_EXTS.join(", ")})`);
-          return;
-        }
-      }
-
-      // Validate file size
-      if (file.size > UPLOAD_MAX_SIZE) {
-        setUploadError(`파일 크기가 20MB를 초과합니다. (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
-        return;
-      }
-
-      setUploading(true);
-      setUploadError(null);
-
-      try {
-        const formData = new FormData();
-        formData.append("file", file);
-        const res = await api.upload<{ file_url: string }>("/upload", formData);
-        if (res.success && res.data?.file_url) {
-          editor.chain().focus().setImage({ src: res.data.file_url }).run();
-        } else {
-          setUploadError("이미지 업로드에 실패했습니다.");
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "이미지 업로드에 실패했습니다.";
-        setUploadError(message);
-      } finally {
-        setUploading(false);
-      }
-    },
-    [editor]
-  );
-
-  const handleImageUpload = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
-
-  const handleFileInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        uploadImageFile(file);
-      }
-      // Reset input so the same file can be selected again
-      e.target.value = "";
-    },
-    [uploadImageFile]
-  );
-
   const handleImage = useCallback(() => {
     if (!editor) return;
     const url = window.prompt("이미지 URL을 입력하세요", "https://");
@@ -264,61 +239,22 @@ export function TiptapEditor({
     }
   }, [editor]);
 
-  // Handle drag & drop
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      const files = e.dataTransfer?.files;
-      if (!files?.length) return;
-
-      const imageFiles = Array.from(files).filter(
-        (f) => f.type.startsWith("image/") || UPLOAD_ALLOWED_EXTS.includes(f.name.split(".").pop()?.toLowerCase() || "")
-      );
-
-      if (imageFiles.length > 0) {
-        e.preventDefault();
-        e.stopPropagation();
-        imageFiles.forEach((file) => uploadImageFile(file));
-      }
-    },
-    [uploadImageFile]
-  );
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    if (e.dataTransfer?.types?.includes("Files")) {
-      e.preventDefault();
-    }
-  }, []);
-
-  // Handle paste
-  const handlePaste = useCallback(
-    (e: React.ClipboardEvent) => {
-      const items = e.clipboardData?.items;
-      if (!items) return;
-
-      for (const item of Array.from(items)) {
-        if (item.type.startsWith("image/")) {
-          e.preventDefault();
-          const file = item.getAsFile();
-          if (file) {
-            uploadImageFile(file);
-          }
-          return;
-        }
-      }
-    },
-    [uploadImageFile]
-  );
-
   if (!editor) {
     return (
-      <div className="skeleton min-h-[300px] rounded-lg border" />
+      <div className={cn("skeleton rounded-lg border", compact ? "min-h-[80px]" : "min-h-[300px]")} />
     );
   }
 
   return (
     <div className={cn("border rounded-lg overflow-hidden", className)}>
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-0.5 p-2 border-b bg-muted/30">
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-0.5 border-b bg-muted/30",
+          // 짧은 글: 얇은 줄 · 작은 단추(p-1) · 14px 아이콘 · 짧은 구분선 — 예전 댓글 에디터와 같은 크기
+          compact ? "px-2 py-1 [&_button]:p-1 [&_svg]:h-3.5 [&_svg]:w-3.5 [&>.w-px]:mx-0.5 [&>.w-px]:h-4" : "p-2"
+        )}
+      >
         {/* Text formatting */}
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleBold().run()}
@@ -348,17 +284,21 @@ export function TiptapEditor({
         >
           <Strikethrough className="w-4 h-4" />
         </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleCode().run()}
-          isActive={editor.isActive("code")}
-          title="인라인 코드"
-        >
-          <Code className="w-4 h-4" />
-        </ToolbarButton>
+        {!compact && (
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleCode().run()}
+            isActive={editor.isActive("code")}
+            title="인라인 코드"
+          >
+            <Code className="w-4 h-4" />
+          </ToolbarButton>
+        )}
 
         <ToolbarSeparator />
 
-        {/* Headings */}
+        {/* Headings — 짧은 글에는 없다 */}
+        {!compact && (
+          <>
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
           isActive={editor.isActive("heading", { level: 1 })}
@@ -382,6 +322,8 @@ export function TiptapEditor({
         </ToolbarButton>
 
         <ToolbarSeparator />
+          </>
+        )}
 
         {/* Lists & blocks */}
         <ToolbarButton
@@ -398,24 +340,30 @@ export function TiptapEditor({
         >
           <ListOrdered className="w-4 h-4" />
         </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          isActive={editor.isActive("blockquote")}
-          title="인용"
-        >
-          <Quote className="w-4 h-4" />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          isActive={editor.isActive("codeBlock")}
-          title="코드 블록"
-        >
-          <Code2 className="w-4 h-4" />
-        </ToolbarButton>
+        {!compact && (
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleBlockquote().run()}
+            isActive={editor.isActive("blockquote")}
+            title="인용"
+          >
+            <Quote className="w-4 h-4" />
+          </ToolbarButton>
+        )}
+        {!compact && (
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+            isActive={editor.isActive("codeBlock")}
+            title="코드 블록"
+          >
+            <Code2 className="w-4 h-4" />
+          </ToolbarButton>
+        )}
 
         <ToolbarSeparator />
 
-        {/* Alignment */}
+        {/* Alignment · Color — 짧은 글에는 없다(저장할 때 style 이 지워진다) */}
+        {!compact && (
+          <>
         <ToolbarButton
           onClick={() => editor.chain().focus().setTextAlign("left").run()}
           isActive={editor.isActive({ textAlign: "left" })}
@@ -485,6 +433,8 @@ export function TiptapEditor({
         </div>
 
         <ToolbarSeparator />
+          </>
+        )}
 
         {/* Insert */}
         <ToolbarButton
@@ -509,7 +459,7 @@ export function TiptapEditor({
                 className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-muted transition-colors text-left"
                 onClick={() => {
                   setShowImageMenu(false);
-                  handleImageUpload();
+                  openFilePicker();
                 }}
               >
                 <Upload className="w-3.5 h-3.5" />
@@ -529,16 +479,20 @@ export function TiptapEditor({
             </div>
           )}
         </div>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().setHorizontalRule().run()}
-          title="구분선"
-        >
-          <Minus className="w-4 h-4" />
-        </ToolbarButton>
+        {!compact && (
+          <ToolbarButton
+            onClick={() => editor.chain().focus().setHorizontalRule().run()}
+            title="구분선"
+          >
+            <Minus className="w-4 h-4" />
+          </ToolbarButton>
+        )}
 
         <ToolbarSeparator />
 
-        {/* Table */}
+        {/* Table — 짧은 글에는 없다 */}
+        {!compact && (
+          <>
         <div className="relative">
           <ToolbarButton
             onClick={() => {
@@ -578,6 +532,8 @@ export function TiptapEditor({
         )}
 
         <ToolbarSeparator />
+          </>
+        )}
 
         {/* History */}
         <ToolbarButton
@@ -595,9 +551,9 @@ export function TiptapEditor({
           <Redo className="w-4 h-4" />
         </ToolbarButton>
 
-        <ToolbarSeparator />
-
-        {/* Source toggle */}
+        {/* Source toggle — 짧은 글에는 없다 */}
+        {!compact && <ToolbarSeparator />}
+        {!compact && (
         <ToolbarButton
           onClick={() => {
             if (showSource) {
@@ -611,6 +567,7 @@ export function TiptapEditor({
         >
           <span className="text-xs font-mono px-0.5">&lt;/&gt;</span>
         </ToolbarButton>
+        )}
       </div>
 
       {/* Hidden file input */}
@@ -618,7 +575,7 @@ export function TiptapEditor({
         ref={fileInputRef}
         type="file"
         aria-label="파일 첨부"
-        accept={UPLOAD_ALLOWED_EXTS.map((e) => `.${e}`).join(",")}
+        accept={EDITOR_IMAGE_ACCEPT}
         className="hidden"
         onChange={handleFileInputChange}
       />
@@ -629,7 +586,7 @@ export function TiptapEditor({
           <span>{uploadError}</span>
           <button
             type="button"
-            onClick={() => setUploadError(null)}
+            onClick={clearUploadError}
             className="ml-2 hover:text-destructive/80"
           >
             &times;
@@ -650,7 +607,10 @@ export function TiptapEditor({
         <textarea
           value={sourceHtml}
           onChange={(e) => handleSourceChange(e.target.value)}
-          className="w-full min-h-[300px] p-4 font-mono text-sm bg-background resize-y focus:outline-none"
+          className={cn(
+            "w-full p-4 font-mono text-sm bg-background resize-y focus:outline-none",
+            compact ? "min-h-[80px]" : "min-h-[300px]"
+          )}
           spellCheck={false}
         />
       ) : (
@@ -661,7 +621,12 @@ export function TiptapEditor({
         >
           <EditorContent
             editor={editor}
-            className="min-h-[300px] p-4 [&_.tiptap]:min-h-[280px] [&_.tiptap]:focus:outline-none"
+            className={cn(
+              "[&_.tiptap]:focus:outline-none",
+              compact
+                ? "min-h-[80px] px-3 py-2 [&_.tiptap]:min-h-[60px] [&_.tiptap]:text-sm"
+                : "min-h-[300px] p-4 [&_.tiptap]:min-h-[280px]"
+            )}
           />
         </div>
       )}

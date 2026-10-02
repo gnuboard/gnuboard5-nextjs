@@ -67,7 +67,11 @@ if ($action === 'social' && isset($apiSegments[1]) && $apiSegments[1] === 'provi
     }
     // Apple(SC-11)은 네이티브 앱 전용 — 웹 bridge(start.php)는 거절하므로 native_only 로 표시한다.
     // 자격증명은 cf_* 컬럼이 아니라 서버 env(api/.env APPLE_*)에 있다.
-    if (in_array('apple', array_map('strtolower', $list), true) && class_exists('AppleClient')) {
+    if (!class_exists('AppleClient') && is_file(__DIR__ . '/../lib/AppleClient.php')) {
+        require_once __DIR__ . '/../lib/AppleClient.php';
+    }
+    // 관리자 소셜 목록에 apple 이 있거나 api/.env 의 APPLE_LOGIN_ENABLED=on (원본 관리자 화면에는 Apple 칸이 없다)
+    if (class_exists('AppleClient') && (in_array('apple', array_map('strtolower', $list), true) || AppleClient::enabledByEnv())) {
         $providers[] = [
             'name'        => 'apple',
             'label'       => 'Apple',

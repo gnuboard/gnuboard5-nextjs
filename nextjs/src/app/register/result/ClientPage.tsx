@@ -89,10 +89,28 @@ export default function RegisterResultPage({
           ) : result ? (
             <>
               {result.requires_email_verification && (
-                <Alert>
-                  <AlertDescription>
-                    입력하신 이메일 주소로 인증 메일을 보냈습니다. 메일의 인증 링크를 확인해야
-                    사이트를 정상적으로 이용할 수 있습니다.
+                <Alert variant={result.verification_mail_sent === false ? "destructive" : "default"}>
+                  <AlertDescription className="space-y-1">
+                    {result.verification_mail_sent === false ? (
+                      <p>
+                        인증 메일을 보내지 못했습니다. 잠시 뒤 로그인 화면에서 아이디와 비밀번호로 로그인을
+                        시도하면 인증 메일을 다시 받을 수 있습니다. 계속 받지 못하면 관리자에게 문의해주세요.
+                      </p>
+                    ) : (
+                      <>
+                        <p>
+                          입력하신 이메일 주소로 인증 메일을 보냈습니다.{" "}
+                          {result.email_certify_minutes && result.email_certify_minutes > 0
+                            ? `${result.email_certify_minutes}분 안에 `
+                            : ""}
+                          메일의 인증 링크를 눌러야 로그인할 수 있습니다.
+                        </p>
+                        <p>
+                          메일이 오지 않으면 스팸함을 확인하거나, 로그인 화면에서 로그인을 시도해 인증 메일을 다시
+                          받으세요.
+                        </p>
+                      </>
+                    )}
                   </AlertDescription>
                 </Alert>
               )}

@@ -15,14 +15,36 @@ import { toastError } from "@/lib/toast";
 import { SafeHtml } from "@/components/SafeHtml";
 import { MemberSideview } from "@/components/MemberSideview";
 import { htmlToPlainText } from "@/lib/sanitize";
+import { contentForEditor, looksLikeHtml } from "@/lib/editor-content";
+import { useCommentEditor } from "@/components/editor/RichTextField";
 
+// "에디터 선택"(cf_editor)에 에디터가 있고 api/.env 의 G5_COMMENT_EDITOR_USE 가 켜져 있으면 게시판 글쓰기와 같은
+// 웹 에디터를 낮게(compact) 쓴다. 둘 중 하나라도 아니면 글자 입력칸(commentEditorOn).
 const CommentEditor = dynamic(
-  () => import("@/components/editor/CommentEditor").then((mod) => ({ default: mod.CommentEditor })),
+  () =>
+    import("@/components/editor/TiptapEditor").then((mod) => ({
+      default: (props: { content: string; onChange: (value: string) => void; placeholder?: string }) => (
+        <mod.TiptapEditor
+          {...props}
+          // 에디터가 늦게 켜져(설정 확인 전에 수정을 연 경우) 글자 댓글이 그대로 와도 줄마다 문단으로 넣는다.
+          content={props.content && !looksLikeHtml(props.content) ? contentForEditor(props.content) : props.content}
+          compact
+        />
+      ),
+    })),
   {
     ssr: false,
     loading: () => <div className="skeleton min-h-[80px] rounded-lg border" />,
   }
 );
+
+/** 댓글 본문 — 에디터로 쓴 HTML 은 걸러서, 태그 없는 글자 댓글(그누보드 · 글자 입력칸)은 줄바꿈을 살려 글자로. */
+function CommentBody({ content }: { content: string }) {
+  if (looksLikeHtml(content)) {
+    return <SafeHtml className="text-sm leading-relaxed" html={content} policy="user" />;
+  }
+  return <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{content}</p>;
+}
 
 interface CommentSectionProps {
   boTable: string;
@@ -142,7 +164,8 @@ const CommentItem = memo(function CommentItem({
   };
 
   const startEdit = () => {
-    setEditContent(comment.wr_content);
+    // 에디터로 고칠 때 글자 댓글은 줄마다 문단으로 넣는다(그대로 넣으면 줄바꿈이 사라진다).
+    setEditContent(useEditor ? contentForEditor(comment.wr_content) : comment.wr_content);
     // 원본 기본 스킨처럼 수정 폼의 비밀글 체크를 지금 상태로 연다.
     setEditSecret((comment.wr_option || "").includes("secret"));
     setEditing(true);
@@ -257,11 +280,7 @@ const CommentItem = memo(function CommentItem({
           </div>
         </div>
       ) : (
-        <SafeHtml
-          className="text-sm leading-relaxed"
-          html={comment.wr_content}
-          policy="user"
-        />
+        <CommentBody content={comment.wr_content} />
       )}
 
       {/* Reply Form */}
@@ -309,7 +328,11 @@ const CommentItem = memo(function CommentItem({
   );
 });
 
-export function CommentSection({ boTable, wrId, initialComments, useEditor }: CommentSectionProps) {
+export function CommentSection({ boTable, wrId, initialComments, useEditor: initialUseEditor }: CommentSectionProps) {
+  // 댓글 에디터 조건(에디터 선택 + G5_COMMENT_EDITOR_USE)을 브라우저에서 확인한다. 화면이 받은 값(initialUseEditor)은 빌드 · 서버 때의 설정이라
+  // 관리자가 에디터를 바꾼 뒤에도 남을 수 있다 — 확인하기 전까지만 쓴다.
+  const siteEditor = useCommentEditor();
+  const useEditor = siteEditor === null ? Boolean(initialUseEditor) : siteEditor;
   const router = useRouter();
   const { user } = useAuthStore();
   const [comments, setComments] = useState<Comment[]>(initialComments);

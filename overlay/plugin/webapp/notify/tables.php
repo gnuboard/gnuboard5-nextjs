@@ -45,6 +45,39 @@ if (!defined('G5_APP_FORCE_UPDATE_MESSAGE')) define('G5_APP_FORCE_UPDATE_MESSAGE
 // ---------------------------------------------------------------------------
 add_replace('admin_dbupgrade', 'webapp_admin_dbupgrade', 1, 1);
 
+// 그누보드 5.6.41 부터 adm/dbupgrade.php 는 migrations/*.sql 을 돌리고 admin_dbupgrade 대신
+// admin_dbupgrade_result(결과 배열) 를 부른다. 두 판 모두에서 우리 표가 설치되도록 새 훅에도 건다 —
+// 5.6.30 은 새 훅을, 5.6.41 은 옛 훅을 부르지 않으므로 한 번만 돈다.
+add_replace('admin_dbupgrade_result', 'webapp_admin_dbupgrade_result', 1, 1);
+
+if (!function_exists('webapp_admin_dbupgrade_result')) {
+    /**
+     * @param mixed $result ['success' => bool, 'applied' => int, 'skipped' => int, 'errors' => string[]]
+     * @return mixed 같은 배열 — 우리 설치기가 표를 바꿨으면 applied 를 하나씩 올리고, 실패는 errors 에 더한다
+     */
+    function webapp_admin_dbupgrade_result($result)
+    {
+        if (!is_array($result)) {
+            return $result;
+        }
+        // api/lib/Schema.php 의 $installers 와 같은 목록 — 그 제품이 설치돼 있을 때만 함수가 있다.
+        foreach (array('webapp_admin_dbupgrade', 'dday_admin_dbupgrade', 'baby_admin_dbupgrade', 'print_admin_dbupgrade') as $installer) {
+            if (!function_exists($installer)) {
+                continue;
+            }
+            try {
+                if ($installer(false)) {
+                    $result['applied'] = (int) ($result['applied'] ?? 0) + 1;
+                }
+            } catch (\Throwable $e) {
+                $result['success'] = false;
+                $result['errors'][] = $installer . ': ' . $e->getMessage();
+            }
+        }
+        return $result;
+    }
+}
+
 if (!function_exists('webapp_table_exists')) {
     function webapp_table_exists(string $table): bool
     {

@@ -150,15 +150,30 @@ export function productShippingPayment(product?: ShopProduct | null, selected = 
   };
 }
 
+/** 주소의 ?is_id= — 찾아갈 사용후기 번호(없거나 숫자가 아니면 0). */
+export function reviewFocusIdFromSearch(search: string): number {
+  const raw = new URLSearchParams(search).get("is_id") ?? "";
+  return /^\d+$/.test(raw) ? Number(raw) : 0;
+}
+
+/** 주소의 ?iq_id= — 찾아갈 상품문의 번호(없거나 숫자가 아니면 0). */
+export function qaFocusIdFromSearch(search: string): number {
+  const raw = new URLSearchParams(search).get("iq_id") ?? "";
+  return /^\d+$/.test(raw) ? Number(raw) : 0;
+}
+
 export function productDetailTabFromSearch(search: string) {
   const params = new URLSearchParams(search);
   const tab = (params.get("tab") ?? "").toLowerCase();
   const form = (params.get("form") ?? "").toLowerCase();
 
-  if (form === "review" || tab === "reviews" || tab === "review" || tab === "itemuse") {
+  // ?is_id= 는 후기 하나를 가리킨다(그누보드 item.php?is_id= · 사용후기 목록의 "후기 바로가기") — 사용후기 탭.
+  if (form === "review" || tab === "reviews" || tab === "review" || tab === "itemuse" || reviewFocusIdFromSearch(search) > 0) {
     return "reviews";
   }
-  if (form === "qa" || form === "qna" || tab === "qa" || tab === "qna" || tab === "itemqa") {
+  // ?iq_id= 는 문의 하나를 가리킨다(그누보드 item.php?iq_id= · 상품문의 목록의 "문의 바로가기") — 상품문의 탭.
+  // 후기와 문의를 둘 다 달고 오면 레퍼런스처럼 후기를 앞세운다(위에서 이미 돌아갔다).
+  if (form === "qa" || form === "qna" || tab === "qa" || tab === "qna" || tab === "itemqa" || qaFocusIdFromSearch(search) > 0) {
     return "qa";
   }
   if (tab === "shipping" || tab === "delivery") {

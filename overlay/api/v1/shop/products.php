@@ -523,7 +523,7 @@ if ($apiMethod === 'POST' && $it_id !== '' && ($shopSegments[1] ?? '') === 'reco
         Response::error('받는 사람 이메일이 올바르지 않습니다.', 422);
     }
     // 회원별 발송 한도 — 아래 세션 한도는 세션 쿠키 없이 Bearer 로 보내면 매번 새로 시작한다.
-    $recommendLimit = Throttle::checkMemberQuota('recmail', (string) $member['mb_id'], 3, 10);
+    $recommendLimit = Throttle::checkMemberQuota('recmail', (string) $member['mb_id'], 3, 10, true, true);
     if ($recommendLimit !== null) {
         Response::error($recommendLimit, 429);
     }

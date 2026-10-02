@@ -109,6 +109,8 @@ if ($apiMethod === 'POST' && $action === 'prepare') {
         );
     }
 
+    shop_api_cart_require_shown_rows($cartItems, $filterCtIds);
+
     if (empty($cartItems)) {
         Response::error('Cart is empty.', 400);
     }

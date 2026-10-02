@@ -233,6 +233,29 @@ if ($apiMethod === 'GET' && $qnaAction === '') {
     $sortField = $allowedSortFields[$sst] ?? 'q.iq_id';
     $sortDirection = in_array($sod, ['asc', 'desc'], true) ? $sod : 'desc';
 
+    // 문의 하나를 가리켜 들어오면(?focus_iq_id= — 상품 상세 주소의 iq_id, 상품문의 목록의 "문의 바로가기")
+    // 그 문의가 실린 쪽을 연다. 사용후기의 focus_is_id 와 같다. 상품이 정해져 있고 번호순 정렬일 때만,
+    // 이 상품의 문의가 아니면 없던 일로 한다. (?iq_id= 는 "문의 하나 보기"로 이미 쓰이므로 이름을 달리 둔다.)
+    $focusIqId = isset($_GET['focus_iq_id']) ? (int) $_GET['focus_iq_id'] : 0;
+    if ($focusIqId > 0 && $it_id !== '' && $sortField === 'q.iq_id') {
+        $focusRow = DB::fetch(
+            "SELECT iq_id FROM {$qnaTable} WHERE iq_id = ? AND it_id = ? LIMIT 1",
+            [$focusIqId, $it_id]
+        );
+        if ($focusRow) {
+            $comparison = $sortDirection === 'desc' ? '>' : '<';
+            $before = DB::count(
+                "SELECT COUNT(*)
+                 FROM {$qnaTable} q
+                 LEFT JOIN {$itemTable} i ON i.it_id = q.it_id
+                 WHERE {$whereSql} AND q.iq_id {$comparison} ?",
+                array_merge($params, [$focusIqId])
+            );
+            $page = intdiv($before, $perPage) + 1;
+            $offset = ($page - 1) * $perPage;
+        }
+    }
+
     $total = DB::count(
         "SELECT COUNT(*)
          FROM {$qnaTable} q

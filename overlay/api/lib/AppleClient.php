@@ -52,6 +52,15 @@ class AppleClient
         return $path !== '' && is_file($path) ? (string) file_get_contents($path) : '';
     }
 
+    /**
+     * api/.env 의 APPLE_LOGIN_ENABLED=on 으로 Apple 로그인을 켰는지. 그누보드 원본 관리자 화면(소셜 서비스 목록)에는
+     * Apple 칸이 없어 cf_social_servicelist 에 apple 을 넣을 길이 없다 — 원본을 고치지 않고 켜는 자리다.
+     */
+    public static function enabledByEnv(): bool
+    {
+        return in_array(strtolower(self::env('APPLE_LOGIN_ENABLED')), array('1', 'on', 'true', 'yes'), true);
+    }
+
     /** 토큰 교환·revoke 에 필요한 값이 모두 있는지. */
     public static function configured(): bool
     {

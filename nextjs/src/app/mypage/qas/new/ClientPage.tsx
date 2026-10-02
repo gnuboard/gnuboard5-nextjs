@@ -12,7 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { QaContentInput, qaContentForEditor, useQaEditor } from "@/components/qa/qa-editor";
+import { htmlToText } from "@/lib/html-text";
 import { toastError, toastSuccess } from "@/lib/toast";
 
 type NewQaPageProps = {
@@ -26,6 +27,11 @@ type NewQaPageProps = {
 
 function followUpContent(source: QaItem) {
   return `\n\n\n\n====== 이전 문의 내용 =======\n${source.qa_content}`;
+}
+
+/** 에디터로 쓸 때의 추가질문 첫 내용 — 그누보드 qawrite.php(w=r)처럼 빈 줄 몇 개 뒤에 이전 내용을 붙인다. */
+function followUpEditorContent(source: QaItem) {
+  return `<p></p><p></p><p>====== 이전 문의 내용 =======</p>${qaContentForEditor(source.qa_content, source.qa_html)}`;
 }
 
 function withSearch(path: string, search?: string) {
@@ -78,9 +84,6 @@ export default function NewQaPage({
           qa_category:
             prev.qa_category || nextReplySource?.qa_category || nextConfig.categories[0] || "",
           qa_email: prev.qa_email || user?.mb_email || "",
-          qa_content:
-            prev.qa_content ||
-            (nextReplySource ? followUpContent(nextReplySource) : nextConfig.qa_insert_content || ""),
         }));
       } catch (error) {
         toastError(error instanceof Error ? error.message : "1:1 문의 설정을 불러오지 못했습니다.");
@@ -99,9 +102,24 @@ export default function NewQaPage({
     }
   }, [isInitialized, loginHref, router, user]);
 
+  // 첫 내용(추가질문의 이전 내용 · 설정의 기본 문구)은 에디터를 쓰는지 안 뒤에 한 번 채운다.
+  const useEditor = useQaEditor(config);
+  const [prefilled, setPrefilled] = useState(false);
+  useEffect(() => {
+    if (prefilled || loading || useEditor === null) return;
+    const initial = replySource
+      ? useEditor
+        ? followUpEditorContent(replySource)
+        : followUpContent(replySource)
+      : config?.qa_insert_content || "";
+    setForm((prev) => ({ ...prev, qa_content: prev.qa_content || initial }));
+    setPrefilled(true);
+  }, [config, loading, prefilled, replySource, useEditor]);
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!form.qa_subject.trim() || !form.qa_content.trim()) {
+    const contentText = useEditor ? htmlToText(form.qa_content) : form.qa_content.trim();
+    if (!form.qa_subject.trim() || (!contentText && !/<img\b/i.test(form.qa_content))) {
       toastError("제목과 내용을 입력해 주세요.");
       return;
     }
@@ -110,6 +128,7 @@ export default function NewQaPage({
     try {
       const payload = {
         ...form,
+        qa_html: useEditor ? 1 : 0,
         ...(replyTo > 0 ? { qa_reply_to: replyTo } : {}),
       };
       const created = files.some(Boolean)
@@ -124,7 +143,7 @@ export default function NewQaPage({
     }
   }
 
-  if ((loginHref && (!isInitialized || !user)) || loading) {
+  if ((loginHref && (!isInitialized || !user)) || loading || !prefilled) {
     return <div className="skeleton h-64 rounded-lg" />;
   }
 
@@ -230,14 +249,11 @@ export default function NewQaPage({
 
           <div className="space-y-2">
             <Label htmlFor="qa_content">내용</Label>
-            <Textarea
+            <QaContentInput
               id="qa_content"
               value={form.qa_content}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, qa_content: event.target.value }))
-              }
-              rows={10}
-              required
+              onChange={(value) => setForm((prev) => ({ ...prev, qa_content: value }))}
+              useEditor={Boolean(useEditor)}
             />
           </div>
 

@@ -38,6 +38,8 @@ export interface RegisterResponse {
   member?: Record<string, string | number | undefined>;
   user?: Record<string, string | number | undefined>;
   requires_email_verification?: boolean;
+  /** 메일 인증을 받을 때 가입 인증 메일이 실제로 나갔는지. */
+  verification_mail_sent?: boolean;
   mb_id?: string;
   message?: string;
   registration_result_url?: string;
@@ -88,6 +90,10 @@ export interface RegisterResult {
   mb_email: string;
   mb_datetime: string;
   requires_email_verification: boolean;
+  /** 가입 인증 메일이 실제로 나갔는지. 이 세션에 기록이 없으면 null(예전 서버는 없음). */
+  verification_mail_sent?: boolean | null;
+  /** 인증 링크 유효시간(분). 0 이면 기한 없음. */
+  email_certify_minutes?: number;
 }
 
 export async function getRegisterResult(): Promise<RegisterResult> {

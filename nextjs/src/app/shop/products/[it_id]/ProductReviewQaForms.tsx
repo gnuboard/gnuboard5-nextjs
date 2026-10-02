@@ -7,7 +7,8 @@ import { cn, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SafeHtml } from "@/components/SafeHtml";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextField, useSiteEditor } from "@/components/editor/RichTextField";
+import { contentForEditor, hasContent } from "@/lib/editor-content";
 import { Star } from "lucide-react";
 import { toastSuccess, toastError } from "@/lib/toast";
 import { updateShopQa, deleteShopQa } from "@/services/shop";
@@ -30,6 +31,8 @@ export function ReviewForm({
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+  // 사이트 에디터(cf_editor)가 있으면 웹 에디터 — 그누보드 shop/itemuseform.php 와 같은 조건.
+  const siteEditor = useSiteEditor();
   const subjectId = useId();
   const contentId = useId();
   const imageInputId = useId();
@@ -53,7 +56,7 @@ export function ReviewForm({
       className="space-y-3 rounded-lg border p-4"
       onSubmit={async (e) => {
         e.preventDefault();
-        if (!subject.trim() || !content.trim()) {
+        if (!subject.trim() || !hasContent(content, Boolean(siteEditor))) {
           toastError("제목과 내용을 입력해주세요.");
           return;
         }
@@ -124,16 +127,18 @@ export function ReviewForm({
       </div>
       <div>
         <label htmlFor={contentId} className="mb-1 block text-sm font-medium">내용</label>
-        <textarea
+        <RichTextField
           id={contentId}
           value={content}
-          onChange={(e) => setContent(e.target.value)}
+          onChange={setContent}
+          useEditor={siteEditor}
           rows={4}
-          className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-          required
+          ariaLabel="후기 내용"
         />
       </div>
-      {/* 이미지 첨부 — textarea에는 본문만 두고, 제출 시 업로드 URL을 img HTML로 합친다. */}
+      {/* 이미지 첨부 — textarea에는 본문만 두고, 제출 시 업로드 URL을 img HTML로 합친다.
+          웹 에디터를 쓰면 에디터의 사진 단추로 본문에 넣으므로 이 칸은 없다. */}
+      {siteEditor === false && (
       <div>
         <label htmlFor={imageInputId} className="mb-1 block text-sm font-medium">
           사진 첨부 <span className="text-xs text-muted-foreground">(선택)</span>
@@ -182,6 +187,7 @@ export function ReviewForm({
           </div>
         )}
       </div>
+      )}
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={submitting}>
           {submitting ? "등록 중..." : "등록"}
@@ -223,6 +229,8 @@ export function QaForm({
 }) {
   const [subject, setSubject] = useState("");
   const [question, setQuestion] = useState("");
+  // 사이트 에디터(cf_editor)가 있으면 웹 에디터 — 그누보드 shop/itemqaform.php 와 같은 조건.
+  const siteEditor = useSiteEditor();
   const [email, setEmail] = useState("");
   const [hp, setHp] = useState("");
   const [secret, setSecret] = useState(false);
@@ -253,7 +261,7 @@ export function QaForm({
       className="space-y-3 rounded-lg border p-4"
       onSubmit={async (e) => {
         e.preventDefault();
-        if (!subject.trim() || !question.trim()) {
+        if (!subject.trim() || !hasContent(question, Boolean(siteEditor))) {
           toastError("제목과 내용을 입력해주세요.");
           return;
         }
@@ -297,13 +305,13 @@ export function QaForm({
       </div>
       <div>
         <label htmlFor={questionId} className="mb-1 block text-sm font-medium">내용</label>
-        <textarea
+        <RichTextField
           id={questionId}
           value={question}
-          onChange={(e) => setQuestion(e.target.value)}
+          onChange={setQuestion}
+          useEditor={siteEditor}
           rows={4}
-          className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-          required
+          ariaLabel="문의 내용"
         />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -366,6 +374,7 @@ export function QaListItem({ qa, onChanged }: { qa: ShopQA; onChanged: () => voi
   const [hp, setHp] = useState(qa.iq_hp ?? "");
   const [secret, setSecret] = useState(String(qa.iq_secret ?? "0") === "1");
   const [submitting, setSubmitting] = useState(false);
+  const siteEditor = useSiteEditor();
   const editSubjectId = useId();
   const editQuestionId = useId();
   const editEmailId = useId();
@@ -395,7 +404,7 @@ export function QaListItem({ qa, onChanged }: { qa: ShopQA; onChanged: () => voi
 
   const handleUpdate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!subject.trim() || !question.trim()) {
+    if (!subject.trim() || !hasContent(question, Boolean(siteEditor))) {
       toastError("제목과 내용을 입력해 주세요.");
       return;
     }
@@ -452,12 +461,13 @@ export function QaListItem({ qa, onChanged }: { qa: ShopQA; onChanged: () => voi
           </div>
           <div className="sm:col-span-2">
             <label htmlFor={editQuestionId} className="mb-1 block text-sm font-medium">내용</label>
-            <Textarea
+            <RichTextField
               id={editQuestionId}
               value={question}
-              onChange={(event) => setQuestion(event.target.value)}
+              onChange={setQuestion}
+              useEditor={siteEditor}
               rows={4}
-              required
+              ariaLabel="문의 내용"
             />
           </div>
           <div>
@@ -523,7 +533,16 @@ export function QaListItem({ qa, onChanged }: { qa: ShopQA; onChanged: () => voi
         {(canEdit || canDelete) && (
           <div className="flex shrink-0 gap-1">
             {canEdit && (
-              <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(true)}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  // 에디터로 고칠 때 글자 문의는 줄마다 문단으로 넣는다(그대로 넣으면 줄바꿈이 사라진다).
+                  setQuestion(siteEditor ? contentForEditor(qa.iq_question) : qa.iq_question);
+                  setEditing(true);
+                }}
+              >
                 수정
               </Button>
             )}

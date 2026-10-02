@@ -29,8 +29,9 @@ import {
   getShopPolicy,
   getShopShippingFreeThreshold,
   getShopProductReviewSummary,
-  getShopProductQas,
+  getShopProductQaPage,
   getShopProductReviews,
+  getShopProductReviewPage,
   getShopNaverPayConfig,
   registerShopNaverPayOrder,
   registerShopNaverPayWish,
@@ -40,6 +41,8 @@ import {
   cartIdsFromAddResponse,
   productShippingPayment,
   productDetailTabFromSearch,
+  reviewFocusIdFromSearch,
+  qaFocusIdFromSearch,
   productDetailFormFromSearch,
   isLegacyShortProductPath,
 } from "@/components/shop/productDetailHelpers";
@@ -84,7 +87,16 @@ export default function ProductDetailClient({
   const [qas, setQas] = useState<ShopQA[]>([]);
   const [shippingPolicy, setShippingPolicy] = useState<ShopPolicy | null>(null);
   const [reviewPage, setReviewPage] = useState(1);
+  // 사용후기 쪽 — 서버가 실제로 연 쪽(찾아간 후기가 있으면 그 쪽)과 마지막 쪽.
+  const [reviewShownPage, setReviewShownPage] = useState(1);
+  const [reviewLastPage, setReviewLastPage] = useState(1);
+  // 주소의 ?is_id= — 첫 불러오기에서만 서버에 넘겨 그 후기가 있는 쪽을 연다. 쪽을 옮기면 비운다.
+  const [pendingFocusIsId, setPendingFocusIsId] = useState(0);
   const [qaPage, setQaPage] = useState(1);
+  // 상품문의 쪽 — 사용후기와 같다(서버가 연 쪽 · 마지막 쪽 · 주소의 ?iq_id= 를 첫 불러오기에서만).
+  const [qaShownPage, setQaShownPage] = useState(1);
+  const [qaLastPage, setQaLastPage] = useState(1);
+  const [pendingFocusIqId, setPendingFocusIqId] = useState(0);
   const [addingToCart, setAddingToCart] = useState(false);
   const [naverPayConfig, setNaverPayConfig] = useState<ShopNaverPayConfig | null>(null);
   const [naverPaySubmitting, setNaverPaySubmitting] = useState(false);
@@ -254,6 +266,8 @@ export default function ProductDetailClient({
     setReviewSummary(null);
     setQas([]);
     setReviewPage(1);
+    setPendingFocusIsId(reviewFocusIdFromSearch(productQueryString));
+    setPendingFocusIqId(qaFocusIdFromSearch(productQueryString));
     setQaPage(1);
     setActiveTab(productDetailTabFromSearch(productQueryString));
   }, [it_id, productQueryString]);
@@ -294,6 +308,83 @@ export default function ProductDetailClient({
     const nextTab = productDetailTabFromSearch(productQueryString);
     setActiveTab((current) => (current === nextTab ? current : nextTab));
   }, [productQueryString]);
+
+  // 탭을 골라 들어오면(?tab= · ?form= — 사용후기 목록의 "후기 바로가기" 등) 그 탭 자리로 내려간다.
+  // 탭은 상품 사진 · 구매 상자 아래 멀리 있어 맨 위에 머무르면 고른 탭이 보이지 않는다. 같은 주소에는 한 번만.
+  const scrolledTabKeyRef = useRef("");
+  useEffect(() => {
+    if (!product?.it_id) return;
+    const params = new URLSearchParams(productQueryString);
+    // ?is_id= 면 탭이 아니라 그 후기로 간다(레퍼런스 item.php?is_id= — 그 줄로 데려가 잠깐 표시).
+    // ?iq_id= 면 그 문의로(레퍼런스와 같이 후기와 문의를 둘 다 달고 오면 후기를 앞세운다).
+    const reviewFocusId = reviewFocusIdFromSearch(productQueryString);
+    const qaFocusId = reviewFocusId ? 0 : qaFocusIdFromSearch(productQueryString);
+    const focusId = reviewFocusId || qaFocusId;
+    const focusSelector = reviewFocusId
+      ? `[data-review-id="${reviewFocusId}"]`
+      : `[data-qa-id="${qaFocusId}"]`;
+    if (!params.get("tab") && !params.get("form") && !focusId) return;
+    const key = `${product.it_id}?${productQueryString}`;
+    if (scrolledTabKeyRef.current === key) return;
+
+    // 탭은 상품 정보보다 늦게 그려지고, 위의 사진이 늦게 읽히면 아래로 밀린다 — 탭이 생길 때까지 잠깐 기다렸다가
+    // 내려가고, 밀리면 두 번 더 맞춘다. 그사이 사용자가 스크롤 · 누르기 · 키 입력을 하면 그만둔다.
+    let stopped = false;
+    const timers: number[] = [];
+    const stopEvents = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+    const stop = () => {
+      stopped = true;
+      timers.forEach((timer) => window.clearTimeout(timer));
+      stopEvents.forEach((type) => window.removeEventListener(type, stop));
+    };
+    // 찾아갈 자리 — 후기 · 문의를 가리켰으면 그 카드, 아니면 탭 띠. 이 상품 것이 아니어서 끝내 안 나오면 탭 띠로.
+    let useTabs = !focusId;
+    const findTarget = () =>
+      useTabs
+        ? document.querySelector<HTMLElement>('[role="tablist"][aria-label="상품 상세 정보"]')
+        : document.querySelector<HTMLElement>(focusSelector);
+    const scrollToTarget = (): HTMLElement | null => {
+      const target = findTarget();
+      if (!target) return null;
+      // 떠 있는 머리(쇼핑 헤더) 높이만큼 덜 내려가 머리에 가리지 않게 한다.
+      const header = document.querySelector<HTMLElement>("header");
+      const offset = (header?.getBoundingClientRect().height ?? 0) + (useTabs ? 16 : 24);
+      window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - offset, behavior: "instant" });
+      return target;
+    };
+    const TARGET_WAIT_MS = 100;
+    const TARGET_WAIT_TRIES = 50;
+    /** 찾아간 후기 표시를 걷는 때(레퍼런스와 같이 5초 — 어느 줄인지 알렸으면 할 일을 다 했다). */
+    const FOCUS_MARK_MS = 5000;
+    let tries = 0;
+    const attempt = () => {
+      if (stopped) return;
+      const target = scrollToTarget();
+      if (target) {
+        scrolledTabKeyRef.current = key;
+        if (!useTabs) {
+          target.dataset.focused = "true";
+          target.focus({ preventScroll: true });
+          window.setTimeout(() => {
+            target.dataset.focused = "false";
+          }, FOCUS_MARK_MS);
+        }
+        stopEvents.forEach((type) => window.addEventListener(type, stop, { passive: true }));
+        [500, 1500].forEach((delay) => timers.push(window.setTimeout(() => !stopped && scrollToTarget(), delay)));
+        timers.push(window.setTimeout(stop, 1600));
+        return;
+      }
+      if (++tries < TARGET_WAIT_TRIES) {
+        timers.push(window.setTimeout(attempt, TARGET_WAIT_MS));
+      } else if (!useTabs) {
+        useTabs = true;
+        tries = 0;
+        timers.push(window.setTimeout(attempt, 0));
+      }
+    };
+    timers.push(window.setTimeout(attempt, 0));
+    return stop;
+  }, [product?.it_id, productQueryString]);
 
   useEffect(() => {
     if (!product?.it_id) return;
@@ -346,29 +437,62 @@ export default function ProductDetailClient({
   useEffect(() => {
     if (activeTab === "reviews" && it_id) {
       Promise.all([
-        getShopProductReviews(it_id, reviewPage).catch(() => []),
+        getShopProductReviewPage(it_id, reviewPage, pendingFocusIsId || undefined).catch(() => null),
         getShopProductReviewSummary(it_id).catch(() => null),
-      ]).then(([nextReviews, nextSummary]) => {
-        setReviews(nextReviews);
+      ]).then(([nextPage, nextSummary]) => {
+        setReviews(nextPage?.items ?? []);
+        setReviewShownPage(nextPage?.meta?.current_page ?? reviewPage);
+        setReviewLastPage(nextPage?.meta?.last_page ?? 1);
         setReviewSummary(nextSummary);
       });
     }
-  }, [activeTab, reviewPage, it_id]);
+  }, [activeTab, reviewPage, it_id, pendingFocusIsId]);
+
+  /** 사용후기 쪽 옮기기 — 찾아간 후기 표시는 그만두고, 탭 머리로 올라가 새 쪽을 처음부터 보게 한다. */
+  const handleReviewPageChange = useCallback((nextPage: number) => {
+    setPendingFocusIsId(0);
+    setReviewPage(nextPage);
+    const tablist = document.querySelector<HTMLElement>('[role="tablist"][aria-label="상품 상세 정보"]');
+    if (tablist) {
+      const header = document.querySelector<HTMLElement>("header");
+      const offset = (header?.getBoundingClientRect().height ?? 0) + 16;
+      window.scrollTo({ top: tablist.getBoundingClientRect().top + window.scrollY - offset, behavior: "instant" });
+    }
+  }, []);
+
+  const applyQaPage = useCallback((result: { items: ShopQA[]; meta?: { current_page?: number; last_page?: number } } | null, fallbackPage: number) => {
+    setQas(result?.items ?? []);
+    setQaShownPage(result?.meta?.current_page ?? fallbackPage);
+    setQaLastPage(result?.meta?.last_page ?? 1);
+  }, []);
 
   useEffect(() => {
     if (activeTab === "qa" && it_id) {
-      getShopProductQas(it_id, qaPage)
-        .then(setQas)
-        .catch(() => setQas([]));
+      getShopProductQaPage(it_id, qaPage, pendingFocusIqId || undefined)
+        .then((result) => applyQaPage(result, qaPage))
+        .catch(() => applyQaPage(null, qaPage));
     }
-  }, [activeTab, qaPage, it_id]);
+  }, [activeTab, qaPage, it_id, pendingFocusIqId, applyQaPage]);
 
+  // 문의를 쓰거나 고치면 지금 보는 쪽을 다시 읽는다.
   const reloadQas = useCallback(() => {
     if (!it_id) return;
-    getShopProductQas(it_id, qaPage)
-      .then(setQas)
-      .catch(() => setQas([]));
-  }, [it_id, qaPage]);
+    getShopProductQaPage(it_id, qaShownPage)
+      .then((result) => applyQaPage(result, qaShownPage))
+      .catch(() => applyQaPage(null, qaShownPage));
+  }, [it_id, qaShownPage, applyQaPage]);
+
+  /** 상품문의 쪽 옮기기 — 사용후기와 같이 찾아간 문의 표시는 그만두고 탭 머리로 올라간다. */
+  const handleQaPageChange = useCallback((nextPage: number) => {
+    setPendingFocusIqId(0);
+    setQaPage(nextPage);
+    const tablist = document.querySelector<HTMLElement>('[role="tablist"][aria-label="상품 상세 정보"]');
+    if (tablist) {
+      const header = document.querySelector<HTMLElement>("header");
+      const offset = (header?.getBoundingClientRect().height ?? 0) + 16;
+      window.scrollTo({ top: tablist.getBoundingClientRect().top + window.scrollY - offset, behavior: "instant" });
+    }
+  }, []);
 
   const handleAddToCart = useCallback(async () => {
     if (!product) return;
@@ -620,9 +744,13 @@ export default function ProductDetailClient({
 
   const handleQaSubmitted = useCallback(() => {
     if (!product) return;
-    getShopProductQas(product.it_id, 1).then(setQas).catch(() => undefined);
+    // 새 문의는 맨 앞(1쪽)에 선다 — 쪽 정보까지 새로 받는다.
+    getShopProductQaPage(product.it_id, 1)
+      .then((result) => applyQaPage(result, 1))
+      .catch(() => undefined);
+    setPendingFocusIqId(0);
     setQaPage(1);
-  }, [product]);
+  }, [product, applyQaPage]);
 
   return (
     <ProductDetailView
@@ -682,6 +810,12 @@ export default function ProductDetailClient({
       onQaSubmitted={handleQaSubmitted}
       reviews={reviews}
       reviewSummary={reviewSummary}
+      reviewPage={reviewShownPage}
+      reviewLastPage={reviewLastPage}
+      onReviewPageChange={handleReviewPageChange}
+      qaPage={qaShownPage}
+      qaLastPage={qaLastPage}
+      onQaPageChange={handleQaPageChange}
       qas={qas}
       onQaChanged={reloadQas}
       shippingFreeThreshold={shippingFreeThreshold}

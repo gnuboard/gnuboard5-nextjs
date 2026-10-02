@@ -75,6 +75,40 @@ const NICEPAY_RESPONSE_FIELDS = [
   "VbankExpTime",
 ] as const;
 
+/**
+ * 나이스페이 결제창(iframe)은 창 크기 맞추기(code 11)와 인증 결과(code 0 · 2)를 JSON "문자열"로 postMessage 하고,
+ * nicepay-3.0.js 는 그 문자열을 eval 로 객체로 바꾼다. 이 사이트의 CSP 는 'unsafe-eval' 을 허용하지 않으므로
+ * (허용하면 안 된다) eval 이 막혀 레이어가 처음 크기 660x505 에 머물러 결제창이 잘리고, 인증 결과도 처리되지 않았다.
+ * 나이스페이에서 온 문자열 메시지를 먼저(캡처 단계) 받아 JSON 으로 풀어 객체로 다시 보낸다 — nicepay-3.0.js 는
+ * 객체면 eval 없이 그대로 쓴다. JSON 이 아니면 손대지 않는다. 돌려주는 함수로 뗀다.
+ */
+const NICEPAY_MESSAGE_ORIGIN = /^https:\/\/([a-z0-9-]+\.)*nicepay\.co\.kr$/i;
+
+export function installNicepayMessageBridge(target: Window = window): () => void {
+  const onMessage = (event: MessageEvent) => {
+    if (typeof event.data !== "string" || !NICEPAY_MESSAGE_ORIGIN.test(event.origin)) return;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(event.data);
+    } catch {
+      return;
+    }
+    if (!parsed || typeof parsed !== "object" || !("code" in parsed)) return;
+    event.stopImmediatePropagation();
+    target.dispatchEvent(
+      new MessageEvent("message", {
+        data: parsed,
+        origin: event.origin,
+        lastEventId: event.lastEventId,
+        source: event.source,
+        ports: [...event.ports],
+      })
+    );
+  };
+  target.addEventListener("message", onMessage, { capture: true });
+  return () => target.removeEventListener("message", onMessage, { capture: true });
+}
+
 function nicepayAllowedMessageOrigins(nicepay?: NicepayExtra) {
   return paymentMessageOrigins(nicepay?.return_url);
 }
@@ -280,6 +314,7 @@ export function requestNicepayPayment(req: PaymentRequest): Promise<void> {
     const hostWindow = window as NicepayWindow;
     const bodySnapshot = new Set<Element>(Array.from(document.body.children));
     const allowedOrigins = nicepayAllowedMessageOrigins(nicepay);
+    const removeMessageBridge = installNicepayMessageBridge();
     let resultCompleted = false;
     let settled = false;
 
@@ -292,6 +327,7 @@ export function requestNicepayPayment(req: PaymentRequest): Promise<void> {
     function cleanup() {
       if (resultTimer) window.clearTimeout(resultTimer);
       window.removeEventListener("message", onNicepayMessage);
+      removeMessageBridge();
       Array.from(document.body.children).forEach((element) => {
         if (!bodySnapshot.has(element)) element.remove();
       });

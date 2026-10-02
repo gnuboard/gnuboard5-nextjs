@@ -60,7 +60,8 @@ export function SoluneRail() {
     let alive = true;
 
     const cancel = whenIdle(() => {
-      void getRecentItems({ view: "c", limit: COMMENT_LIMIT })
+      // 원본 홈의 최신 댓글(latest)처럼 — 새글 표가 비어도 글 표에서 채운다.
+      void getRecentItems({ view: "c", limit: COMMENT_LIMIT, fallback: "latest" })
         .then((result) => {
           if (alive) setComments(result.items);
         })

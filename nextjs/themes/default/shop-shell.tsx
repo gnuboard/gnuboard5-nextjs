@@ -1,9 +1,12 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { Menu, Search, ShoppingBag, UserRound } from "lucide-react";
 import { G5Link as Link } from "@/components/ui/g5-link";
 import { g5PathForRuntime } from "@/lib/config";
+import { shouldBypassImageOptimization } from "@/lib/image";
+import { memberAvatarUrl } from "@/lib/member-avatar";
 import { G5_SHOP_LOGO, SoluneBrandLogo } from "./brand-logo";
 import { SoluneCompanyInfo, useSoluneCompany } from "./site-company";
 import type { ShopCategory } from "@/lib/shop-types";
@@ -306,9 +309,7 @@ export function SoluneShopLayoutShell({ children, config, shopCategories: builtC
               >
                 <Search size={15} aria-hidden />
               </button>
-              <Link href={signedIn ? "/mypage" : loginHref} className="solune-shop-account" aria-label={signedIn ? "마이페이지" : "로그인"}>
-                <UserRound size={15} aria-hidden />
-              </Link>
+              <ShopAccountLink signedIn={signedIn} avatarUrl={signedIn ? memberAvatarUrl(user) : ""} loginHref={loginHref} />
               <CartLink />
             </div>
           </div>
@@ -353,5 +354,36 @@ export function SoluneShopLayoutShell({ children, config, shopCategories: builtC
 
       <ShopFooter config={config} />
     </div>
+  );
+}
+
+/**
+ * 헤더 오른쪽 회원 단추. 로그인했으면 회원 그림(회원이미지 → 회원아이콘, 커뮤니티 옆 칸 로그인 카드와 같은 순서)을
+ * 동그라미 안에 채우고, 그림이 없거나 못 읽으면 사람 모양 아이콘을 그대로 쓴다.
+ */
+function ShopAccountLink({ signedIn, avatarUrl, loginHref }: { signedIn: boolean; avatarUrl: string; loginHref: string }) {
+  const [failedUrl, setFailedUrl] = useState("");
+  const showAvatar = signedIn && avatarUrl !== "" && failedUrl !== avatarUrl;
+
+  return (
+    <Link
+      href={signedIn ? "/mypage" : loginHref}
+      className={showAvatar ? "solune-shop-account has-avatar" : "solune-shop-account"}
+      aria-label={signedIn ? "마이페이지" : "로그인"}
+    >
+      {showAvatar ? (
+        <Image
+          src={avatarUrl}
+          alt=""
+          width={36}
+          height={36}
+          className="solune-shop-account-avatar"
+          unoptimized={shouldBypassImageOptimization(avatarUrl)}
+          onError={() => setFailedUrl(avatarUrl)}
+        />
+      ) : (
+        <UserRound size={15} aria-hidden />
+      )}
+    </Link>
   );
 }

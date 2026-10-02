@@ -11,6 +11,7 @@
  *       gr_id = 그룹 id로 필터
  *       mb_id = 작성자로 필터
  *       mb_key = 작성자 공개 키로 필터(사이드뷰 "최근 글" — 주소에 아이디를 남기지 않는다)
+ *       fallback = 'latest' 면 새글 표에 맞는 줄이 없을 때 게시판 글 표에서 최근 글을 채운다(홈 위젯 — 원본 latest() 처럼)
  *       page  = 1-based page (default 1)
  *       limit = 1..100 (default 20)
  *
@@ -138,6 +139,8 @@ if (!function_exists('api_recent_fallback_from_write_tables')) {
                     w.wr_option,
                     IF(w.wr_is_comment = 1, w.wr_content, '') AS wr_content,
                     p.wr_option AS parent_option,
+                    p.mb_id AS parent_mb_id,
+                    p.wr_ip AS parent_ip,
                     p.wr_subject AS parent_subject,
                     p.wr_seo_title AS parent_seo_title
                  FROM {$writeTable} w
@@ -169,7 +172,12 @@ if (!function_exists('api_recent_fallback_from_write_tables')) {
                     'comment_excerpt' => $isComment
                         ? api_recent_comment_excerpt(
                             $row,
-                            array('wr_option' => $row['parent_option'] ?? ''),
+                            array(
+                                'wr_id'     => (int) $row['wr_parent'],
+                                'wr_option' => $row['parent_option'] ?? '',
+                                'mb_id'     => $row['parent_mb_id'] ?? '',
+                                'wr_ip'     => $row['parent_ip'] ?? '',
+                            ),
                             (int) ($board['bo_read_level'] ?? 1),
                             $viewer,
                             (string) $board['bo_table']
@@ -249,7 +257,14 @@ $newRows = DB::fetchAll(
 // 그누보드 write 테이블은 게시판별로 분리되어 있어 단일 JOIN이 불가능.
 // bo_table별로 그룹핑한 뒤 IN 쿼리로 한 번에 fetch — 쿼리 횟수가 페이지 row 수에 비례하지 않고
 // 페이지에 등장한 unique bo_table 수에 비례한다 (보통 5~10).
-if ($total === 0 && !$newRows) {
+// 대체 경로는 새글 표(g5_board_new)가 통째로 비었을 때만 쓴다. 조건(회원 · 그룹 · 원글만)으로 거른 결과가 0건이라고
+// 게시판 글 표를 직접 훑으면 원본 bbs/new.php 와 달라진다 — 오래되어 새글 표에서 지워진 글까지 나와
+// 한 회원의 원글 수가 전체 원글 수보다 많아졌다.
+// 다만 홈의 "최근 댓글" 같은 위젯은 원본 latest() 처럼 글 표를 읽어야 한다 — 그누보드가 새글 표를
+// cf_new_del 일 뒤에 지우므로, 한동안 조용한 사이트에서 위젯이 비지 않게 ?fallback=latest 로 고른다.
+// 회원 · 그룹 필터와 함께면 받지 않는다 — 위젯은 view 만 쓰고, 필터를 붙여 글 표 전체를 훑는 무거운 조회를 일부러 일으키지 못하게.
+$latestFallback = isset($_GET['fallback']) && $_GET['fallback'] === 'latest' && $mb_id === '' && $gr_id === '';
+if ($total === 0 && !$newRows && ($latestFallback || !DB::fetch("SELECT 1 AS x FROM {$boardNewTable} LIMIT 1"))) {
     list($fallbackItems, $fallbackTotal) = api_recent_fallback_from_write_tables(
         $view,
         $gr_id,

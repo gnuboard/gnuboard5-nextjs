@@ -43,6 +43,7 @@ import { boardPostHref, boardPostPath, isBbsSeoRewrite } from "@/lib/board-url";
 import { themeConfig } from "@g5-theme/theme.config";
 import type { G5ThemeConfig } from "@/lib/theme-types";
 import BoardPostListClient from "../ClientPage";
+import { commentEditorOn } from "@/lib/editor-content";
 
 interface ClientPageProps {
   boTable?: string;
@@ -158,7 +159,7 @@ export default function PostViewClient({
         setBoardName(nextBoard?.bo_subject ?? bo_table);
       setBoard(nextBoard);
         setBoard(nextBoard);
-        setCommentEditorEnabled(!!settings?.comment_editor);
+        setCommentEditorEnabled(commentEditorOn(settings?.cf_editor, settings?.comment_editor));
 
         const seoPost = seoPostResult.ok ? seoPostResult.data : null;
         const seoAccessDenied = !seoPostResult.ok && (seoPostResult.status === 401 || seoPostResult.status === 403);
@@ -198,7 +199,7 @@ export default function PostViewClient({
       setBbsRewriteMode(Number(settings?.cf_bbs_rewrite ?? 0));
       setBoardName(nextBoard?.bo_subject ?? bo_table);
       setBoard(nextBoard);
-      setCommentEditorEnabled(!!settings?.comment_editor);
+      setCommentEditorEnabled(commentEditorOn(settings?.cf_editor, settings?.comment_editor));
       setMissing(!nextPost && !nextAccessDenied);
       setAccessDenied(nextAccessDenied);
       setLoadError(false);

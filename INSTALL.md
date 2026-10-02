@@ -66,6 +66,9 @@ MANIFEST.json
 - API와 프론트가 서로 다른 도메인에서 동작한다면(예: Vercel) `api/.env`에
   `G5_CORS_ALLOWED_ORIGINS`와 `G5_SOCIAL_WEB_HOSTS`를 적으세요.
   `api/env.example`은 모든 값이 주석으로 된 예시이니 필요한 줄만 골라 쓰세요.
+- 비밀번호 찾기 · 메일 인증 메일의 링크는 요청의 Host 헤더가 아니라 설정된 사이트 주소로만
+  만듭니다. `config.php`의 `G5_DOMAIN`(Gnuboard5 5.6.41 이상은 원래 필요) 또는 `api/.env`의
+  `NEXT_PUBLIC_APP_URL`을 적어야 이 메일이 나갑니다.
 - 새 화면은 설치 직후 검색엔진에 노출되지 않습니다. 공개할 때 `api/.env`에
   `G5_NEXTJS_SEO=on`(필요하면 `G5_NEXTJS_SEO_SITEMAP=on`)을 적으세요.
 - `nextjs-install/apache-htaccess-rules.txt`는 테마 적용 때 들어가는 rewrite 규칙의
@@ -77,6 +80,9 @@ MANIFEST.json
   내보내지 마세요. 브리지를 거쳐야 설치 폴더에 맞는 주소로 바뀝니다.
   `nextjs-install/nginx/`의 파일은 보안 헤더 · 요청 수 제한 같은 추가 설정의
   참고본입니다.
+- Gnuboard5 5.6.41 이상은 DB 마이그레이션 SQL을 `migrations/` 폴더에 둡니다. Apache는
+  그 폴더의 `.htaccess`로 막히지만 nginx는 `.htaccess`를 읽지 않으므로,
+  `nextjs-install/nginx/*-theme-locations.conf`의 `/migrations` 차단 블록을 함께 넣으세요.
 
 ## 배포자용 메모
 

@@ -304,9 +304,10 @@ export default function WritePage({ boTable: fallbackBoTable }: WritePageProps) 
         secret: formData.wr_secret ? "secret" : "",
         // 그누보드 write_update.php 의 html 값(html1 | html2 | 빈 값) — wr_option 에 그대로 남는다.
         // 에디터 게시판은 원본 스킨처럼 늘 html1(본문이 HTML). 수정 중인 글이 예전에 빈 값으로 저장됐어도 html1 로 고쳐진다.
-        html: usesEditor ? "html1" : !canUseHtml ? "" : formData.html === "1" ? "html1" : formData.html === "2" ? "html2" : "",
-        // 답변메일받기(그누보드 mail) — 쓸 수 없는 게시판이면 빈 값.
-        mail: canReceiveMail && formData.mail ? "mail" : "",
+        // HTML 권한이 없으면 보내지 않는다 — 새 글은 html 없이, 수정은 지금 글의 값이 그대로 남는다.
+        html: usesEditor ? "html1" : !canUseHtml ? undefined : formData.html === "1" ? "html1" : formData.html === "2" ? "html2" : "",
+        // 답변메일받기(그누보드 mail) — 쓸 수 없는 게시판이면 보내지 않아 저장된 설정을 지우지 않는다.
+        mail: canReceiveMail ? (formData.mail ? "mail" : "") : undefined,
         reply_to: replyTo ? replyTo.wr_id : undefined,
       };
 

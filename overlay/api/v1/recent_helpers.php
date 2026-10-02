@@ -23,14 +23,19 @@ if (!function_exists('api_recent_comment_excerpt')) {
         if (!$isSuper && $level < max(1, $boardReadLevel)) {
             return null;
         }
-        // 게시판을 알면 글 읽기와 같은 판정(그룹 접근 · 본인확인 · 읽기 레벨)까지 본다 — 레벨만 보면
-        // 그룹 회원 전용이나 본인확인 게시판의 댓글 내용이 최근 댓글로 새어 나간다.
+        // 게시판을 알면 목록 발췌와 같은 판정(그룹 접근 · 본인확인 · 읽기 레벨, 읽기 포인트를 받는 게시판은 부모 글을
+        // 이미 포인트를 내고 읽었거나 내 글일 때만)까지 본다 — 레벨만 보면 제한 · 유료 게시판의 댓글 내용이 새어 나간다.
         if (!$isSuper && $boTable !== '' && function_exists('api_can_read_board')) {
             static $boards = array();
             if (!array_key_exists($boTable, $boards)) {
                 $boards[$boTable] = api_get_board($boTable) ?: null;
             }
-            if ($boards[$boTable] === null || !api_can_read_board($viewer ?: null, $boTable, $boards[$boTable])) {
+            if ($boards[$boTable] === null) {
+                return null;
+            }
+            $parentId = (int) ($parent['wr_id'] ?? 0);
+            $allowed = api_board_excerpt_allowed_ids($viewer ?: null, $boTable, $boards[$boTable], array($parent + array('wr_id' => $parentId)));
+            if (!isset($allowed[$parentId])) {
                 return null;
             }
         }

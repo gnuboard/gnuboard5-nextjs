@@ -8,6 +8,21 @@
 
 if (!defined('_GNUBOARD_')) exit;
 
+if (!function_exists('api_settings_feature_flag')) {
+    /**
+     * 화면 기능 스위치(댓글 에디터 · 무한 스크롤 · PWA) — config.php 에 상수가 있으면 그 값, 없으면 api/.env 의 같은
+     * 이름(on/off). 그누보드 원본 config.php 에는 이 상수가 없어서, 원본을 고치지 않고 켤 수 있게 .env 로도 받는다.
+     */
+    function api_settings_feature_flag(string $name): bool
+    {
+        if (defined($name)) {
+            return (bool) constant($name);
+        }
+        $value = function_exists('g5_api_config_value') ? strtolower(trim((string) g5_api_config_value($name))) : '';
+        return in_array($value, array('1', 'on', 'true', 'yes'), true);
+    }
+}
+
 // -------------------------------------------------------------------------
 // GET /v1/settings
 // -------------------------------------------------------------------------
@@ -68,13 +83,13 @@ $publicSettings = [
     'cf_movie_extension'=> isset($config['cf_movie_extension']) ? $config['cf_movie_extension'] : '',
     'visit'             => $visit,
     'shop_enabled'      => defined('G5_USE_SHOP') ? G5_USE_SHOP : false,
-    'comment_editor'    => defined('G5_COMMENT_EDITOR_USE') ? (bool) G5_COMMENT_EDITOR_USE : false,
+    'comment_editor'    => api_settings_feature_flag('G5_COMMENT_EDITOR_USE'),
     // 글쓰기 화면이 그누보드 write.php 와 같은 조건을 쓰도록 — 에디터는 cf_editor 가 있을 때만,
     // "답변메일받기" 는 cf_email_use(와 게시판 bo_use_email)가 켜졌을 때만.
     'cf_editor'         => isset($config['cf_editor']) ? (string) $config['cf_editor'] : '',
     'cf_email_use'      => isset($config['cf_email_use']) ? (int) $config['cf_email_use'] : 0,
-    'infinite_scroll'   => defined('G5_INFINITE_SCROLL_USE') ? (bool) G5_INFINITE_SCROLL_USE : false,
-    'pwa_enabled'       => defined('G5_PWA_USE') ? (bool) G5_PWA_USE : false,
+    'infinite_scroll'   => api_settings_feature_flag('G5_INFINITE_SCROLL_USE'),
+    'pwa_enabled'       => api_settings_feature_flag('G5_PWA_USE'),
 
     /**
      * 모바일 앱 버전 정책 — 강제 업그레이드용.
@@ -175,6 +190,11 @@ if (!function_exists('api_settings_features')) {
         foreach ($known as $key) {
             $features[$key] = in_array($key, $enabled, true);
         }
+        // 인증 메일 다시 보내기(POST /v1/auth/resend-verification, 앱 계약 SC-17)는 서버가 갖춘 기능이라
+        // 목록과 상관없이, 이 사이트가 실제로 인증 메일을 보낼 수 있을 때 켠다 — 못 보내면 앱은 1:1 문의 안내로 대신한다.
+        $config = function_exists('api_get_config') ? api_get_config() : [];
+        $features['resend_verification'] = !empty($config['cf_use_email_certify']) && !empty($config['cf_email_use'])
+            && function_exists('api_mail_link_base') && api_mail_link_base() !== '';
         return $features;
     }
 }

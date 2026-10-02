@@ -370,6 +370,25 @@ export async function getShopProductReviews(
   return validateApiData(response.data, shopReviewListSchema, []);
 }
 
+/**
+ * 상품 상세의 사용후기 한 쪽 — 쪽 정보(meta)와 함께. focusIsId 를 주면 서버가 그 후기가 실린 쪽을 연다
+ * (상품 주소의 ?is_id= — 사용후기 목록의 "후기 바로가기"). meta.current_page 가 실제로 연 쪽이다.
+ */
+export async function getShopProductReviewPage(
+  itId: string,
+  page = 1,
+  focusIsId?: number
+): Promise<ShopReviewListResult> {
+  const response = await apiClient.get<unknown>("/shop/reviews", {
+    params: { it_id: itId, page, focus_is_id: focusIsId || undefined },
+  });
+
+  return {
+    items: validateApiData(response.data, shopReviewListSchema, []),
+    meta: response.meta,
+  };
+}
+
 export async function getShopReviews(
   params: ShopReviewListParams = {}
 ): Promise<ShopReviewListResult> {
@@ -378,6 +397,7 @@ export async function getShopReviews(
       page: params.page,
       per_page: params.perPage,
       q: params.q || undefined,
+      sfl: params.q && params.sfl ? params.sfl : undefined,
     },
   });
 
@@ -409,6 +429,14 @@ export function getShopReviewsCached(
   );
 }
 
+/** 승인된 사용후기 전체의 건수 · 평균(사용후기 목록의 "전체 N건 · 평균 N.N★"). */
+export async function getShopReviewOverallSummary(): Promise<ShopReviewSummary | null> {
+  const response = await apiClient.get<unknown>("/shop/reviews/summary");
+  const parsed = shopReviewSummarySchema.safeParse(response.data);
+
+  return parsed.success ? parsed.data : null;
+}
+
 export async function getShopProductReviewSummary(
   itId: string
 ): Promise<ShopReviewSummary | null> {
@@ -425,6 +453,8 @@ export interface ShopReviewListParams {
   perPage?: number;
   status?: "all" | "confirmed" | "pending";
   q?: string;
+  /** 검색 항목 — 그누보드 itemuselist 의 sfl(i.it_name · r.it_id · r.is_subject · r.is_content · r.is_name · r.mb_id). */
+  sfl?: string;
 }
 
 export interface ShopReviewListResult {
@@ -481,6 +511,25 @@ export function deleteShopReview(reviewId: string | number) {
   return apiClient.delete(`/shop/reviews/${reviewId}`);
 }
 
+/**
+ * 상품 상세의 상품문의 한 쪽 — 쪽 정보(meta)와 함께. focusIqId 를 주면 서버가 그 문의가 실린 쪽을 연다
+ * (상품 주소의 ?iq_id= — 상품문의 목록의 "문의 바로가기"). meta.current_page 가 실제로 연 쪽이다.
+ */
+export async function getShopProductQaPage(
+  itId: string,
+  page = 1,
+  focusIqId?: number
+): Promise<ShopQaListResult> {
+  const response = await apiClient.get<unknown>("/shop/reviews/qna", {
+    params: { it_id: itId, page, focus_iq_id: focusIqId || undefined },
+  });
+
+  return {
+    items: validateApiData(response.data, shopQaListSchema, []),
+    meta: response.meta,
+  };
+}
+
 export async function getShopProductQas(
   itId: string,
   page = 1
@@ -501,6 +550,7 @@ export async function getShopQas(
       per_page: params.perPage,
       status: params.status === "all" ? undefined : params.status,
       q: params.q || undefined,
+      sfl: params.q && params.sfl ? params.sfl : undefined,
     },
   });
 
@@ -515,6 +565,8 @@ export interface ShopQaListParams {
   perPage?: number;
   status?: "all" | "answered" | "unanswered";
   q?: string;
+  /** 검색 항목 — 그누보드 itemqalist 의 sfl(i.it_name · q.it_id · q.iq_subject · q.iq_question · q.iq_name · q.mb_id). */
+  sfl?: string;
 }
 
 export interface ShopQaListResult {

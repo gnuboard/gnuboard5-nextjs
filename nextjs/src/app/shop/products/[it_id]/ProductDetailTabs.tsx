@@ -40,6 +40,12 @@ export function ProductDetailTabs({
   onQaSubmitted,
   reviews,
   reviewSummary,
+  reviewPage,
+  reviewLastPage,
+  onReviewPageChange,
+  qaPage,
+  qaLastPage,
+  onQaPageChange,
   reviewAverage,
   reviewTotal,
   reviewScores,
@@ -61,6 +67,12 @@ export function ProductDetailTabs({
   onQaSubmitted: () => void;
   reviews: ShopReview[];
   reviewSummary: ShopReviewSummary | null;
+  reviewPage: number;
+  reviewLastPage: number;
+  onReviewPageChange: (page: number) => void;
+  qaPage: number;
+  qaLastPage: number;
+  onQaPageChange: (page: number) => void;
   reviewAverage: number;
   reviewTotal: number;
   reviewScores: ReviewScore[];
@@ -138,6 +150,9 @@ export function ProductDetailTabs({
             onReviewSubmitted={onReviewSubmitted}
             reviews={reviews}
             reviewSummary={reviewSummary}
+            reviewPage={reviewPage}
+            reviewLastPage={reviewLastPage}
+            onReviewPageChange={onReviewPageChange}
             reviewAverage={reviewAverage}
             reviewTotal={reviewTotal}
             reviewScores={reviewScores}
@@ -154,6 +169,9 @@ export function ProductDetailTabs({
             qas={qas}
             onQaChanged={onQaChanged}
             loginHref={loginHref}
+            qaPage={qaPage}
+            qaLastPage={qaLastPage}
+            onQaPageChange={onQaPageChange}
           />
         )}
 
@@ -275,6 +293,9 @@ function ReviewsTab({
   onReviewSubmitted,
   reviews,
   reviewSummary,
+  reviewPage,
+  reviewLastPage,
+  onReviewPageChange,
   reviewAverage,
   reviewTotal,
   reviewScores,
@@ -287,6 +308,9 @@ function ReviewsTab({
   onReviewSubmitted: () => void;
   reviews: ShopReview[];
   reviewSummary: ShopReviewSummary | null;
+  reviewPage: number;
+  reviewLastPage: number;
+  onReviewPageChange: (page: number) => void;
   reviewAverage: number;
   reviewTotal: number;
   reviewScores: ReviewScore[];
@@ -357,7 +381,15 @@ function ReviewsTab({
         <p className="py-8 text-center text-muted-foreground">아직 리뷰가 없습니다.</p>
       ) : (
         reviews.map((review) => (
-          <div key={review.is_id} className="rounded-lg border p-4">
+          /* 후기 하나를 주소로 가리킬 수 있게 이름표를 단다(?is_id= — 레퍼런스 itemuse.skin.php 의 #is_N).
+             찾아오면 ProductDetailClient 가 data-focused 로 잠깐 표시하고 초점을 준다(탭 차례에는 넣지 않는다). */
+          <div
+            key={review.is_id}
+            id={`is_${review.is_id}`}
+            data-review-id={review.is_id}
+            tabIndex={-1}
+            className="rounded-lg border p-4 outline-none transition-[background-color,box-shadow] duration-1000 data-[focused=true]:bg-primary/5 data-[focused=true]:ring-2 data-[focused=true]:ring-primary"
+          >
             <div className="mb-2 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="flex">
@@ -388,7 +420,63 @@ function ReviewsTab({
           </div>
         ))
       )}
+      <ReviewPager page={reviewPage} lastPage={reviewLastPage} onPageChange={onReviewPageChange} />
     </div>
+  );
+}
+
+/** 사용후기 쪽 번호 — 전에는 첫 쪽(20개)만 보여 그 뒤 후기는 볼 길이 없었다. 지금 쪽 둘레 다섯 쪽과 처음 · 끝. */
+function ReviewPager({
+  page,
+  lastPage,
+  onPageChange,
+  label = "사용후기 쪽 번호",
+}: {
+  page: number;
+  lastPage: number;
+  onPageChange: (page: number) => void;
+  /** 쪽 번호 띠의 이름 — 상품문의도 같은 띠를 쓴다. */
+  label?: string;
+}) {
+  if (lastPage <= 1) return null;
+  const start = Math.max(1, page - 2);
+  const end = Math.min(lastPage, page + 2);
+  const pages: number[] = [];
+  for (let next = start; next <= end; next++) pages.push(next);
+  const buttonClass = "inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 text-sm tabular-nums transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40";
+
+  return (
+    <nav className="product-review-pager flex flex-wrap items-center justify-center gap-1 pt-4" aria-label={label}>
+      <button type="button" className={buttonClass} disabled={page <= 1} onClick={() => onPageChange(page - 1)} aria-label="이전 쪽">
+        ‹
+      </button>
+      {start > 1 ? (
+        <>
+          <button type="button" className={buttonClass} onClick={() => onPageChange(1)}>1</button>
+          {start > 2 ? <span className="px-1 text-muted-foreground">…</span> : null}
+        </>
+      ) : null}
+      {pages.map((next) => (
+        <button
+          key={next}
+          type="button"
+          className={cn(buttonClass, next === page && "border-primary bg-primary text-primary-foreground hover:bg-primary")}
+          aria-current={next === page ? "page" : undefined}
+          onClick={() => onPageChange(next)}
+        >
+          {next}
+        </button>
+      ))}
+      {end < lastPage ? (
+        <>
+          {end < lastPage - 1 ? <span className="px-1 text-muted-foreground">…</span> : null}
+          <button type="button" className={buttonClass} onClick={() => onPageChange(lastPage)}>{lastPage}</button>
+        </>
+      ) : null}
+      <button type="button" className={buttonClass} disabled={page >= lastPage} onClick={() => onPageChange(page + 1)} aria-label="다음 쪽">
+        ›
+      </button>
+    </nav>
   );
 }
 
@@ -400,6 +488,9 @@ function QaTab({
   qas,
   onQaChanged,
   loginHref,
+  qaPage,
+  qaLastPage,
+  onQaPageChange,
 }: {
   product: ShopProduct;
   canWriteQa: boolean;
@@ -408,6 +499,9 @@ function QaTab({
   qas: ShopQA[];
   onQaChanged: () => void;
   loginHref: string;
+  qaPage: number;
+  qaLastPage: number;
+  onQaPageChange: (page: number) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -428,42 +522,57 @@ function QaTab({
       {qas.length === 0 ? (
         <p className="py-8 text-center text-muted-foreground">아직 문의가 없습니다.</p>
       ) : (
-        qas.map((qa) => {
-          if (qa.can_edit || qa.can_delete) {
-            return <QaListItem key={qa.iq_id} qa={qa} onChanged={onQaChanged} />;
-          }
-          const isLocked = qa.can_view === false;
-          return (
-            <div key={qa.iq_id} className="rounded-lg border p-4">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-medium">{qa.mb_nick}</span>
-                <span className="text-xs text-muted-foreground">{formatDate(qa.iq_time)}</span>
-              </div>
-              <h4 className="font-medium">{isLocked ? "비밀글입니다." : qa.iq_subject}</h4>
-              {isLocked ? (
-                <p className="mt-1 text-sm text-muted-foreground">
-                  작성자와 관리자만 내용을 볼 수 있습니다.
-                </p>
-              ) : (
-                <SafeHtml
-                  className="prose prose-sm mt-1 max-w-none text-sm text-muted-foreground"
-                  html={qa.iq_question}
-                  policy="user"
-                />
-              )}
-              {!isLocked && qa.iq_answer && (
-                <div className="mt-3 rounded-md bg-muted p-3">
-                  <p className="text-sm font-medium">답변</p>
-                  <SafeHtml
-                    className="prose prose-sm mt-1 max-w-none text-sm text-muted-foreground"
-                    html={qa.iq_answer}
-                    policy="user"
-                  />
-                </div>
-              )}
-            </div>
-          );
-        })
+        qas.map((qa) => (
+          /* 문의 하나를 주소로 가리킬 수 있게 이름표를 단다(?iq_id= — 레퍼런스 #iq_N). 찾아오면
+             ProductDetailClient 가 data-focused 로 잠깐 표시하고 초점을 준다 — 후기 카드와 같다. */
+          <div
+            key={qa.iq_id}
+            id={`iq_${qa.iq_id}`}
+            data-qa-id={qa.iq_id}
+            tabIndex={-1}
+            className="rounded-lg outline-none transition-[background-color,box-shadow] duration-1000 data-[focused=true]:bg-primary/5 data-[focused=true]:ring-2 data-[focused=true]:ring-primary"
+          >
+            <QaCard qa={qa} onQaChanged={onQaChanged} />
+          </div>
+        ))
+      )}
+      <ReviewPager page={qaPage} lastPage={qaLastPage} onPageChange={onQaPageChange} label="상품문의 쪽 번호" />
+    </div>
+  );
+}
+
+function QaCard({ qa, onQaChanged }: { qa: ShopQA; onQaChanged: () => void }) {
+  if (qa.can_edit || qa.can_delete) {
+    return <QaListItem qa={qa} onChanged={onQaChanged} />;
+  }
+  const isLocked = qa.can_view === false;
+  return (
+    <div className="rounded-lg border p-4">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-sm font-medium">{qa.mb_nick}</span>
+        <span className="text-xs text-muted-foreground">{formatDate(qa.iq_time)}</span>
+      </div>
+      <h4 className="font-medium">{isLocked ? "비밀글입니다." : qa.iq_subject}</h4>
+      {isLocked ? (
+        <p className="mt-1 text-sm text-muted-foreground">
+          작성자와 관리자만 내용을 볼 수 있습니다.
+        </p>
+      ) : (
+        <SafeHtml
+          className="prose prose-sm mt-1 max-w-none text-sm text-muted-foreground"
+          html={qa.iq_question}
+          policy="user"
+        />
+      )}
+      {!isLocked && qa.iq_answer && (
+        <div className="mt-3 rounded-md bg-muted p-3">
+          <p className="text-sm font-medium">답변</p>
+          <SafeHtml
+            className="prose prose-sm mt-1 max-w-none text-sm text-muted-foreground"
+            html={qa.iq_answer}
+            policy="user"
+          />
+        </div>
       )}
     </div>
   );

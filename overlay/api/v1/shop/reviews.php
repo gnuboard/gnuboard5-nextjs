@@ -31,10 +31,10 @@ if ($subAction === 'summary') {
         Response::error('Method not allowed.', 405);
     }
 
+    // it_id 가 없으면 승인된 후기 전체 — 사용후기 목록(itemuselist)의 "전체 N건 · 평균 N.N★".
     $it_id = isset($_GET['it_id']) ? trim($_GET['it_id']) : '';
-    if (!$it_id) {
-        Response::error('it_id query parameter is required.', 422);
-    }
+    $scopeSql = $it_id !== '' ? "it_id = ? AND is_confirm = '1'" : "is_confirm = '1'";
+    $scopeParams = $it_id !== '' ? [$it_id] : [];
 
     $reviewTable = DB::table('g5_shop_item_use_table');
     $photoSql = "(is_content LIKE '%<img%' OR is_content LIKE '%&lt;img%')";
@@ -43,17 +43,17 @@ if ($subAction === 'summary') {
                 IFNULL(AVG(is_score), 0) AS average_score,
                 SUM(CASE WHEN {$photoSql} THEN 1 ELSE 0 END) AS photo_count
          FROM {$reviewTable}
-         WHERE it_id = ? AND is_confirm = '1'",
-        [$it_id]
+         WHERE {$scopeSql}",
+        $scopeParams
     ) ?: [];
 
     $total = (int) ($base['total'] ?? 0);
     $scoreRows = DB::fetchAll(
         "SELECT is_score, COUNT(*) AS cnt
          FROM {$reviewTable}
-         WHERE it_id = ? AND is_confirm = '1' AND is_score BETWEEN 1 AND 5
+         WHERE {$scopeSql} AND is_score BETWEEN 1 AND 5
          GROUP BY is_score",
-        [$it_id]
+        $scopeParams
     );
     $scoreCounts = [];
     foreach ($scoreRows as $row) {
@@ -304,6 +304,30 @@ if ($apiMethod === 'GET' && $subAction === '') {
     $sortField = $allowedSortFields[$sst] ?? 'r.is_id';
     $sortDirection = in_array($sod, ['asc', 'desc'], true) ? $sod : 'desc';
 
+    // 후기 하나를 가리켜 들어오면(?focus_is_id= — 상품 상세 주소의 is_id, 사용후기 목록의 "후기 바로가기")
+    // 그 후기가 실린 쪽을 연다. 레퍼런스 테마(solune_shop_review_page)처럼 서버에서 한 번 세어 맞춘다.
+    // 상품이 정해져 있고 번호순 정렬일 때만 — 이 상품의 승인된 후기가 아니면 없던 일로 한다.
+    // (?is_id= 는 "내 후기 하나 보기"로 이미 쓰이므로 이름을 달리 둔다.)
+    $focusIsId = isset($_GET['focus_is_id']) ? (int) $_GET['focus_is_id'] : 0;
+    if ($focusIsId > 0 && $it_id !== '' && $sortField === 'r.is_id') {
+        $focusRow = DB::fetch(
+            "SELECT is_id FROM {$reviewTable} WHERE is_id = ? AND it_id = ? AND is_confirm = '1' LIMIT 1",
+            [$focusIsId, $it_id]
+        );
+        if ($focusRow) {
+            $comparison = $sortDirection === 'desc' ? '>' : '<';
+            $before = DB::count(
+                "SELECT COUNT(*)
+                 FROM {$reviewTable} r
+                 LEFT JOIN {$itemTable} i ON i.it_id = r.it_id
+                 WHERE {$whereSql} AND r.is_id {$comparison} ?",
+                array_merge($params, [$focusIsId])
+            );
+            $page = intdiv($before, $perPage) + 1;
+            $offset = ($page - 1) * $perPage;
+        }
+    }
+
     $total = DB::count(
         "SELECT COUNT(*)
          FROM {$reviewTable} r
@@ -315,6 +339,7 @@ if ($apiMethod === 'GET' && $subAction === '') {
     $rows = DB::fetchAll(
         "SELECT r.is_id, r.it_id, r.mb_id, r.is_subject, r.is_content, r.is_score,
                 r.is_name, r.is_confirm, r.is_time,
+                r.is_reply_subject, r.is_reply_content, r.is_reply_name,
                 i.it_name, i.ca_id, i.it_price, i.it_img1, i.it_seo_title
          FROM {$reviewTable} r
          LEFT JOIN {$itemTable} i ON i.it_id = r.it_id
@@ -342,6 +367,10 @@ if ($apiMethod === 'GET' && $subAction === '') {
             'is_time'    => $row['is_time'],
             'is_confirm' => $row['is_confirm'],
             'mb_nick'    => $row['is_name'],
+            // 관리자 답변(그누보드 itemuselist 의 내용보기 겹창에 함께 나온다).
+            'is_reply_subject' => (string) ($row['is_reply_subject'] ?? ''),
+            'is_reply_content' => (string) ($row['is_reply_content'] ?? ''),
+            'is_reply_name'    => (string) ($row['is_reply_name'] ?? ''),
             'product_image_url' => $productImage,
             // 후기 카드 사진 — 후기 본문의 첫 사진, 없으면 상품 사진(그누보드 get_itemuselist_thumbnail 과 같다).
             'thumbnail_url' => api_editor_first_image_url($row['is_content'] ?? '', 400) ?: $productImage,
