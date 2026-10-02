@@ -12,8 +12,11 @@ export const PUBLISHER = {
   repoUrl: 'https://github.com/gnuboard/gnuboard5-nextjs',
 };
 
-/** 사용자가 읽는 파일에 남으면 안 되는 개인 흔적(관리자 개인 계정 · 개인 서버 이름). */
-export const PERSONAL_TRACE_PATTERN = { label: 'personal account trace', regex: /thisgun/i };
+/**
+ * 사용자가 읽는 파일에 남으면 안 되는 개인 흔적(관리자 개인 계정 · 개인 서버 이름).
+ * 테마 데모 사이트 주소(thisgun3.mycafe24.com)는 README 에 일부러 둔 것이라 뺀다.
+ */
+export const PERSONAL_TRACE_PATTERN = { label: 'personal account trace', regex: /thisgun(?!3\.mycafe24\.com)/i };
 
 /** 개인 흔적을 보는 곳 — 사용자가 읽는 문서와 설치물. 개발용 검사 스크립트(nextjs/scripts)는 보지 않는다. */
 export const USER_FACING_ROOTS = [

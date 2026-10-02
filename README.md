@@ -9,6 +9,11 @@
 
 한 번 빌드한 테마가 루트 설치와 하위 폴더 설치에서 모두 동작합니다.
 
+## 테마 데모
+
+- <https://thisgun3.mycafe24.com/> — 그누보드에 테마를 설치한 사이트
+- <https://gnuboard5-nextjs-demo.vercel.app/> — 같은 테마를 Vercel 에 띄운 데모(데이터는 위 사이트의 API)
+
 ## 설치
 
 GitHub 가 자동으로 만드는 소스 압축(Source code)이 아니라 **Releases 의 zip** 을 받으세요.
