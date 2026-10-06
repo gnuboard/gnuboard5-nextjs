@@ -10,6 +10,7 @@ import {
 import { isSecretPost } from "../src/lib/post-flags";
 import { memberAvatarUrl, memberInitial } from "../src/lib/member-avatar";
 import { isMemberKey, memberProfilePath, memberRecentPath } from "../src/lib/member-key";
+import { emailVerifyNoticeFor } from "../src/lib/email-verify-notice";
 
 // 여러 화면이 함께 쓰는 공용 판정 · 표기 함수. 화면마다 따로 계산하던 것을 모았으므로 규칙이 바뀌지 않게 묶어 둔다.
 
@@ -110,5 +111,22 @@ test.describe("member-key (회원 주소에 아이디 대신 공개 키)", () =>
     expect(memberRecentPath("admin", "MNhJgOD-6LSNqA5")).toBe("/recent?mb=MNhJgOD-6LSNqA5");
     expect(memberProfilePath("admin", "")).toBe("/members/admin");
     expect(memberRecentPath("admin", "")).toBe("/recent?mb_id=admin");
+  });
+});
+
+test.describe("emailVerifyNoticeFor (메일 인증 링크 결과 ?email_verify=)", () => {
+  test("알려진 결과는 로그인 전 · 로그인한 채 두 문구를 준다", () => {
+    expect(emailVerifyNoticeFor("ok")?.ok).toBe(true);
+    expect(emailVerifyNoticeFor("ok")?.signedInText).toBe("이메일 인증이 완료되었습니다.");
+    expect(emailVerifyNoticeFor("already")?.ok).toBe(true);
+    expect(emailVerifyNoticeFor("expired")?.ok).toBe(false);
+    expect(emailVerifyNoticeFor("expired")?.signedInText).toContain("로그아웃한 뒤");
+    expect(emailVerifyNoticeFor("invalid")?.ok).toBe(false);
+  });
+
+  test("모르는 값 · 빈 값 · Object 기본 속성 이름은 안내하지 않는다", () => {
+    for (const value of ["", null, undefined, "nope", "constructor", "__proto__", "toString"]) {
+      expect(emailVerifyNoticeFor(value)).toBeNull();
+    }
   });
 });

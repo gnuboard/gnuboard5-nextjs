@@ -91,6 +91,9 @@ if ($bo_table && !$subResource && $apiMethod === 'GET') {
 
     // 분류별 글 수는 여기서 세지 않는다 — 글보기 · RSS 도 이 응답을 쓰므로 글이 많은 게시판에서는
     // 조회마다 글 테이블 전체를 훑게 된다. 목록 화면만 /category-counts 를 따로 부른다(아래).
+    // 누구나 부를 수 있는 응답이라 화면이 쓰지 않는 관리용 칸은 뺀다 — 게시판 관리자 아이디(공격 대상이 된다),
+    // 서버에 있는 상단 · 하단 파일 경로.
+    unset($board['bo_admin'], $board['bo_include_head'], $board['bo_include_tail']);
     Response::success($board);
 }
 
@@ -509,14 +512,27 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'POST') {
     $wrReply = '';
     if ($replyTo > 0) {
         $replyParent = DB::fetch(
-            "SELECT wr_id, wr_num, wr_reply, wr_subject, wr_option, wr_email, mb_id FROM {$write_table} WHERE wr_id = ? AND wr_is_comment = 0",
+            "SELECT wr_id, wr_num, wr_reply, wr_subject, wr_option, wr_email, mb_id, wr_10 FROM {$write_table} WHERE wr_id = ? AND wr_is_comment = 0",
             [$replyTo]
         );
-        if (!$replyParent) {
+        // 신고로 숨겨진 글은 관리자 말고는 없는 글처럼 — 답글로 다시 드러내지 못하게.
+        if (!$replyParent || ($adminRole === '' && (string) ($replyParent['wr_10'] ?? '') === 'report_hidden')) {
             Response::error('Post to reply to was not found.', 404);
         }
         if ($adminRole === '' && (int) ($member['mb_level'] ?? 0) < (int) ($board['bo_reply_level'] ?? 1)) {
             Response::error('You do not have permission to reply in this board.', 403);
+        }
+        // 원본 bbs/write.php(w=r) 와 같이 — 공지에는 답글을 달 수 없고, 비밀글에는 글쓴이와 관리자만(비회원의
+        // 비밀글은 관리자만) 답글을 단다.
+        $noticeIds = array_map('intval', array_filter(array_map('trim', explode(',', (string) ($board['bo_notice'] ?? '')))));
+        if (in_array((int) $replyParent['wr_id'], $noticeIds, true)) {
+            Response::error('공지에는 답변할 수 없습니다.', 400);
+        }
+        if ($adminRole === '' && strpos((string) $replyParent['wr_option'], 'secret') !== false) {
+            $parentOwner = (string) ($replyParent['mb_id'] ?? '');
+            if ($parentOwner === '' || $parentOwner !== (string) ($member['mb_id'] ?? '')) {
+                Response::error('비밀글에는 자신 또는 관리자만 답변이 가능합니다.', 403);
+            }
         }
         if (strlen((string) $replyParent['wr_reply']) >= 10) {
             Response::error('This thread cannot take any more replies.', 400);
@@ -560,7 +576,7 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'POST') {
         $write_table,
         0
     );
-    $ca_name      = isset($input['ca_name']) ? $input['ca_name'] : '';
+    $ca_name      = api_board_validated_category($board, $input['ca_name'] ?? '', $adminRole);
     $wr_link1     = isset($input['wr_link1']) ? api_safe_board_link($input['wr_link1']) : '';
     $wr_link2     = isset($input['wr_link2']) ? api_safe_board_link($input['wr_link2']) : '';
 

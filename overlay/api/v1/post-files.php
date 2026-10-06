@@ -48,7 +48,8 @@ $post = DB::fetch(
     "SELECT * FROM {$writeTable} WHERE wr_id = ? LIMIT 1",
     [$wr_id]
 );
-if (!$post) {
+// 댓글도 같은 글 테이블에 있지만 그누보드 댓글에는 첨부가 없다 — 댓글 행에 파일을 붙이지 못하게 글만 받는다.
+if (!$post || (int) ($post['wr_is_comment'] ?? 0) === 1) {
     Response::error('Post not found.', 404);
 }
 
@@ -121,12 +122,18 @@ $uploaded = post_files_normalize_files($_FILES['files'] ?? null);
 // Parse order[] into a list of slot descriptors.
 // Each slot is either ['kind' => 'keep', 'bf_no' => int] or ['kind' => 'new', 'index' => int].
 $slots = [];
+$referencedNew = []; // order[] 가 가리킨 업로드 번호 — 가리키지 않은 업로드는 저장하지 않는다(디스크에 고아 파일이 쌓이지 않게)
 foreach ($orderInput as $entry) {
     if (is_string($entry) && strpos($entry, 'new:') === 0) {
         $idx = (int) substr($entry, 4);
         if (!isset($uploaded[$idx])) {
             Response::error("order[]에서 참조한 new:{$idx}에 해당하는 업로드 파일이 없습니다.", 422);
         }
+        // 한 업로드를 두 칸이 가리키면 같은 파일을 두 첨부가 나눠 써서, 하나를 지울 때 다른 하나도 깨진다.
+        if (isset($referencedNew[$idx])) {
+            Response::error("order[]에서 new:{$idx}를 두 번 가리켰습니다.", 422);
+        }
+        $referencedNew[$idx] = true;
         $slots[] = ['kind' => 'new', 'index' => $idx];
     } elseif (is_numeric($entry)) {
         $slots[] = ['kind' => 'keep', 'bf_no' => (int) $entry];
@@ -185,16 +192,21 @@ foreach ($slots as $slot) {
 $boardDir = G5_DATA_PATH . '/file/' . $bo_table;
 if (!is_dir($boardDir)) {
     @mkdir($boardDir, 0755, true);
+    // 관리자 게시판 생성(adm/board_form_update.php)처럼 폴더 목록이 보이지 않게 빈 index 를 둔다.
+    @file_put_contents($boardDir . '/index.php', '');
 }
 
 $newRows  = [];
 $savedDisk = []; // for rollback
 try {
     foreach ($uploaded as $i => $u) {
+        if (!isset($referencedNew[$i])) {
+            continue; // order[] 에 없는 업로드 — 첨부가 되지 않으므로 저장하지 않는다
+        }
         $saved = post_files_save_disk($u, $boardDir);
         $savedDisk[] = $saved['path'];
         // 검사 플러그인이 거부하면 이번 요청에서 저장한 파일을 모두 지우고 멈춘다.
-        $newRows[] = post_files_run_upload_hooks($saved, $board, $wr_id, $member, static function () use (&$savedDisk) {
+        $newRows[$i] = post_files_run_upload_hooks($saved, $board, $wr_id, $member, static function () use (&$savedDisk) {
             foreach ($savedDisk as $p) @unlink($p);
         });
     }

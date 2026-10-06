@@ -179,9 +179,15 @@ if ($seg0 === 'me' && isset($apiSegments[1]) && $apiSegments[1] === 'export' && 
         Response::error('Password required for data export.', 422, ['password' => 'Required for security.']);
     }
 
-    // 비밀번호 검증 — DB 의 hash 와 비교
+    // 비밀번호 검증 — DB 의 hash 와 비교. 로그인 · 탈퇴와 같은 실패 횟수 제한(토큰만으로 비밀번호를 대입하지 못하게).
+    $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+    $lockedMsg = Throttle::checkLoginAttempt((string) $mb_id, $ip);
+    if ($lockedMsg !== null) {
+        Response::error($lockedMsg, 429);
+    }
     $hash = isset($member['mb_password']) ? (string) $member['mb_password'] : '';
     if ($hash === '' || !Auth::verifyPassword($password, $hash)) {
+        Throttle::recordLoginFailure((string) $mb_id, $ip);
         Response::error('Invalid password.', 401);
     }
 
@@ -236,7 +242,8 @@ if ($seg0 === 'me' && $apiMethod === 'PATCH') {
 
     foreach ($allowedFields as $field) {
         if (isset($input[$field])) {
-            $value = $input[$field];
+            // 원본 register_form_update.php 와 같은 입력 정리 — 원본 화면 일부가 이 정리를 믿고 값을 그대로 출력한다.
+            $value = api_member_clean_field($field, $input[$field]);
 
             // Extra validation for specific fields
             if ($field === 'mb_email') {
@@ -272,6 +279,11 @@ if ($seg0 === 'me' && $apiMethod === 'PATCH') {
                 if (!Validator::minLength($value, 2) || !Validator::maxLength($value, 20)) {
                     Response::error('Validation failed.', 422, [
                         'mb_nick' => 'mb_nick must be between 2 and 20 characters.',
+                    ]);
+                }
+                if (!api_member_nick_is_valid((string) $value)) {
+                    Response::error('닉네임은 공백없이 한글, 영문, 숫자만 입력 가능합니다.', 422, [
+                        'mb_nick' => 'mb_nick may contain only Korean letters, English letters and digits.',
                     ]);
                 }
                 // Check duplicate nick (excluding current member)
@@ -558,6 +570,10 @@ if ($seg0 === 'me' && isset($apiSegments[1]) && $apiSegments[1] === 'icon' && $a
     if (!$imageInfo || empty($imageInfo[0]) || empty($imageInfo[1])) {
         Response::error('Invalid image file.', 422);
     }
+    // 풀기 전에 가로 · 세로(픽셀 · 메모리)를 본다 — 회원이미지(members_media_routes.php)와 같은 기준.
+    if (!api_image_decodable((int) $imageInfo[0], (int) $imageInfo[1])) {
+        Response::error('그림의 가로 · 세로가 너무 큽니다. 더 작은 그림을 올려 주세요.', 422);
+    }
 
     if (!function_exists('imagegif')) {
         Response::error('Image processing is not available on this server.', 500);
@@ -704,13 +720,21 @@ if ($seg0 && $seg0 !== 'me' && $apiMethod === 'GET') {
         Response::error('Invalid member ID format.', 400);
     }
 
+    // 원본 bbs/profile.php 와 같은 규칙 — 회원만, 자기 정보를 공개한 회원만, 정보를 공개한 회원의 것만(본인 · 최고관리자 예외).
+    // 화면은 정보 공개를 보는 /members/{key}/profile 을 쓴다.
+    $viewer = Auth::requireAuth();
+    $viewerIsSelfOrSuper = (string) $viewer['mb_id'] === $seg0 || Auth::adminRole($viewer) === 'super';
+    if (empty($viewer['mb_open']) && !$viewerIsSelfOrSuper) {
+        Response::error('자신의 정보를 공개하지 않으면 다른 회원의 정보를 볼 수 없습니다.', 403);
+    }
+
     $member = DB::fetch("SELECT * FROM " . DB::table('member_table') . "
             WHERE mb_id = ?
               AND mb_leave_date = ''
               AND mb_intercept_date = ''
             LIMIT 1", [$seg0]);
 
-    if (!$member || !$member['mb_id']) {
+    if (!$member || !$member['mb_id'] || (empty($member['mb_open']) && !$viewerIsSelfOrSuper)) {
         Response::error('Member not found.', 404);
     }
 

@@ -3,22 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { runtimeRouterPush } from "@/lib/runtime-router";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 import { useAuthStore } from "@/store/auth";
 import { api } from "@/lib/api";
 import { exchangeSocialTicket } from "@/services/socialAuth";
 
 type Status = "processing" | "success" | "error";
 
-function safeRedirectPath(value: string | null): string {
-  if (!value) return "/";
-  try {
-    const url = new URL(value, window.location.origin);
-    if (url.origin !== window.location.origin) return "/";
-    return `${url.pathname}${url.search}${url.hash}`;
-  } catch {
-    return "/";
-  }
-}
 
 /**
  * 소셜 로그인 callback.
@@ -103,7 +94,7 @@ export default function SocialCallbackPage() {
           setTimeout(() => window.close(), 500);
         } else {
           // 일반 모드 — 자체 redirect.
-          const target = safeRedirectPath(redirect);
+          const target = safeRedirectPath(redirect) ?? "/";
           setTimeout(() => runtimeRouterPush(router, target), 500);
         }
       } catch (err: unknown) {

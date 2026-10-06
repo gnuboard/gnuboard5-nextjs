@@ -22,75 +22,51 @@ if (!defined('_GNUBOARD_')) exit;
 
 $action = isset($apiSegments[0]) ? $apiSegments[0] : '';
 
-function api_report_target_parts(string $key): ?array
+require_once __DIR__ . '/../lib/report_hide.php'; // 자동 가림 · 기각 뒤 되돌리기(관리자 신고 화면과 같이 쓴다)
+
+/**
+ * 신고할 글 · 댓글이 있고 신고하는 사람이 그 글을 읽을 수 있는지 — 읽지 못하는 글(권한 밖 게시판 · 남의 비밀글)은
+ * 신고도, 자동 가림 집계도 하지 못한다. 댓글은 원글을 읽을 수 있어야 한다.
+ */
+function api_report_target_readable(?array $viewer, string $type, string $key): bool
 {
-    if (!preg_match('/^([A-Za-z0-9_]+)\/([0-9]+)$/', $key, $m)) {
-        return null;
-    }
-
-    $bo_table = api_sanitize_bo_table($m[1]);
-    if (!$bo_table || $bo_table !== $m[1]) {
-        return null;
-    }
-
-    return [$bo_table, (int) $m[2]];
-}
-
-function api_report_option_with_secret(string $option): string
-{
-    $parts = array_filter(array_map('trim', explode(',', $option)), static function ($v) {
-        return $v !== '';
-    });
-    if (!in_array('secret', $parts, true)) {
-        $parts[] = 'secret';
-    }
-    return implode(',', array_values(array_unique($parts)));
-}
-
-function api_report_auto_hide_target(string $type, string $key): bool
-{
-    if (!in_array($type, ['post', 'comment'], true)) {
-        return false;
-    }
-
     $parts = api_report_target_parts($key);
     if (!$parts) {
         return false;
     }
 
     [$bo_table, $wr_id] = $parts;
-    if (!api_get_board($bo_table)) {
+    $board = api_get_board($bo_table);
+    if (!$board) {
         return false;
     }
 
     $write_table = DB::writeTable($bo_table);
-    $isComment = $type === 'comment' ? 1 : 0;
-    $row = DB::fetch(
-        "SELECT wr_id, wr_option, wr_10
-           FROM {$write_table}
-          WHERE wr_id = ? AND wr_is_comment = ?
-          LIMIT 1",
-        [$wr_id, $isComment]
+    $isComment = $type === 'comment';
+    $post = DB::fetch(
+        "SELECT * FROM {$write_table} WHERE wr_id = ? AND wr_is_comment = ? LIMIT 1",
+        [$wr_id, $isComment ? 1 : 0]
     );
-    if (!$row || !$row['wr_id']) {
+    $comment = null;
+    if ($post && $isComment) {
+        $comment = $post;
+        $post = DB::fetch(
+            "SELECT * FROM {$write_table} WHERE wr_id = ? AND wr_is_comment = 0 LIMIT 1",
+            [(int) $post['wr_parent']]
+        );
+    }
+    if (!$post || !api_can_read_board_post($viewer, $bo_table, $board, $post)) {
         return false;
     }
 
-    if ((string) ($row['wr_10'] ?? '') === 'report_hidden') {
-        return true;
+    // 비밀댓글은 볼 수 있는 사람(원글 · 댓글 작성자, 관리자)만 신고한다 — 댓글 목록(api_post_present_comment)과 같은 기준.
+    if ($comment && api_is_secret_option($comment['wr_option'] ?? '')) {
+        $viewerId = $viewer && !empty($viewer['mb_id']) ? (string) $viewer['mb_id'] : '';
+        return $viewerId !== ''
+            && ((string) ($post['mb_id'] ?? '') === $viewerId
+                || (string) ($comment['mb_id'] ?? '') === $viewerId
+                || Auth::adminRole($viewer, $bo_table) !== '');
     }
-
-    DB::execute(
-        "UPDATE {$write_table}
-            SET wr_option = ?, wr_10 = 'report_hidden', wr_last = ?
-          WHERE wr_id = ? AND wr_is_comment = ?",
-        [
-            api_report_option_with_secret((string) ($row['wr_option'] ?? '')),
-            date('Y-m-d H:i:s'),
-            $wr_id,
-            $isComment,
-        ]
-    );
 
     return true;
 }
@@ -209,6 +185,10 @@ if ($apiMethod === 'POST' && $action === '') {
     if (!$reporterMb && !$reporterDev) {
         Response::error('Reporter identity required (login or signed device).', 401);
     }
+    // 글 · 댓글은 있고 읽을 수 있는 것만 — 없는 글 · 권한 밖 글은 같은 404(있는지 드러내지 않게).
+    if (($type === 'post' || $type === 'comment') && !api_report_target_readable($viewer ?: null, $type, $key)) {
+        Response::error('Report target not found.', 404);
+    }
 
     $table = DB::table('content_report_table');
     if ($reporterMb) {
@@ -254,7 +234,9 @@ if ($apiMethod === 'POST' && $action === '') {
          WHERE target_type = ? AND target_key = ? AND status = 'open' AND reporter_mb IS NOT NULL AND reporter_mb <> ''",
         [$type, $key]
     );
-    $autoHidden = $authenticatedOpenCount >= 3 ? api_report_auto_hide_target($type, $key) : false;
+    $autoHidden = $authenticatedOpenCount >= API_REPORT_AUTO_HIDE_THRESHOLD
+        ? api_report_auto_hide_target($type, $key, $reportId)
+        : false;
 
     Response::success([
         'report_id'  => $reportId,
@@ -318,7 +300,15 @@ if ($apiMethod === 'PATCH' && $action !== '') {
           WHERE report_id = ?",
         [$status, (string) $member['mb_id'], $status, $reportId]
     );
-    Response::success(['report_id' => $reportId, 'status' => $status]);
+    // 기각하면 — 남은 회원 신고가 기준보다 적을 때 자동으로 가린 글을 원래대로 돌려놓는다.
+    $restored = false;
+    if ($status === 'dismissed') {
+        $report = DB::fetch("SELECT target_type, target_key FROM `{$table}` WHERE report_id = ? LIMIT 1", [$reportId]);
+        if ($report) {
+            $restored = api_report_restore_after_dismiss((string) $report['target_type'], (string) $report['target_key']);
+        }
+    }
+    Response::success(['report_id' => $reportId, 'status' => $status, 'restored' => $restored]);
 }
 
 Response::error('Not found.', 404);

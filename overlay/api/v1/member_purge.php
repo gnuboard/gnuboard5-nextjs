@@ -12,7 +12,8 @@
  *   - 게시글·댓글: 남기되 작성자를 비식별화(wr_name='탈퇴회원', 이메일·홈페이지·IP 비움).
  *     다른 사람의 댓글이 달린 글이 사라지지 않게 하려는 것이고, 처리방침에 명시돼 있다.
  *   - 그 외 회원에 속한 행(디데이, 아기 기록, 푸시 토큰, 알림 이력, 소셜 연결, 세션,
- *     차단 목록, 스크랩, 쪽지, 포인트, 접속 기록, 소셜 티켓)은 삭제.
+ *     차단 목록, 스크랩, 쪽지, 포인트, 접속 기록, 소셜 티켓, 본인인증 이력, 글 임시저장,
+ *     정기결제 카드, 웹 입장권)은 삭제. 기기 기록은 남기되 이 회원과의 연결 · IP · 브라우저를 지운다.
  *   - 신고 기록은 운영 목적으로 남기되 신고자 식별자만 비운다.
  *   - 파일(회원 아이콘·프로필 이미지·디데이 사진)은 DB 커밋 뒤에 지운다.
  *
@@ -125,6 +126,13 @@ if (!function_exists('api_member_purge_now')) {
                 "`{$prefix}point`",
                 "`{$prefix}login`",
                 "`{$prefix}social_mobile_ticket`",
+                // 본인인증 이력(실명 · 휴대전화 · 생년월일, 인증 IP) — 원본 admin_clear_member_certification() 이 지우는 두 표.
+                "`{$prefix}member_cert_history`",
+                "`{$prefix}cert_history`",
+                // 글 임시저장(올리지 않은 초안), 정기결제 카드(빌링키 — 남기면 결제가 된다), 웹 입장권.
+                "`{$prefix}autosave`",
+                "`{$prefix}subscription_mb_cardinfo`",
+                "`{$prefix}web_ticket`",
             ];
             foreach ($deleteByMbId as $table) {
                 try {
@@ -132,6 +140,17 @@ if (!function_exists('api_member_purge_now')) {
                 } catch (\Throwable $e) {
                     // 없는 테이블은 건너뛴다.
                 }
+            }
+
+            // 기기 기록은 남기되(다른 회원이 그 기기를 가져가지 못하게 하는 보호에 쓴다) 이 회원과의 연결 · IP · 브라우저는 지운다.
+            try {
+                DB::execute(
+                    "UPDATE `{$prefix}device`
+                        SET claimed_by_mb_id = NULL, claimed_at = NULL, first_ip = NULL, last_ip = NULL, user_agent = NULL
+                      WHERE claimed_by_mb_id = ?",
+                    [$mb_id]
+                );
+            } catch (\Throwable $e) {
             }
 
             // 쪽지는 보낸 것과 받은 것 모두.
@@ -154,6 +173,7 @@ if (!function_exists('api_member_purge_now')) {
 
             // 5) 쇼핑 테이블(앱 SC-20). 실패하면 탈퇴 전체를 되돌린다 — 처리방침 문구와 실제 동작이 어긋나면 안 된다.
             $shopResult = api_member_purge_shop($mb_id);
+            $printResult = api_member_purge_print($mb_id);
 
             DB::commit();
         } catch (\Throwable $e) {
@@ -173,6 +193,7 @@ if (!function_exists('api_member_purge_now')) {
             'deleted_files'     => $deletedFiles,
             'anonymized_writes' => $anonymizedWrites,
             'shop'              => $shopResult,
+            'print'             => $printResult,
         ];
     }
 }
@@ -284,6 +305,60 @@ if (!function_exists('api_member_purge_shop')) {
             if ($table !== '') {
                 $out['deleted'] += (int) DB::execute("DELETE FROM `{$table}` WHERE mb_id = ?", [$mb_id]);
             }
+        }
+
+        return $out;
+    }
+}
+
+if (!function_exists('api_member_purge_print')) {
+    /**
+     * 인쇄(plugin/print) 표 — 쇼핑과 같은 원칙. 주문은 거래기록이라 남기고 받는 사람 이름 · 연락처 · 주소 · 요청문만
+     * 익명화하고, 리뷰는 작성자명만 익명화한다. 아트워크(올린 디자인)는 주문 품목이 가리키는 것만 주문 기록으로 남기고
+     * 나머지는 지운다. print 를 쓰지 않는 설치본(설정 키 · 표 없음)은 건너뛴다.
+     *
+     * @return array{orders:int, reviews:int, artworks:int}
+     */
+    function api_member_purge_print(string $mb_id): array
+    {
+        $table = static function (string $key): string {
+            global $g5;
+            $name = !empty($g5[$key]) ? (string) $g5[$key] : '';
+            if ($name === '' || !preg_match('/^[A-Za-z0-9_]+$/', $name)) {
+                return '';
+            }
+            return DB::fetch(
+                'SELECT 1 AS x FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1',
+                [$name]
+            ) ? $name : '';
+        };
+
+        $out = ['orders' => 0, 'reviews' => 0, 'artworks' => 0];
+        $order = $table('print_order_table');
+        if ($order !== '') {
+            $out['orders'] = (int) DB::execute(
+                "UPDATE `{$order}`
+                    SET receiver_name = '탈퇴회원', receiver_phone = '', zipcode = '', addr1 = '', addr2 = '', memo = NULL
+                  WHERE mb_id = ?",
+                [$mb_id]
+            );
+        }
+        $review = $table('print_review_table');
+        if ($review !== '') {
+            $out['reviews'] = (int) DB::execute(
+                "UPDATE `{$review}` SET mb_name = '탈퇴회원' WHERE mb_id = ?",
+                [$mb_id]
+            );
+        }
+        $artwork = $table('print_artwork_table');
+        $orderItem = $table('print_order_item_table');
+        if ($artwork !== '' && $orderItem !== '') {
+            $out['artworks'] = (int) DB::execute(
+                "DELETE a FROM `{$artwork}` a
+                   LEFT JOIN `{$orderItem}` i ON i.artwork_id = a.artwork_id
+                  WHERE a.mb_id = ? AND i.item_id IS NULL",
+                [$mb_id]
+            );
         }
 
         return $out;

@@ -23,6 +23,26 @@ if (!defined('G5_NEXTJS_DEFAULT_RELEASES_URL')) {
     define('G5_NEXTJS_DEFAULT_RELEASES_URL', 'https://github.com/gnuboard/gnuboard5-nextjs/releases');
 }
 
+if (!function_exists('nextjs_default_setup_panel_path')) {
+    /**
+     * 안내에 보일 파일 경로 — 최고관리자에게만 서버의 절대 경로를, 다른 방문자에게는 그누보드 루트 기준 경로를.
+     * 설치가 덜 끝난 사이트는 이 화면이 누구에게나 보이므로 서버 폴더 구조를 내주지 않는다.
+     */
+    function nextjs_default_setup_panel_path($path)
+    {
+        global $is_admin;
+
+        $path = (string) $path;
+        if ($is_admin === 'super' || !defined('G5_PATH')) {
+            return $path;
+        }
+        $root = rtrim(str_replace('\\', '/', G5_PATH), '/') . '/';
+        $normalized = str_replace('\\', '/', $path);
+
+        return strpos($normalized, $root) === 0 ? substr($normalized, strlen($root)) : basename($normalized);
+    }
+}
+
 if (!function_exists('nextjs_default_setup_panel')) {
     /**
      * @param string $variant 'home' 이면 사이트 홈, 'shop' 이면 영카트 화면.
@@ -75,7 +95,7 @@ if (!function_exists('nextjs_default_setup_panel_missing')) {
     <p class="nextjs_default-eyebrow nextjs_default-eyebrow-warning">설치가 끝나지 않았습니다</p>
     <h1 class="nextjs_default-title">Next.js 정적 산출물이 없어 화면을 띄울 수 없습니다.</h1>
     <p class="nextjs_default-copy">
-        테마는 <code><?php echo get_text($index_path); ?></code> 파일이 있을 때만
+        테마는 <code><?php echo get_text(nextjs_default_setup_panel_path($index_path)); ?></code> 파일이 있을 때만
         <?php echo $is_shop ? '영카트5' : '그누보드5'; ?> 호환 화면을 제공합니다. 지금 그 파일이 없습니다.
         개발 저장소의 <code>overlay/</code> 트리에는 PHP 브리지만 들어 있고 빌드 산출물은
         포함되지 않으므로, <strong>릴리스 zip</strong>을 받아 덮어써야 합니다.
@@ -107,7 +127,7 @@ if (!function_exists('nextjs_default_setup_panel_meta')) {
         <div>
             <dt>정적 앱</dt>
             <dd>
-                <code><?php echo get_text(nextjs_default_static_app_path()); ?></code>
+                <code><?php echo get_text(nextjs_default_setup_panel_path(nextjs_default_static_app_path())); ?></code>
                 <span class="nextjs_default-state <?php echo $ready ? 'is-ok' : 'is-missing'; ?>"><?php echo $ready ? '있음' : '없음'; ?></span>
             </dd>
         </div>

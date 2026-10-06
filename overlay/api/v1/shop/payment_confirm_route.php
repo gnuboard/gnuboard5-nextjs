@@ -106,9 +106,25 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
     }
 
     $lockName = (string) ($lock['lock'] ?? '');
+    // 회원은 주문 만들기(무통장)와 같은 회원 잠금도 잡는다 — 다른 주문의 확정과 동시에 같은 쿠폰을 쓰지 못하게.
+    // 못 잡으면 PG 를 취소하지 않고 "진행 중"으로 돌려보낸다(앱이 다시 시도한다). 이름 잠금을 하나만 드는 옛 DB 에서는
+    // 둘째 잠금이 위 주문 잠금을 풀어 버리므로 잡지 않는다 — 그때도 쿠폰 중복은 아래 INSERT 가 막는다(PG 취소).
+    $memberLockName = '';
+    if ($mb_id !== '' && DB::supportsMultipleNamedLocks()) {
+        $memberLockName = shop_api_member_order_lock_name($mb_id);
+        $memberLock = DB::fetch('SELECT GET_LOCK(?, 10) AS got_lock', [$memberLockName]);
+        if ((int) ($memberLock['got_lock'] ?? 0) !== 1) {
+            pg_payment_confirm_release_lock($lockName);
+            Response::error('Payment confirmation is already in progress. Please retry shortly.', 409, [
+                'code' => 'confirm_in_progress',
+            ]);
+        }
+    }
     $txReport = pg_payment_confirm_transaction_report();
     $txActive = false;
     $legacyTxActive = false;
+    $couponsLogged = false; // 이 요청이 쿠폰 사용 기록을 쓰기 시작했는지 — 실패하면 catch 가 이 주문의 기록을 지운다
+    $couponLogging = false; // 쿠폰 사용 기록을 쓰는 중 — 여기서 난 중복 키 오류는 "다른 주문이 이미 쓴 쿠폰"이다
     try {
         // 락 획득 뒤 다시 읽어 중복 confirm 과 레이스를 막는다.
         $lockedOrder = DB::fetch(
@@ -130,6 +146,7 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
                     $alreadyConfirmedUid = shop_api_set_guest_order_cookie($lockedOrder);
                 }
                 pg_payment_confirm_release_lock($lockName);
+                pg_payment_confirm_release_lock($memberLockName);
                 Response::success([
                     'order_id' => (string) $order_id,
                     'tno'      => $lockedTno !== '' ? $lockedTno : (string) $verifyResult['tno'],
@@ -162,12 +179,129 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
             }
         }
 
+        // 주문 · 배송비 쿠폰은 결제 준비가 주문에 적어 둔 마커가 기준이다 — 앱이 보낸 cp_id 를 앞세우면 다른 값을 보내
+        // 실제로 할인받은 쿠폰을 "쓰지 않은" 채로 남겨 다시 쓸 수 있었다. 마커가 없는 옛 준비 주문만 보낸 값을 쓴다.
+        $orderCpId = shop_api_coupon_marker_extract((string) ($order['od_mod_history'] ?? ''));
+        if ($orderCpId === '') {
+            $orderCpId = (string) ($input['cp_id'] ?? '');
+        }
+        $sendCpId = shop_api_coupon_marker_extract((string) ($order['od_mod_history'] ?? ''), 'send');
+        if ($sendCpId === '') {
+            $sendCpId = (string) ($input['cp_id_send'] ?? '');
+        }
+
+        // 이 주문의 쿠폰을 다른 주문이 이미 썼으면 아무것도 바꾸기 전에 멈춘다 — catch 가 PG 승인을 취소하고 409 로
+        // 답한다(원본 orderformupdate.php 의 "쿠폰 중복 = 결제 취소"). 결제 준비는 사용 기록을 남기지 않으므로
+        // 장바구니 여럿에서 같은 쿠폰으로 결제 준비를 해 둘 수 있다.
+        if ($mb_id !== '') {
+            $couponIds = [];
+            foreach (DB::fetchAll(
+                "SELECT ct_history FROM " . DB::table('g5_shop_cart_table') . " WHERE od_id = ? AND cp_price > 0",
+                [$order_id]
+            ) as $rc) {
+                $couponIds[] = shop_api_coupon_marker_extract((string) $rc['ct_history']);
+            }
+            if ((int) ($order['od_coupon'] ?? 0) > 0) {
+                $couponIds[] = $orderCpId;
+            }
+            if ((int) ($order['od_send_coupon'] ?? 0) > 0) {
+                $couponIds[] = $sendCpId;
+            }
+            foreach (array_unique(array_filter($couponIds)) as $couponId) {
+                $usedElsewhere = DB::count(
+                    "SELECT COUNT(*) FROM " . DB::table('g5_shop_coupon_log_table') . "
+                     WHERE cp_id = ? AND mb_id = ? AND od_id <> ?",
+                    [$couponId, $mb_id, $order_id]
+                );
+                if ($usedElsewhere > 0) {
+                    throw new RuntimeException('Coupon already used by another order.');
+                }
+            }
+        }
+
         if (!empty($txReport['transactional'])) {
             DB::beginTransaction();
             $txActive = true;
             pg_legacy_transaction_query('START TRANSACTION');
             $legacyTxActive = true;
         }
+
+    // 쿠폰 사용 기록 — 장바구니 · 재고 · 주문 상태를 바꾸기 전에 먼저 쓴다. 다른 주문이 쓴 쿠폰이면 unique (cp_id, mb_id)
+    // 위반이 여기서 예외로 올라와, 아무것도 바뀌지 않은 채 catch 가 PG 를 취소한다(쇼핑 표가 MyISAM 이라 앞서 바꾼 것을
+    // 되돌릴 수 없다). 뒤에서 실패하면 catch 가 이 주문의 쿠폰 기록을 지운다. prepare 단계에서 주문 row 의
+    // od_coupon / od_receipt_point 에 적용 금액이 이미 있다.
+    $orderCoupon = (int) ($order['od_coupon'] ?? 0);
+    $sendCoupon  = (int) ($order['od_send_coupon'] ?? 0);
+    $orderPoint  = (int) ($order['od_receipt_point'] ?? 0);
+
+    // 쓰기 전에 켠다 — 둘째 INSERT 가 실패해도 catch 가 앞서 쓴 이 주문의 기록을 지워, 결제 안 된 주문이 쿠폰을 쥐지 않게.
+    $couponsLogged = true;
+    $couponLogging = true;
+
+    // 상품/카테고리 쿠폰 (cart row 단위) — 카트 행마다 ct_history 쿠폰 마커 파싱.
+    if ($mb_id !== '') {
+        $rowCoupons = DB::fetchAll(
+            "SELECT ct_id, cp_price, ct_history FROM " . DB::table('g5_shop_cart_table') . "
+             WHERE od_id = ? AND cp_price > 0",
+            [$order_id]
+        );
+        foreach ($rowCoupons as $rc) {
+            if (empty($rc['ct_history'])) continue;
+            $rowCpId = shop_api_coupon_marker_extract($rc['ct_history']);
+            if ($rowCpId === '') continue;
+            // 이 주문에 이미 적혀 있으면 건너뛰고, 아니면 그냥 INSERT — 다른 주문이 쓴 쿠폰이면 unique (cp_id, mb_id)
+            // 위반이 예외로 올라와 catch 가 PG 를 취소한다(IGNORE 로 삼키면 할인만 남았다).
+            $rowLogged = DB::count(
+                "SELECT COUNT(*) FROM " . DB::table('g5_shop_coupon_log_table') . "
+                 WHERE cp_id = ? AND mb_id = ? AND od_id = ?",
+                [$rowCpId, $mb_id, $order_id]
+            );
+            if ($rowLogged === 0) {
+                DB::execute(
+                    "INSERT INTO " . DB::table('g5_shop_coupon_log_table') . "
+                     SET cp_id = ?, mb_id = ?, od_id = ?, cp_price = ?, cl_datetime = ?",
+                    [$rowCpId, $mb_id, $order_id, (int) $rc['cp_price'], date('Y-m-d H:i:s')]
+                );
+            }
+        }
+    }
+
+    if ($orderCoupon > 0) {
+        $cpId = $orderCpId; // 결제 준비가 적어 둔 마커 우선(위에서 정함)
+        if ($cpId !== '') {
+            // 중복 INSERT 방지 — 동일 (cp_id, mb_id, od_id) 이미 있으면 skip.
+            $exists = DB::count(
+                "SELECT COUNT(*) FROM " . DB::table('g5_shop_coupon_log_table') . "
+                 WHERE cp_id = ? AND mb_id = ? AND od_id = ?",
+                [$cpId, $mb_id, $order_id]
+            );
+            if ($exists === 0) {
+                DB::execute(
+                    "INSERT INTO " . DB::table('g5_shop_coupon_log_table') . "
+                     SET cp_id = ?, mb_id = ?, od_id = ?, cp_price = ?, cl_datetime = ?",
+                    [$cpId, $mb_id, $order_id, $orderCoupon, date('Y-m-d H:i:s')]
+                );
+            }
+        }
+    }
+
+    if ($sendCoupon > 0) {
+        if ($sendCpId !== '') { // 결제 준비가 적어 둔 마커 우선(위에서 정함)
+            $exists = DB::count(
+                "SELECT COUNT(*) FROM " . DB::table('g5_shop_coupon_log_table') . "
+                 WHERE cp_id = ? AND mb_id = ? AND od_id = ?",
+                [$sendCpId, $mb_id, $order_id]
+            );
+            if ($exists === 0) {
+                DB::execute(
+                    "INSERT INTO " . DB::table('g5_shop_coupon_log_table') . "
+                     SET cp_id = ?, mb_id = ?, od_id = ?, cp_price = ?, cl_datetime = ?",
+                    [$sendCpId, $mb_id, $order_id, $sendCoupon, date('Y-m-d H:i:s')]
+                );
+            }
+        }
+    }
+    $couponLogging = false;
 
     $cartItems = DB::fetchAll(
         "SELECT it_id, it_name, ct_qty, ct_option, io_id, io_type FROM " . DB::table('g5_shop_cart_table') . "
@@ -254,78 +388,6 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
     );
     shop_api_save_order_address_from_input($member, $order);
 
-    // 쿠폰/포인트 실제 사용 기록 — 매입 승인된 시점에만 기록.
-    //   - prepare 단계에서 이미 주문 row 의 od_coupon / od_receipt_point 에 적용된 금액이 있음.
-    //   - 결제 실패 분기에서는 coupon_log 미기록, insert_point 미호출 → 자연 롤백.
-    $orderCoupon = (int) ($order['od_coupon'] ?? 0);
-    $sendCoupon  = (int) ($order['od_send_coupon'] ?? 0);
-    $orderPoint  = (int) ($order['od_receipt_point'] ?? 0);
-
-    // 상품/카테고리 쿠폰 (cart row 단위) — 카트 행마다 ct_history 쿠폰 마커 파싱.
-    if ($mb_id !== '') {
-        $rowCoupons = DB::fetchAll(
-            "SELECT ct_id, cp_price, ct_history FROM " . DB::table('g5_shop_cart_table') . "
-             WHERE od_id = ? AND cp_price > 0",
-            [$order_id]
-        );
-        foreach ($rowCoupons as $rc) {
-            if (empty($rc['ct_history'])) continue;
-            $rowCpId = shop_api_coupon_marker_extract($rc['ct_history']);
-            if ($rowCpId === '') continue;
-            // INSERT IGNORE — unique (cp_id, mb_id) 가 막아주므로 중복 호출도 안전.
-            DB::execute(
-                "INSERT IGNORE INTO " . DB::table('g5_shop_coupon_log_table') . "
-                 SET cp_id = ?, mb_id = ?, od_id = ?, cp_price = ?, cl_datetime = ?",
-                [$rowCpId, $mb_id, $order_id, (int) $rc['cp_price'], date('Y-m-d H:i:s')]
-            );
-        }
-    }
-
-    if ($orderCoupon > 0) {
-        // cp_id 결정 우선순위: 1) 클라가 confirm body 로 보낸 값,
-        // 2) prepare 단계에서 od_mod_history 에 박아둔 쿠폰 마커.
-        $cpId = isset($input['cp_id']) ? (string) $input['cp_id'] : '';
-        if ($cpId === '' && !empty($order['od_mod_history'])) {
-            $cpId = shop_api_coupon_marker_extract($order['od_mod_history']);
-        }
-        if ($cpId !== '') {
-            // 중복 INSERT 방지 — 동일 (cp_id, mb_id, od_id) 이미 있으면 skip.
-            $exists = DB::count(
-                "SELECT COUNT(*) FROM " . DB::table('g5_shop_coupon_log_table') . "
-                 WHERE cp_id = ? AND mb_id = ? AND od_id = ?",
-                [$cpId, $mb_id, $order_id]
-            );
-            if ($exists === 0) {
-                DB::execute(
-                    "INSERT INTO " . DB::table('g5_shop_coupon_log_table') . "
-                     SET cp_id = ?, mb_id = ?, od_id = ?, cp_price = ?, cl_datetime = ?",
-                    [$cpId, $mb_id, $order_id, $orderCoupon, date('Y-m-d H:i:s')]
-                );
-            }
-        }
-    }
-
-    if ($sendCoupon > 0) {
-        $sendCpId = isset($input['cp_id_send']) ? (string) $input['cp_id_send'] : '';
-        if ($sendCpId === '' && !empty($order['od_mod_history'])) {
-            $sendCpId = shop_api_coupon_marker_extract($order['od_mod_history'], 'send');
-        }
-        if ($sendCpId !== '') {
-            $exists = DB::count(
-                "SELECT COUNT(*) FROM " . DB::table('g5_shop_coupon_log_table') . "
-                 WHERE cp_id = ? AND mb_id = ? AND od_id = ?",
-                [$sendCpId, $mb_id, $order_id]
-            );
-            if ($exists === 0) {
-                DB::execute(
-                    "INSERT INTO " . DB::table('g5_shop_coupon_log_table') . "
-                     SET cp_id = ?, mb_id = ?, od_id = ?, cp_price = ?, cl_datetime = ?",
-                    [$sendCpId, $mb_id, $order_id, $sendCoupon, date('Y-m-d H:i:s')]
-                );
-            }
-        }
-    }
-
     if ($orderPoint > 0 && function_exists('insert_point')) {
         // Match YoungCart orderformupdate.php point ledger content while keeping
         // payment confirmation idempotent for repeated callback requests.
@@ -378,6 +440,14 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
         if ($txActive) {
             DB::rollBack();
         }
+        if ($couponsLogged && $mb_id !== '') {
+            // 확정하지 못한 주문의 쿠폰 사용 기록은 지운다(PG 를 취소하므로 쿠폰은 다시 쓸 수 있어야 한다).
+            try {
+                DB::execute("DELETE FROM " . DB::table('g5_shop_coupon_log_table') . " WHERE od_id = ? AND mb_id = ?", [$order_id, $mb_id]);
+            } catch (Throwable $couponUndoError) {
+                // 아래 대사 기록에 원래 오류가 남는다.
+            }
+        }
         if ($legacyTxActive) {
             try {
                 pg_legacy_transaction_query('ROLLBACK');
@@ -388,16 +458,16 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
 
         error_log('[api/shop/payment] Order finalization failed: ' . $e->getMessage());
         $internalMessage = '결제 확정 DB 처리 실패: ' . $e->getMessage();
-        $message = '결제 확정 처리에 실패했습니다.';
-        $localFailureNetCancel = null;
-        $localFailureInicisNetCancel = null;
-        $localFailureTossCancel = null;
+        // 다른 주문이 이미 쓴 쿠폰 — 위 사전 검사에 걸렸거나, 그 뒤 끼어든 주문 때문에 사용 기록 INSERT 가 unique 에 걸렸다.
+        $couponConflict = $e->getMessage() === 'Coupon already used by another order.'
+            || ($couponLogging && $e instanceof PDOException && (int) ($e->errorInfo[1] ?? 0) === 1062);
+        $pgCancel = null; // 이 PG 의 취소 결과 — null 이면 자동 취소 경로가 없다
         if ($pg_service === 'toss' && is_array($verifyResult['toss_cancel'] ?? null)) {
             $cancelContext = $verifyResult['toss_cancel'];
             $paymentKey = (string) ($cancelContext['payment_key'] ?? '');
             $cancelReason = 'Order finalization failed after Toss payment confirmation.';
             if ($paymentKey !== '') {
-                $localFailureTossCancel = pg_toss_api_request(
+                $pgCancel = pg_toss_api_request(
                     $cfg,
                     'POST',
                     '/v1/payments/' . rawurlencode($paymentKey) . '/cancel',
@@ -405,34 +475,25 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
                     'local-failure-cancel-' . hash('sha256', (string) $order_id . '|' . $paymentKey . '|' . (string) ($cancelContext['amount'] ?? 0))
                 );
             } else {
-                $localFailureTossCancel = ['ok' => false, 'error' => 'Toss paymentKey missing for local failure cancel.'];
+                $pgCancel = ['ok' => false, 'error' => 'Toss paymentKey missing for local failure cancel.'];
             }
-            $message .= !empty($localFailureTossCancel['ok'])
-                ? ' / Toss cancel requested after local failure.'
-                : ' / Toss cancel failed after local failure; manual reconciliation required.';
         } elseif (($pg_service === 'inicis' || $pg_service === 'kakaopay') && is_array($verifyResult['inicis_net_cancel'] ?? null)) {
             $cancelContext = $verifyResult['inicis_net_cancel'];
-            $localFailureInicisNetCancel = pg_inicis_net_cancel(
+            $pgCancel = pg_inicis_net_cancel(
                 (string) ($cancelContext['url'] ?? ''),
                 is_array($cancelContext['params'] ?? null) ? $cancelContext['params'] : []
             );
-            $message .= !empty($localFailureInicisNetCancel['ok'])
-                ? ' / Inicis net-cancel requested after local failure.'
-                : ' / Inicis net-cancel failed after local failure; manual reconciliation required.';
         } elseif (($pg_service === 'inicis' || $pg_service === 'kakaopay') && is_array($verifyResult['inicis_mobile_net_cancel'] ?? null)) {
             $cancelContext = $verifyResult['inicis_mobile_net_cancel'];
-            $localFailureInicisNetCancel = pg_inicis_mobile_net_cancel(
+            $pgCancel = pg_inicis_mobile_net_cancel(
                 (string) ($cancelContext['url'] ?? ''),
                 (string) ($cancelContext['mid'] ?? ''),
                 (string) ($cancelContext['tid'] ?? ''),
                 (int) ($cancelContext['amount'] ?? 0)
             );
-            $message .= !empty($localFailureInicisNetCancel['ok'])
-                ? ' / Inicis mobile net-cancel requested after local failure.'
-                : ' / Inicis mobile net-cancel failed after local failure; manual reconciliation required.';
         } elseif ($pg_service === 'nicepay' && is_array($verifyResult['nicepay_net_cancel'] ?? null)) {
             $cancelContext = $verifyResult['nicepay_net_cancel'];
-            $localFailureNetCancel = pg_nicepay_net_cancel(
+            $pgCancel = pg_nicepay_net_cancel(
                 (string) ($cancelContext['url'] ?? ''),
                 (string) ($cancelContext['tid'] ?? ''),
                 (string) ($cancelContext['auth_token'] ?? ''),
@@ -440,28 +501,32 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
                 (int) ($cancelContext['amount'] ?? 0),
                 (string) ($cancelContext['merchant_key'] ?? '')
             );
-            $message .= !empty($localFailureNetCancel['ok'])
-                ? ' / Nicepay net-cancel requested after local failure.'
-                : ' / Nicepay net-cancel failed after local failure; manual reconciliation required.';
         }
+        $pgCancelled = $pgCancel === null ? null : !empty($pgCancel['ok']);
+        // 대사에 필요한 내용(실패 이유 · PG 취소 결과 · 트랜잭션 여부)은 주문 기록과 서버 로그에 — 응답에는 싣지 않는다.
+        $cancelSummary = shop_payment_cancel_result_summary($pgCancel);
+        error_log('[api/shop/payment] PG cancel after local failure od_id=' . $order_id . ' pg=' . $pg_service . ': ' . $cancelSummary);
         try {
-            pg_append_order_history((string) $order_id, $internalMessage . ' / tx=' . (!empty($txReport['transactional']) ? 'on' : 'off'));
+            pg_append_order_history(
+                (string) $order_id,
+                $internalMessage . ' / PG 취소 ' . $cancelSummary . ' / tx=' . (!empty($txReport['transactional']) ? 'on' : 'off')
+            );
         } catch (Throwable $historyError) {
             // DB 자체가 실패한 경우 히스토리 기록도 실패할 수 있다.
         }
         pg_payment_confirm_release_lock($lockName);
+        pg_payment_confirm_release_lock($memberLockName);
 
-        Response::error($message . ' PG 승인 여부와 주문 상태를 대사해야 합니다.', 409, [
-            'code' => 'manual_reconciliation', // SC-14
-            'transactional' => !empty($txReport['transactional']),
-            'engine_report' => $txReport,
-            'toss_cancel' => $localFailureTossCancel,
-            'inicis_net_cancel' => $localFailureInicisNetCancel,
-            'nicepay_net_cancel' => $localFailureNetCancel,
+        $failureMessage = shop_payment_confirm_failure_message($couponConflict, $pgCancelled);
+        Response::error($failureMessage, 409, [
+            'code' => 'manual_reconciliation', // SC-14 — 앱은 이 code 로 재전송을 멈춘다
+            'reason' => $couponConflict ? 'coupon_already_used' : 'finalize_failed',
+            'pg_cancelled' => $pgCancelled, // true 취소 요청 성공 / false 실패 / null 자동 취소 경로 없음
         ]);
     }
 
     pg_payment_confirm_release_lock($lockName);
+    pg_payment_confirm_release_lock($memberLockName);
 
     // 결제 결과 알림 메일 — 가상계좌는 계좌 발급/입금대기 안내, 나머지는 결제 완료 안내.
     shop_api_send_order_mail((string) $order_id, $settleCase === '가상계좌' && $finalStatus === '주문' ? 'placed' : 'paid');

@@ -197,11 +197,10 @@ function nextjs_default_current_board_post_image_sources()
         return array();
     }
 
-    $board = sql_fetch(
-        " select bo_read_level from `{$board_table}` where bo_table = '{$escaped_bo_table}' limit 1 ",
-        false
-    );
-    if (!is_array($board) || (int) ($board['bo_read_level'] ?? 1) > 1) {
+    // 비회원이 볼 수 있는 게시판의 글만 본문을 읽는다 — 글 메타데이터와 같은 판정(읽기 · 목록 레벨, 비밀글 전용,
+    // 그룹 접근)을 함께 써서, 한쪽만 고쳐 다른 쪽으로 새는 일이 없게(그룹 게시판 글의 이미지 주소가 헤더로 나갔다).
+    if (!function_exists('nextjs_default_board_allows_public_runtime_metadata')
+        || !nextjs_default_board_allows_public_runtime_metadata($bo_table)) {
         return array();
     }
 

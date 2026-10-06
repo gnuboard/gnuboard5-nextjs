@@ -265,6 +265,8 @@ export default function WritePage({ boTable: fallbackBoTable }: WritePageProps) 
   const categories = board?.bo_category_list
     ? board.bo_category_list.split("|").filter(Boolean)
     : [];
+  // 원본 write_update.php 와 같이 분류를 쓰는 게시판은 분류를 골라야 한다 — API 도 같은 기준으로 거절한다.
+  const categoryRequired = Number(board?.bo_use_category ?? 0) === 1 && categories.length > 0;
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -279,6 +281,11 @@ export default function WritePage({ boTable: fallbackBoTable }: WritePageProps) 
     submittingRef.current = true;
     setError("");
 
+    if (categoryRequired && !formData.ca_name) {
+      submittingRef.current = false;
+      setError("분류를 선택하세요.");
+      return;
+    }
     if (!formData.wr_subject.trim()) {
       submittingRef.current = false;
       setError("제목을 입력해주세요.");
@@ -454,7 +461,7 @@ export default function WritePage({ boTable: fallbackBoTable }: WritePageProps) 
                     setFormData((prev) => ({ ...prev, ca_name: v }))
                   }
                 >
-                  <SelectTrigger aria-label="분류">
+                  <SelectTrigger aria-label="분류" aria-required={categoryRequired}>
                     <SelectValue placeholder="분류를 선택하세요" />
                   </SelectTrigger>
                   <SelectContent>

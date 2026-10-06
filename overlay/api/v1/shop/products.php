@@ -620,6 +620,12 @@ if ($apiMethod === 'POST' && $it_id !== '' && ($shopSegments[1] ?? '') === 'reco
 //   재입고 시 SMS 발송 대상 목록에 추가. 비회원도 휴대폰만 있으면 신청 가능.
 // =========================================================================
 if ($apiMethod === 'POST' && $it_id !== '' && ($shopSegments[1] ?? '') === 'stock-notify') {
+    // 비회원도 신청할 수 있는 문자 발송 목록이라, 한 곳에서 상품 × 전화번호를 마구 넣어 문자 비용을 만들지 못하게
+    // IP 당 1분 3번 · 1시간 20번까지만 받는다.
+    $stockSmsQuota = Throttle::checkMemberQuota('stocksms', (string) ($_SERVER['REMOTE_ADDR'] ?? ''), 3, 20, true, false);
+    if ($stockSmsQuota !== null) {
+        Response::error($stockSmsQuota, 429);
+    }
     $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
     $hp = preg_replace('/[^0-9\-]/', '', (string) ($input['hp'] ?? ''));
     $hp = function_exists('hyphen_hp_number') ? hyphen_hp_number($hp) : $hp;

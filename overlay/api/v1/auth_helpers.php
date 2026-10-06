@@ -466,15 +466,60 @@ if (!function_exists('api_social_suggest_nick')) {
         }
 
         $nick = trim(strip_tags($nick));
-        if ($nick === '') {
-            $nick = '소셜회원';
-        }
-
         if (function_exists('social_relace_nick')) {
             $nick = social_relace_nick($nick);
         }
+        // 가입 검사(api_member_nick_is_valid)를 통과하는 글자만 — 이모지 · 기호가 남으면 제안한 닉네임으로 가입이 막힌다.
+        $nick = (string) preg_replace('/[^가-힣A-Za-z0-9]/u', '', $nick);
+        if (function_exists('mb_strlen') && mb_strlen($nick, 'UTF-8') < 2) {
+            $nick = '소셜회원';
+        }
 
         return api_social_unique_nick($nick);
+    }
+}
+
+if (!function_exists('api_member_nick_is_valid')) {
+    /** 닉네임 글자 — 원본 valid_mb_nick() 과 같이 공백 없이 한글 · 영문 · 숫자만. 원본 관리자 목록 일부가 그대로 출력한다. */
+    function api_member_nick_is_valid(string $nick): bool
+    {
+        if ($nick === '') {
+            return false;
+        }
+        if (function_exists('check_string') && defined('G5_HANGUL') && defined('G5_ALPHABETIC') && defined('G5_NUMERIC')) {
+            return (bool) check_string($nick, G5_HANGUL + G5_ALPHABETIC + G5_NUMERIC);
+        }
+
+        return (bool) preg_match('/^[가-힣A-Za-z0-9]+$/u', $nick);
+    }
+}
+
+if (!function_exists('api_member_clean_field')) {
+    /**
+     * 회원 입력 정리 — 원본 bbs/register_form_update.php 와 같이 이름 · 전화 · 주소는 태그를 지우고, 휴대폰은 숫자 · '-',
+     * 우편번호는 숫자만. 원본 화면 일부가 이 정리를 믿고 값을 그대로 출력한다. 그 밖의 필드는 앞뒤 공백만 지운다.
+     */
+    function api_member_clean_field(string $field, $value): string
+    {
+        if (is_array($value)) {
+            return '';
+        }
+        $value = trim((string) $value);
+        switch ($field) {
+            case 'mb_name':
+            case 'mb_tel':
+            case 'mb_addr1':
+            case 'mb_addr2':
+            case 'mb_addr3':
+                return function_exists('clean_xss_tags') ? clean_xss_tags($value, 1, 1) : strip_tags($value);
+            case 'mb_hp':
+                return (string) preg_replace('/[^0-9\-]/', '', $value);
+            case 'mb_zip1':
+            case 'mb_zip2':
+                return (string) preg_replace('/[^0-9]/', '', $value);
+            default:
+                return $value;
+        }
     }
 }
 

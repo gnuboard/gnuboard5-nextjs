@@ -450,8 +450,14 @@ if ($action === 'register' && $apiMethod === 'POST') {
     }
 
     $mb_id    = $input['mb_id'];
-    $mb_nick  = $input['mb_nick'];
-    $mb_name  = $input['mb_name'];
+    $mb_nick  = trim((string) $input['mb_nick']);
+    // 원본 register_form_update.php 와 같은 닉네임 검사 · 이름 정리 — 원본 화면 일부가 이 검사를 믿고 그대로 출력한다.
+    if (!api_member_nick_is_valid($mb_nick)) {
+        Response::error('닉네임은 공백없이 한글, 영문, 숫자만 입력 가능합니다.', 422, [
+            'mb_nick' => 'mb_nick may contain only Korean letters, English letters and digits.',
+        ]);
+    }
+    $mb_name  = api_member_clean_field('mb_name', $input['mb_name']);
     $mb_email = $input['mb_email'];
 
     // 그누보드 훅(bbs/register_form_update.php 와 같은 이름 · 인자, 신규 가입이라 $w = '')
@@ -461,7 +467,7 @@ if ($action === 'register' && $apiMethod === 'POST') {
     // 인증했으면 이름·휴대폰은 인증값으로 저장하고, 생년월일·성인 여부는 입력값을 받지 않는다.
     $cert        = api_auth_register_cert($input);
     $mbCertified = $cert['certified'];
-    $mbHp        = $cert['hp'] ?? (isset($input['mb_hp']) ? trim((string) $input['mb_hp']) : '');
+    $mbHp        = $cert['hp'] ?? (isset($input['mb_hp']) ? api_member_clean_field('mb_hp', $input['mb_hp']) : '');
     $mbBirth     = $cert['birth'];
     $mbAdult     = $cert['adult'];
     $mbSex       = $cert['sex'];
@@ -511,8 +517,13 @@ if ($action === 'register' && $apiMethod === 'POST') {
     $defaultLevel = max(1, min(9, $defaultLevel));
     // 원본(plugin/social/register_member_update.php)처럼 소셜 가입은 G5_SOCIAL_CERTIFY_MAIL 을 켠 사이트에서만
     // 메일 인증을 받는다 — 그 밖에는 바로 인증된 회원(5.6.41 정리 작업이 미인증 회원을 기한 뒤 탈퇴 처리한다).
+    // 다만 소셜 계정이 알려 준 주소와 다른 이메일을 적었다면 그 주소는 아무도 확인하지 않았으므로 메일 인증을
+    // 받는다 — 남의 주소를 선점하거나 비밀번호 재설정 메일이 엉뚱한 곳으로 가지 않게(이메일을 주지 않는 소셜
+    // 계정 · 같은 주소면 원본처럼 바로 인증).
+    $socialEmail = $socialSignupRow ? strtolower(trim((string) ($socialSignupProfile['email'] ?? ''))) : '';
+    $socialEmailChanged = $socialSignupRow && strtolower(trim((string) $mb_email)) !== $socialEmail;
     $useEmailCertify = !empty($config['cf_use_email_certify'])
-        && (!$socialSignupRow || (defined('G5_SOCIAL_CERTIFY_MAIL') && G5_SOCIAL_CERTIFY_MAIL));
+        && (!$socialSignupRow || (defined('G5_SOCIAL_CERTIFY_MAIL') && G5_SOCIAL_CERTIFY_MAIL) || $socialEmailChanged);
 
     if (!empty($config['cf_cert_use']) && !empty($config['cf_cert_req']) && $mbCertified === '') {
         Response::error('본인확인을 완료해 주세요.', 422, [

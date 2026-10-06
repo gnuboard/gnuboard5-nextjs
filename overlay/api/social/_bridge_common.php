@@ -270,6 +270,10 @@ if (!function_exists('nextjs25_social_validate_mobile_redirect')) {
         if ($redirect === '' || preg_match('#^https?://#i', $redirect)) {
             return '';
         }
+        // 앱 스킴 주소도 원래 문자열을 돌려주므로 해석이 갈릴 수 있는 문자(\, 제어 · 공백 문자)는 거절한다.
+        if (preg_match('/[\\\\\x00-\x20\x7f]/', $redirect)) {
+            return '';
+        }
 
         if (!preg_match('#^[a-zA-Z][a-zA-Z0-9.+-]*://#', $redirect)) {
             return '';
@@ -293,7 +297,17 @@ if (!function_exists('nextjs25_social_validate_redirect')) {
         }
 
         if (preg_match('#^https?://#i', $redirect)) {
-            $redirectHost = strtolower((string) parse_url($redirect, PHP_URL_HOST));
+            // 허용 호스트인지는 parse_url 로 보지만 돌려주는 것은 원래 문자열이다. PHP 와 브라우저가 다르게 읽는
+            // 주소는 거절한다 — "https://evil.example\@허용호스트/" 를 parse_url 은 허용 호스트로 읽지만 브라우저는
+            // "\" 를 "/" 로 보아 evil.example 로 간다(그 뒤 로그인 티켓이 붙어 계정 탈취로 이어진다).
+            if (preg_match('/[\\\\\x00-\x20\x7f]/', $redirect)) {
+                return '';
+            }
+            $parts = parse_url($redirect);
+            if (!is_array($parts) || isset($parts['user']) || isset($parts['pass'])) {
+                return '';
+            }
+            $redirectHost = strtolower((string) ($parts['host'] ?? ''));
             if ($redirectHost && in_array($redirectHost, nextjs25_social_allowed_web_hosts(), true)) {
                 return $redirect;
             }

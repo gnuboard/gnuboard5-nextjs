@@ -190,10 +190,12 @@ class Throttle
         // mb_id = '__enum__' prefix 로 구분.
         $key = '__enum__' . substr(hash('sha256', $ip), 0, 12);
 
+        // 이 IP 가 넣은 행(ip = 요청 IP)만 센다. 로그인 실패 기록도 같은 칸을 쓰므로, 남이 이 키를 아이디로
+        // 넣어 로그인을 틀려도(그 행의 ip 는 그 사람의 IP) 이 IP 의 한도를 채울 수 없다.
         $perMin = DB::count(
             "SELECT COUNT(*) FROM `{$table}`
-              WHERE mb_id = ? AND last_attempt_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE)",
-            [$key]
+              WHERE mb_id = ? AND ip = ? AND last_attempt_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE)",
+            [$key, $ip]
         );
         if ($perMin >= self::ENUM_PER_MINUTE) {
             return '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.';
@@ -201,8 +203,8 @@ class Throttle
 
         $perHour = DB::count(
             "SELECT COUNT(*) FROM `{$table}`
-              WHERE mb_id = ? AND last_attempt_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)",
-            [$key]
+              WHERE mb_id = ? AND ip = ? AND last_attempt_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)",
+            [$key, $ip]
         );
         if ($perHour >= self::ENUM_PER_HOUR) {
             return '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.';

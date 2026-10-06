@@ -12,8 +12,8 @@ import { expect, request as playwrightRequest, test } from "@playwright/test";
  *   CART_SMOKE_API_URL(선택)                            API 주소. 없으면 PLAYWRIGHT_BASE_URL 의 api/v1/
  *   예: PLAYWRIGHT_BASE_URL=http://localhost CART_SMOKE_MEMBER_ID=… CART_SMOKE_ITEM_ID=… npm run test:cart-api
  *
- * 지키는 것: 다른 장바구니 번호에 담긴 회원 상품은 장바구니 목록에서 지금 장바구니로 모이고, 바로구매 줄과 줄 지정 ·
- * 바로구매 목록은 모으지 않는다. 주문서가 보낸 줄이 하나라도 없으면 주문 · 결제 준비는 409(CART_CHANGED)로 멈춘다.
+ * 지키는 것: 다른 장바구니 번호에 담긴 회원 상품은 장바구니 목록(gather=1)에서 지금 장바구니로 모이고, 바로구매 줄과 줄
+ * 지정 · 바로구매 목록, gather 없이 부르는 목록(머리의 미니 장바구니)은 모으지 않는다. 주문서가 보낸 줄이 하나라도 없으면 주문 · 결제 준비는 409(CART_CHANGED)로 멈춘다.
  */
 
 const env = process.env;
@@ -90,13 +90,14 @@ test.describe("cart api: gather member rows, order only shown rows", () => {
       const directId = String(direct.body.data?.ct_id);
       created.push({ ctId: directId, cartId: elsewhere });
 
-      // 줄 지정 · 바로구매 목록은 모으지 않는다
-      await call("GET", "shop/cart?ct_ids=999999999", token, other);
-      await call("GET", "shop/cart?direct=1", token, other);
+      // 줄 지정 · 바로구매 목록, gather 없이 부르는 목록(머리의 미니 장바구니)은 모으지 않는다
+      await call("GET", "shop/cart?ct_ids=999999999&gather=1", token, other);
+      await call("GET", "shop/cart?direct=1&gather=1", token, other);
+      expect(ids((await call("GET", "shop/cart", token, other)).body)).toEqual([]);
       expect(ids((await call("GET", `shop/cart?ct_ids=${normalId}`, token, other)).body)).toEqual([]);
 
-      // 장바구니 목록은 모은다 — 바로구매 줄은 두고
-      const gathered = await call("GET", "shop/cart", token, here);
+      // 장바구니 화면 · 주문서의 목록(gather=1)은 모은다 — 바로구매 줄은 두고
+      const gathered = await call("GET", "shop/cart?gather=1", token, here);
       // 다른 줄까지 모였다면 이 회원을 누가 쓰고 있다 — 시험 전용 회원으로 다시 돌린다.
       expect(ids(gathered.body), "the test member must not be in use elsewhere").toEqual([normalId]);
       created[0].cartId = here;
@@ -111,6 +112,12 @@ test.describe("cart api: gather member rows, order only shown rows", () => {
       const prepare = await call("POST", "shop/payment/prepare", token, here, { ...orderer, ct_ids: shownCtIds });
       expect(prepare.status, prepare.body.message).toBe(409);
       expect(prepare.body.errors?.code).toBe("CART_CHANGED");
+
+      // 받는 줄 번호는 100개까지 — 넘으면 앞의 줄만 잘라 주문하지 않고 거절한다
+      const tooMany = Array.from({ length: 101 }, (_, index) => String(index + 1)).join(",");
+      const big = await call("POST", "shop/orders", token, here, { ...orderer, ct_ids: tooMany, client_uid: `cart-smoke-many-${here}` });
+      expect(big.status, big.body.message).toBe(422);
+      expect(big.body.errors?.code).toBe("TOO_MANY_CART_ROWS");
 
       // 멈춘 주문은 줄을 건드리지 않는다
       expect(ids((await call("GET", `shop/cart?ct_ids=${normalId}`, token, here)).body)).toEqual([normalId]);

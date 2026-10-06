@@ -106,13 +106,23 @@ function pg_mark_vbank_deposited(string $provider, string $orderId, string $tno,
     if (($order['od_settle_case'] ?? '') !== '가상계좌') {
         return ['ok' => false, 'error' => 'Order is not a virtual-account payment.'];
     }
+    // 통보를 보낸 PG 와 이 주문을 받은 PG 가 같아야 한다 — 다른 PG 의 통보로 입금 처리하지 않게(예전 주문처럼
+    // od_pg 가 비어 있으면 대조하지 않는다).
+    $orderPg = strtolower(trim((string) ($order['od_pg'] ?? '')));
+    if ($orderPg !== '' && $orderPg !== strtolower(trim($provider))) {
+        return ['ok' => false, 'error' => 'Provider mismatch.'];
+    }
     if ($tno !== '' && !empty($order['od_tno']) && (string) $order['od_tno'] !== $tno) {
         return ['ok' => false, 'error' => 'Transaction id mismatch.'];
     }
     $expectedAmount = (int) ($order['od_misu'] ?? 0) > 0
         ? (int) ($order['od_misu'] ?? 0)
         : (int) ($order['od_receipt_price'] ?? 0);
-    if ($amount > 0 && $expectedAmount !== $amount) {
+    // 금액이 없는 통보는 금액 대조를 건너뛰는 길이 되므로 받지 않는다.
+    if ($amount <= 0) {
+        return ['ok' => false, 'error' => 'Amount required.'];
+    }
+    if ($expectedAmount !== $amount) {
         return ['ok' => false, 'error' => 'Amount mismatch.'];
     }
 

@@ -20,6 +20,7 @@ if ($apiMethod === 'POST' && $action === 'prepare') {
     if (!$input) {
         $input = $_POST;
     }
+    $input = shop_api_clean_order_input($input); // 원본 orderformupdate.php 와 같은 입력 정리
 
     $ctIdSource = $input['ct_ids'] ?? $input['cart_ids'] ?? null;
     $hasCtIdFilter = is_array($ctIdSource)
@@ -32,6 +33,7 @@ if ($apiMethod === 'POST' && $action === 'prepare') {
     if ($hasCtIdFilter && empty($filterCtIds)) {
         Response::error('Invalid cart item ids.', 422);
     }
+    shop_api_cart_require_ct_ids_within_limit($ctIdSource);
     if (!empty($filterCtIds)) {
         shop_api_restore_pending_cart_rows_by_ct_ids(
             $member,
@@ -265,7 +267,7 @@ if ($apiMethod === 'POST' && $action === 'prepare') {
     }
 
     // Generate order ID
-    $od_id_new = date('YmdHis') . sprintf('%04d', mt_rand(0, 9999));
+    $od_id_new = shop_api_new_order_id();
     $orderTime = date('Y-m-d H:i:s');
     $remoteIp = $_SERVER['REMOTE_ADDR'] ?? '';
     $od_pwd = $member && !empty($member['mb_password'])
@@ -371,12 +373,25 @@ if ($apiMethod === 'POST' && $action === 'prepare') {
     $ctIds = array_column($cartItems, 'ct_id');
     if (!empty($ctIds)) {
         $placeholders = implode(',', array_fill(0, count($ctIds), '?'));
-        DB::execute(
+        // 읽은 그 장바구니에 아직 쇼핑 중인 줄만 묶는다 — 그새 다른 곳에서 주문된 줄을 다시 '쇼핑'으로 되돌리지 않게.
+        $bound = DB::execute(
             "UPDATE " . DB::table('g5_shop_cart_table') . "
              SET od_id = ?, ct_status = ?
-             WHERE ct_id IN ({$placeholders})",
-            array_merge([$od_id_new, shop_api_cart_status_shopping()], $ctIds)
+             WHERE ct_id IN ({$placeholders})
+               AND od_id = ?
+               AND " . shop_api_cart_active_status_sql(),
+            array_merge([$od_id_new, shop_api_cart_status_shopping()], $ctIds, [$cart_id], shop_api_cart_active_statuses())
         );
+        if ($bound !== count($ctIds)) {
+            // 줄을 읽은 뒤 다른 탭 · 기기에서 옮겨졌거나(장바구니 모으기) 지워졌다 — 묶은 줄은 장바구니로 돌려놓고
+            // 방금 만든 임시 주문을 지운 뒤 멈춘다. 결제창은 아직 열리지 않았다.
+            shop_api_cart_unbind_rows($od_id_new, $cart_id, $ctIds);
+            DB::execute(
+                "DELETE FROM " . DB::table('g5_shop_order_table') . " WHERE od_id = ? AND od_status = '준비'",
+                [$od_id_new]
+            );
+            shop_api_cart_changed_error();
+        }
     }
 
     // Compute PG-specific signed fields based on active PG

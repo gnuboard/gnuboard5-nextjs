@@ -237,7 +237,7 @@ function nextjs_default_board_allows_public_runtime_metadata($bo_table)
     }
 
     $board = sql_fetch(
-        " select bo_read_level, bo_use_secret from `{$table}` where bo_table = '{$escaped}' limit 1 ",
+        " select gr_id, bo_list_level, bo_read_level, bo_use_secret from `{$table}` where bo_table = '{$escaped}' limit 1 ",
         false
     );
 
@@ -245,12 +245,22 @@ function nextjs_default_board_allows_public_runtime_metadata($bo_table)
         return false;
     }
 
-    if ((int) ($board['bo_read_level'] ?? 1) > 1) {
+    if ((int) ($board['bo_list_level'] ?? 1) > 1 || (int) ($board['bo_read_level'] ?? 1) > 1) {
         return false;
     }
 
     if ((int) ($board['bo_use_secret'] ?? 0) >= 2) {
         return false;
+    }
+
+    // 그룹 접근을 쓰는 게시판은 비회원이 글을 볼 수 없다(원본 bbs/board.php) — 제목 · 본문 발췌도 내지 않는다.
+    $groupTable = isset($g5['group_table']) ? (string) $g5['group_table'] : '';
+    $grId = nextjs_default_sql_escape_value((string) ($board['gr_id'] ?? ''));
+    if ($groupTable !== '' && $grId !== null && $grId !== '') {
+        $group = sql_fetch(" select gr_use_access from `{$groupTable}` where gr_id = '{$grId}' limit 1 ", false);
+        if (is_array($group) && !empty($group['gr_use_access'])) {
+            return false;
+        }
     }
 
     return true;

@@ -583,6 +583,8 @@ if (!function_exists('g5_api_send_deployment_status')) {
                 'ok' => $dbOk,
                 'board_count' => $boardCount,
                 'board_new_count' => $boardNewCount,
+                // false 면 이름 잠금을 하나만 드는 옛 DB(MySQL 5.7.5 · MariaDB 10.0.2 미만) — 주문 · 포인트 경합 방어가 약해진다.
+                'multiple_named_locks' => $dbOk ? DB::supportsMultipleNamedLocks() : null,
             ),
             // 로그인에 필요한 확장 테이블이 갖춰졌는지. 파일만 올리고 dbupgrade 를 안 돌린
             // 설치본을 여기서 바로 가려낸다. 부팅의 ensure() 가 한 번 만들어 두므로 보통 ok:true.

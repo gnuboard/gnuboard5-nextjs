@@ -14,8 +14,12 @@ const EMPTY_CART: ShopCartResponse = {
   shipping_cost: 0,
 };
 
+/**
+ * 장바구니 화면의 목록 — gather=1 로 그누보드 화면 · 다른 기기에 담긴 이 회원의 상품을 이 장바구니로 모아 받는다.
+ * (머리의 미니 장바구니는 모으지 않는다 — 줄 번호를 보내지 않는 예전 앱의 주문서를 화면마다 흔들지 않게.)
+ */
 export async function getCart(): Promise<ShopCartResponse> {
-  const response = await apiClient.get<unknown>("/shop/cart");
+  const response = await apiClient.get<unknown>("/shop/cart", { params: { gather: 1 } });
   return validateApiData(response.data, shopCartResponseSchema, EMPTY_CART);
 }
 

@@ -61,17 +61,23 @@ if (!function_exists('shop_orders_client_uid_marker')) {
 }
 
 if (!function_exists('shop_orders_create_lock_name')) {
-    function shop_orders_create_lock_name(string $cartId, string $clientUid): string
+    function shop_orders_create_lock_name(string $cartId, string $clientUid, string $mbId = ''): string
     {
-        $source = $clientUid !== '' ? 'uid:' . $clientUid : 'cart:' . $cartId;
+        // 회원은 회원 단위로 — 장바구니를 여러 개 만들어 같은 쿠폰 · 포인트를 동시에 쓰지 못하게(결제 확정과 같은 잠금).
+        if ($mbId !== '' && function_exists('shop_api_member_order_lock_name')) {
+            return shop_api_member_order_lock_name($mbId);
+        }
+        // 장바구니로 잠근다 — 재시도 키(client_uid)는 클라이언트가 고르므로, 키마다 잠그면 같은 장바구니를 다른 키로
+        // 동시에 주문할 수 있다. 같은 키의 재시도는 같은 장바구니로 오므로 이것으로 함께 줄을 선다.
+        $source = $cartId !== '' ? 'cart:' . $cartId : 'uid:' . $clientUid;
         return 'g5_order_create_' . md5($source);
     }
 }
 
 if (!function_exists('shop_orders_acquire_create_lock')) {
-    function shop_orders_acquire_create_lock(string $cartId, string $clientUid, int $timeout = 10): string
+    function shop_orders_acquire_create_lock(string $cartId, string $clientUid, int $timeout = 10, string $mbId = ''): string
     {
-        $lockName = shop_orders_create_lock_name($cartId, $clientUid);
+        $lockName = shop_orders_create_lock_name($cartId, $clientUid, $mbId);
         $row = DB::fetch('SELECT GET_LOCK(?, ?) AS got_lock', [$lockName, $timeout]);
         if ((int) ($row['got_lock'] ?? 0) !== 1) {
             throw new RuntimeException('Order submission is already in progress. Please try again shortly.');
@@ -604,3 +610,4 @@ if (!function_exists('shop_orders_list_filter')) {
 }
 
 require_once __DIR__ . '/orders_payment_cancel_helpers.php';
+require_once __DIR__ . '/orders_create_undo.php';

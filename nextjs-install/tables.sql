@@ -102,6 +102,8 @@ CREATE TABLE IF NOT EXISTS `g5_content_report` (
     `closed_by`    VARCHAR(20) NULL DEFAULT NULL,
     `closed_at`    DATETIME NULL DEFAULT NULL,
     `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `hide_prev_option` VARCHAR(255) NULL DEFAULT NULL COMMENT '자동 가림 전 wr_option (가림을 일으킨 신고 행만)',
+    `hide_prev_wr10`   VARCHAR(255) NULL DEFAULT NULL COMMENT '자동 가림 전 wr_10',
     UNIQUE KEY `uniq_one_per_reporter` (`target_type`, `target_key`, `reporter_mb`, `reporter_dev`),
     KEY `idx_target_status` (`target_type`, `target_key`, `status`),
     KEY `idx_status_created` (`status`, `created_at`)

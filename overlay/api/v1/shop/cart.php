@@ -326,10 +326,11 @@ if ($apiMethod === 'GET' && $ct_id === '') {
         $filterSql = ' AND c.ct_id IN (' . implode(',', array_fill(0, count($filterCtIds), '?')) . ')';
         $params = array_merge($params, $filterCtIds);
     } else {
-        // 장바구니 목록 — 그누보드 화면 · 다른 기기에 담긴 이 회원의 상품을 이 장바구니로 모은다(그누보드 로그인 때와 같다).
-        // 장바구니 화면 · 머리의 미니 장바구니 · 줄 지정 없이 연 주문서가 부른다. 줄 지정 · 바로구매 목록에서는 모으지 않는다.
-        // 주문은 주문서가 보여 준 줄만 받으므로(shop_api_cart_require_shown_rows) 여기서 모여도 본 것과 다른 주문은 생기지 않는다.
-        if (!$directFilter) {
+        // 장바구니 목록 — gather=1 이면 그누보드 화면 · 다른 기기에 담긴 이 회원의 상품을 이 장바구니로 모은다(그누보드
+        // 로그인 때와 같다). 장바구니 화면 · 줄 지정 없이 연 주문서(웹 · 새 앱)만 요청한다 — 머리의 미니 장바구니처럼 화면마다
+        // 부르는 곳은 모으지 않아, 줄 번호를 보내지 않는 예전 앱이 주문서를 띄운 동안 웹의 아무 화면이 그 상품을 가져가지
+        // 않게 한다. 줄 지정 · 바로구매 목록에서는 모으지 않는다. 주문은 주문서가 보여 준 줄만 받는다(shop_api_cart_require_shown_rows).
+        if (!$directFilter && shop_api_truthy($_GET['gather'] ?? null)) {
             shop_api_cart_adopt_member_items($cart_id, $mb_id);
         }
         $filterSql = ' AND c.ct_direct = ' . ($directFilter ? '1' : '0');

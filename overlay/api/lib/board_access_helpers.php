@@ -159,7 +159,40 @@ function api_can_access_board_list(?array $viewer, string $bo_table, array $boar
         return false;
     }
 
+    // 그룹 접근을 쓰는 게시판은 그룹 회원만 목록 · 최신글을 본다. 원본 bbs/board.php 는 목록에서 이것을 보지 않지만
+    // 검색(bbs/search.php)은 같은 게시판을 빼고, 글 보기 · 쓰기는 막는다 — 목록만 제목 · 작성자를 내주지 않게 맞춘다.
+    if (!api_board_group_access_allowed($viewer, $bo_table, $board, false)) {
+        return false;
+    }
+
     return api_board_cert_restriction($viewer, $bo_table, $board) === null;
+}
+
+/**
+ * 글 분류 — 원본 bbs/write_update.php 와 같이 분류를 쓰는 게시판은 분류가 있어야 하고 게시판 분류 목록에 있는 것만
+ * (관리자는 '공지'도) 받는다. 분류를 쓰지 않는 게시판은 ''. 원본 기본 스킨은 이 확인을 믿고 분류 이름을 그대로 출력한다.
+ */
+function api_board_validated_category(array $board, $caName, string $adminRole): string
+{
+    if ((int) ($board['bo_use_category'] ?? 0) !== 1) {
+        return '';
+    }
+
+    $caName = trim((string) $caName);
+    if ($caName === '') {
+        Response::error('분류를 선택하세요.', 422, ['ca_name' => 'ca_name is required.']);
+    }
+
+    $list = (string) ($board['bo_category_list'] ?? '') . ($adminRole !== '' ? '|공지' : '');
+    $categories = array_values(array_filter(array_map('trim', explode('|', $list)), 'strlen'));
+    if (!$categories) {
+        return '';
+    }
+    if (!in_array($caName, $categories, true)) {
+        Response::error('분류를 올바르게 입력하세요.', 422, ['ca_name' => 'ca_name is not one of this board\'s categories.']);
+    }
+
+    return $caName;
 }
 
 function api_can_write_board_post(?array $viewer, string $bo_table, array $board): bool

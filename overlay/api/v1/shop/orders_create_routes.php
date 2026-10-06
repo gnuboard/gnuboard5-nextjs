@@ -9,6 +9,7 @@ if ($apiMethod === 'POST' && $od_id === '') {
     if (!$input) {
         $input = $_POST;
     }
+    $input = shop_api_clean_order_input($input); // 원본 orderformupdate.php 와 같은 입력 정리
 
     $clientUid = shop_orders_client_uid($input['client_uid'] ?? '');
     $createLockName = '';
@@ -23,6 +24,7 @@ if ($apiMethod === 'POST' && $od_id === '') {
     if ($hasCtIdFilter && empty($filterCtIds)) {
         Response::error('Invalid cart item ids.', 422);
     }
+    shop_api_cart_require_ct_ids_within_limit($ctIdSource);
     if (!empty($filterCtIds)) {
         $filterSql = ' AND ct_id IN (' . implode(',', array_fill(0, count($filterCtIds), '?')) . ')';
         $cartParams = array_merge($cartParams, $filterCtIds);
@@ -75,7 +77,7 @@ if ($apiMethod === 'POST' && $od_id === '') {
     }
 
     try {
-        $createLockName = shop_orders_acquire_create_lock($cart_id, $clientUid);
+        $createLockName = shop_orders_acquire_create_lock($cart_id, $clientUid, 10, (string) $mb_id);
     } catch (RuntimeException $e) {
         Response::error($e->getMessage(), 409);
     }
@@ -306,8 +308,8 @@ if ($apiMethod === 'POST' && $od_id === '') {
     $od_tax_flag = (int) $taxAmounts['od_tax_flag'];
     $od_cash     = !empty($input['od_cash_request']) ? 1 : 0;
 
-    // Generate order ID: YmdHis + 4 random digits
-    $od_id_new = date('YmdHis') . sprintf('%04d', mt_rand(0, 9999));
+    // Generate order ID: YmdHis + 4 random digits — 아직 쓰이지 않은 번호로(같은 초에 겹치지 않게).
+    $od_id_new = shop_api_new_order_id();
     $remoteIp = $_SERVER['REMOTE_ADDR'] ?? '';
     if ($member && !empty($member['mb_password'])) {
         $od_pwd = $member['mb_password'];
@@ -318,10 +320,34 @@ if ($apiMethod === 'POST' && $od_id === '') {
     $newOrder = null;
     $savedAddress = null;
     $orderTxActive = false;
+    // 끝내지 못했을 때 되돌릴 것(shop_orders_undo_failed_create) — 묶은 줄, 주문 행을 넣었나, 재고를 줄였나.
+    $ctIds = [];
+    $orderInserted = false;
+    $stockDecremented = false;
 
     try {
         DB::beginTransaction();
         $orderTxActive = true;
+
+    // Move cart items to order first: YoungCart stores cart row status equal to order status.
+    // 묶인 줄은 쇼핑 중이 아니어서 장바구니 모으기 · 다른 주문이 가져가지 못한다. 줄을 읽은 뒤 다른 탭 · 기기에서
+    // 옮겨졌거나(장바구니 모으기) 지워졌으면, 아직 주문 · 쿠폰 기록을 쓰기 전에 멈춘다 — catch 가 묶은 줄을 장바구니로
+    // 돌려놓고(MyISAM 이면 트랜잭션 되돌리기가 듣지 않는다) 409 CART_CHANGED 로 답한다.
+    $ctIds = array_column($cartItems, 'ct_id');
+    $placeholders = implode(',', array_fill(0, count($ctIds), '?'));
+    $bound = DB::execute(
+        "UPDATE " . DB::table('g5_shop_cart_table') . "
+         SET od_id = ?,
+             mb_id = ?,
+             ct_status = ?
+         WHERE ct_id IN ({$placeholders})
+           AND od_id = ?
+           AND " . shop_api_cart_active_status_sql(),
+        array_merge([$od_id_new, $mb_id, $od_status], $ctIds, [$cart_id], shop_api_cart_active_statuses())
+    );
+    if ($bound !== count($ctIds)) {
+        throw new ShopApiCartChangedException('Cart rows changed while creating the order.');
+    }
 
     // Insert order
     DB::execute(
@@ -428,6 +454,7 @@ if ($apiMethod === 'POST' && $od_id === '') {
             $remoteIp,
         ]
     );
+    $orderInserted = true;
 
     // 쿠폰/포인트 실제 사용 기록 — 무통장 흐름에선 주문 INSERT 직후 즉시 확정.
     // (PG 결제는 prepare/confirm 두 단계라 confirm 에서 별도 처리)
@@ -447,37 +474,26 @@ if ($apiMethod === 'POST' && $od_id === '') {
     }
 
     // 상품/카테고리 쿠폰 (cart row 단위) — ct_history 쿠폰 마커 파싱해 coupon_log 기록.
-    // 동일 cp_id 가 여러 카트 행에 적용된 경우는 unique key (cp_id, mb_id) 로 막힘.
+    // 한 주문 안의 같은 쿠폰은 위 재평가가 한 줄만 남긴다. 다른 주문이 이미 쓴 쿠폰이면 unique (cp_id, mb_id) 위반이
+    // 예외로 올라와 이 주문 전체를 되돌린다(원본 orderformupdate.php 처럼 "중복 = 주문 실패") — IGNORE 로 삼키면
+    // 할인만 그대로 남는다.
     if ($mb_id !== '') {
         foreach ($cartItems as $ci) {
             if (empty($ci['cp_price']) || empty($ci['ct_history'])) continue;
             $rowCpId = shop_api_coupon_marker_extract($ci['ct_history']);
             if ($rowCpId === '') continue;
             DB::execute(
-                "INSERT IGNORE INTO " . DB::table('g5_shop_coupon_log_table') . "
+                "INSERT INTO " . DB::table('g5_shop_coupon_log_table') . "
                  SET cp_id = ?, mb_id = ?, od_id = ?, cp_price = ?, cl_datetime = ?",
                 [$rowCpId, $mb_id, $od_id_new, (int) $ci['cp_price'], $orderTime]
             );
         }
     }
-    // Move cart items to order: YoungCart stores cart row status equal to order status.
-    $ctIds = array_column($cartItems, 'ct_id');
-    $placeholders = implode(',', array_fill(0, count($ctIds), '?'));
-
-    DB::execute(
-        "UPDATE " . DB::table('g5_shop_cart_table') . "
-         SET od_id = ?,
-             mb_id = ?,
-             ct_status = ?
-         WHERE ct_id IN ({$placeholders})
-           AND od_id = ?",
-        array_merge([$od_id_new, $mb_id, $od_status], $ctIds, [$cart_id])
-    );
-
     // YoungCart grants purchase points when the order reaches the completion flow,
     // not at the initial order creation / bank-deposit waiting step.
 
     shop_api_decrement_order_stock($cartItems);
+    $stockDecremented = true;
     DB::execute(
         "UPDATE " . DB::table('g5_shop_cart_table') . "
          SET ct_stock_use = 1
@@ -510,9 +526,23 @@ if ($apiMethod === 'POST' && $od_id === '') {
     } catch (Throwable $e) {
         if ($orderTxActive) {
             DB::rollBack();
+            // 주문을 끝내지 못했다 — 이 요청이 쓴 것(묶은 줄 · 주문 행 · 쿠폰 기록 · 재고)을 되돌린다(MyISAM 이면
+            // 트랜잭션 되돌리기가 듣지 않는다).
+            shop_orders_undo_failed_create([
+                'od_id' => $od_id_new,
+                'cart_id' => $cart_id,
+                'ct_ids' => $ctIds,
+                'mb_id' => $mb_id,
+                'cart_items' => $cartItems,
+                'order_inserted' => $orderInserted,
+                'stock_decremented' => $stockDecremented,
+            ]);
         }
         shop_orders_release_create_lock($createLockName);
         $createLockName = '';
+        if ($e instanceof ShopApiCartChangedException) {
+            shop_api_cart_changed_error();
+        }
         $message = $e instanceof RuntimeException ? $e->getMessage() : '주문 처리 중 오류가 발생했습니다.';
         Response::error($message, 409);
     }

@@ -8,7 +8,7 @@
  *   - add_event('admin_get_page_dday_notifications')        화면 출력 (head~tail 사이)
  *
  * 진입: /adm/view.php?call=dday_notifications
- * 권한: view.php 가 $is_admin 또는 g5_auth 등록 여부로 검사한다.
+ * 권한: 최고관리자만(dday_nt_request_handler 가 본다). view.php 는 관리 권한 행이 하나라도 있으면 들여보낸다.
  *
  * 두 테이블을 함께 본다.
  *   - g5_push_queue       : 서버가 Expo 로 "보내려고 시도한" 기록 (성공/실패/재시도)
@@ -91,6 +91,14 @@ if (!function_exists('dday_nt_admin_menu')) {
      */
     function dday_nt_request_handler($arr_query, $token)
     {
+        global $is_admin;
+
+        // 원본 view.php 는 관리 권한 행이 하나라도 있으면 들여보내고 화면마다 권한을 보게 맡긴다. 이 화면은 모든
+        // 회원의 알림 본문(쪽지 · 주문 · 배송)을 보여 주므로 최고관리자만 — 푸시 공지 · 신고 처리 화면과 같은 기준.
+        if ($is_admin !== 'super') {
+            alert('최고관리자만 접근 가능합니다.');
+        }
+
         require_once G5_PATH . '/api/lib/DB.php';
 
         $queueTable = DB::table('push_queue_table');

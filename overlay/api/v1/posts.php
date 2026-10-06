@@ -485,6 +485,9 @@ if (!$action && $apiMethod === 'PATCH') {
         );
     }
 
+    if (array_key_exists('ca_name', $input)) {
+        $input['ca_name'] = api_board_validated_category($board, $input['ca_name'], Auth::adminRole($member, $bo_table));
+    }
     if (isset($input['wr_link1'])) {
         $input['wr_link1'] = api_safe_board_link($input['wr_link1']);
     }

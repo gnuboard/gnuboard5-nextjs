@@ -61,6 +61,16 @@ if (!function_exists('api_member_media_store')) {
         if (!isset($decoders[$type]) || !function_exists($decoders[$type])) {
             Response::error('gif · jpg · png 그림만 올릴 수 있습니다.', 422);
         }
+        // 펼치기 전에 크기를 본다 — 바이트는 작아도 가로 · 세로가 큰 그림(한 색 PNG 등)은 펼치는 순간 메모리를
+        // 수백 MB 잡는다. 다른 사진 처리와 같은 픽셀 · 메모리 한도(api_image_decodable)를 쓴다.
+        $infoW = (int) ($info[0] ?? 0);
+        $infoH = (int) ($info[1] ?? 0);
+        $decodable = function_exists('api_image_decodable')
+            ? api_image_decodable($infoW, $infoH)
+            : ($infoW > 0 && $infoH > 0 && $infoW * $infoH <= 4096 * 4096);
+        if (!$decodable) {
+            Response::error('그림의 가로 · 세로가 너무 큽니다. 더 작은 그림을 올려 주세요.', 422);
+        }
 
         $src = @$decoders[$type]($file['tmp_name']);
         if (!$src) {

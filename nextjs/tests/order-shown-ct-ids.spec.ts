@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   MAX_ORDER_CT_IDS,
+  buildCartRequestOptions,
   buildShippingQuoteParams,
   shownOrderCtIds,
 } from "../src/app/shop/order/orderDataHelpers";
@@ -33,6 +34,12 @@ test.describe("order form sends the rows it showed", () => {
     expect(shownOrderCtIds("", many)).toBe("");
     expect(shownOrderCtIds("1,2", many)).toBe("1,2");
     expect(shownOrderCtIds("", many.slice(0, MAX_ORDER_CT_IDS)).split(",")).toHaveLength(MAX_ORDER_CT_IDS);
+  });
+
+  test("the whole-cart order form gathers the member's rows; selected or buy-now forms do not", () => {
+    expect(buildCartRequestOptions(false, "")).toEqual({ params: { gather: 1 } });
+    expect(buildCartRequestOptions(false, "10,11")).toEqual({ params: { ct_ids: "10,11" } });
+    expect(buildCartRequestOptions(true, "")).toEqual({ params: { direct: 1 } });
   });
 
   test("the shipping quote asks for the same rows", () => {

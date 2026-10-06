@@ -434,7 +434,20 @@ if ($apiMethod === 'POST' && $action === 'download') {
     }
 
     $pointCost = !empty($zone['cz_type']) ? (int) $zone['cz_point'] : 0;
+    // 포인트로 사는 쿠폰은 회원 포인트 잠금(주문의 포인트 차감과 같은 이름)도 잡는다 — 위 잠금은 쿠폰존마다라
+    // 서로 다른 쿠폰을 동시에 받으면 둘 다 같은 잔액을 보고 포인트가 마이너스가 된다.
+    // 이름 잠금을 하나만 드는 옛 DB 에서는 둘째 잠금이 위 쿠폰존 잠금을 풀어 버리므로(중복 다운로드가 열린다) 잡지 않는다.
+    $pointLockKey = '';
     if ($pointCost > 0) {
+        if (DB::supportsMultipleNamedLocks()) {
+            $pointLockKey = 'g5_shop_point_member_' . md5($mb_id);
+            $pointLock = DB::fetch('SELECT GET_LOCK(?, 5) AS lk', [$pointLockKey]);
+            if (empty($pointLock['lk'])) {
+                shop_api_coupon_download_release_lock($lockKey);
+                Response::error('잠시 후 다시 시도해 주십시오.', 409);
+            }
+        }
+
         $pointRow = DB::fetch(
             "SELECT mb_point FROM " . DB::table('member_table') . "
              WHERE mb_id = ? LIMIT 1",
@@ -442,11 +455,13 @@ if ($apiMethod === 'POST' && $action === 'download') {
         );
         $memberPoint = $pointRow ? (int) $pointRow['mb_point'] : (int) ($member['mb_point'] ?? 0);
         if (($memberPoint - $pointCost) < 0) {
+            shop_api_coupon_download_release_lock($pointLockKey);
             shop_api_coupon_download_release_lock($lockKey);
             Response::error('보유하신 포인트가 부족하여 쿠폰을 다운로드할 수 없습니다.', 400);
         }
 
         if (!function_exists('insert_point')) {
+            shop_api_coupon_download_release_lock($pointLockKey);
             shop_api_coupon_download_release_lock($lockKey);
             Response::error('포인트 처리 함수를 찾을 수 없습니다.', 500);
         }
@@ -454,6 +469,7 @@ if ($apiMethod === 'POST' && $action === 'download') {
 
     $cp_id = shop_api_coupon_download_generate_id($mb_id, $cz_id);
     if ($cp_id === '') {
+        shop_api_coupon_download_release_lock($pointLockKey);
         shop_api_coupon_download_release_lock($lockKey);
         Response::error('Coupon ID Error', 500);
     }
@@ -483,6 +499,7 @@ if ($apiMethod === 'POST' && $action === 'download') {
     if ($pointCost > 0) {
         insert_point($mb_id, (-1) * $pointCost, "쿠폰 $cp_id 발급");
     }
+    shop_api_coupon_download_release_lock($pointLockKey);
 
     // 다운로드 카운트 증가 — 운영 통계용.
     DB::execute(
@@ -621,6 +638,17 @@ if ($apiMethod === 'POST' && $action === 'apply-to-cart') {
     ];
     $res = shop_api_item_coupon_evaluate($coupon, $cart, $itemCats, $mb_id);
     if (!$res['ok']) Response::error($res['reason'] ?? '사용 불가 쿠폰', 400);
+
+    // 쿠폰 한 장은 상품 한 줄에만 — 이미 쓴 쿠폰인지 보는 coupon_log 는 주문이 성립해야 채워지므로, 카트 단계에서
+    // 같은 쿠폰을 여러 줄에 붙이면 줄마다 할인돼 합계가 쿠폰 금액의 N배가 된다(원본은 쿠폰 선택 화면에서만 막는다).
+    $sameCouponRows = DB::count(
+        "SELECT COUNT(*) FROM " . DB::table('g5_shop_cart_table') . "
+          WHERE od_id = ? AND ct_id <> ? AND ct_history = ? AND cp_price > 0",
+        [$cart_id, $ct_id, shop_api_coupon_marker_value($cp_id)]
+    );
+    if ($sameCouponRows > 0) {
+        Response::error('이미 다른 상품에 적용한 쿠폰입니다. 그 상품에서 쿠폰을 해제한 뒤 적용해 주세요.', 409);
+    }
 
     // 동일 카트 행에 이미 다른 쿠폰이 묶여있으면 덮어쓰기. ct_history 에 쿠폰 마커 저장.
     DB::execute(

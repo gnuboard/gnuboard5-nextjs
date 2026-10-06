@@ -42,24 +42,38 @@ function pg_mobile_return_html(string $targetUrl, string $title, string $message
     exit;
 }
 
+/**
+ * 결제 결과를 postMessage 로 넘길 창의 origin. 이 사이트 자신 또는 API 를 부르도록 허용한 앱(CORS 목록)만 그대로 쓰고,
+ * 그 밖이거나 비었으면 이 사이트 origin 으로 보낸다 — '*' 나 요청이 고른 아무 origin 으로 보내면 결제창을 연 다른
+ * 사이트가 결과를 받는다(본인확인 결과 cert_post_message_origin 과 같은 방식). 앱 WebView 는 네이티브 인터페이스로
+ * 받으므로 이 값을 쓰지 않는다.
+ */
 function pg_post_message_origin(string $origin): string {
-    $origin = trim($origin);
-    if ($origin === '') {
-        return '*';
+    $normalize = static function (string $value): string {
+        $parts = parse_url(trim($value));
+        if (!$parts || empty($parts['scheme']) || empty($parts['host'])) {
+            return '';
+        }
+        $scheme = strtolower((string) $parts['scheme']);
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            return '';
+        }
+        $port = isset($parts['port']) ? ':' . (int) $parts['port'] : '';
+        return $scheme . '://' . strtolower((string) $parts['host']) . $port;
+    };
+
+    $self = $normalize(pg_request_origin());
+    $allowed = function_exists('shop_api_cookie_allowed_origins') ? shop_api_cookie_allowed_origins() : [];
+    if ($self !== '') {
+        $allowed[] = $self;
     }
 
-    $parts = parse_url($origin);
-    if (!$parts || empty($parts['scheme']) || empty($parts['host'])) {
-        return '*';
+    $requested = $normalize($origin);
+    if ($requested !== '' && in_array($requested, $allowed, true)) {
+        return $requested;
     }
 
-    $scheme = strtolower((string) $parts['scheme']);
-    if (!in_array($scheme, ['http', 'https'], true)) {
-        return '*';
-    }
-
-    $port = isset($parts['port']) ? ':' . (int) $parts['port'] : '';
-    return $scheme . '://' . $parts['host'] . $port;
+    return $self !== '' ? $self : '*';
 }
 
 function pg_bridge_script_tag(string $body): string {

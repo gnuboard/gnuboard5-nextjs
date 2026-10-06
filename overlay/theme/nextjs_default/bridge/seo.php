@@ -181,7 +181,7 @@ function nextjs_default_seo_public_board($bo_table)
     }
 
     $board = sql_fetch(
-        " select bo_table, bo_subject, bo_list_level, bo_read_level, bo_use_secret from `{$table}` where bo_table = '" . $bo_table . "' limit 1 ",
+        " select bo_table, bo_subject, gr_id, bo_list_level, bo_read_level, bo_use_secret from `{$table}` where bo_table = '" . $bo_table . "' limit 1 ",
         false
     );
     if (!is_array($board) || empty($board['bo_table'])) {
@@ -191,6 +191,16 @@ function nextjs_default_seo_public_board($bo_table)
     // 비회원(레벨 1)이 목록을 볼 수 없거나, 비밀글만 쓰는 게시판이면 공개가 아니다.
     if ((int) ($board['bo_list_level'] ?? 1) > 1 || (int) ($board['bo_read_level'] ?? 1) > 1 || (int) ($board['bo_use_secret'] ?? 0) >= 2) {
         return null;
+    }
+
+    // 그룹 접근을 쓰는 게시판도 공개가 아니다 — 비회원은 글을 볼 수 없다(원본 bbs/board.php).
+    $groupTable = nextjs_default_seo_table('group_table');
+    $grId = (string) ($board['gr_id'] ?? '');
+    if ($groupTable !== '' && preg_match('/^[0-9A-Za-z_]+$/', $grId)) {
+        $group = sql_fetch(" select gr_use_access from `{$groupTable}` where gr_id = '" . $grId . "' limit 1 ", false);
+        if (is_array($group) && !empty($group['gr_use_access'])) {
+            return null;
+        }
     }
 
     return $board;
@@ -700,8 +710,12 @@ function nextjs_default_seo_public_boards()
         return array();
     }
 
+    // 그룹 접근을 쓰는 게시판은 뺀다(위 nextjs_default_seo_public_board 와 같은 기준).
+    $groupTable = nextjs_default_seo_table('group_table');
+    $groupFilter = $groupTable !== '' ? " and gr_id not in (select gr_id from `{$groupTable}` where gr_use_access = 1)" : '';
+
     $boards = array();
-    foreach (nextjs_default_seo_query_rows(" select bo_table from `{$table}` where bo_list_level <= 1 and bo_read_level <= 1 and bo_use_secret < 2 order by bo_order, bo_table ") as $row) {
+    foreach (nextjs_default_seo_query_rows(" select bo_table from `{$table}` where bo_list_level <= 1 and bo_read_level <= 1 and bo_use_secret < 2{$groupFilter} order by bo_order, bo_table ") as $row) {
         $bo_table = (string) $row['bo_table'];
         if (preg_match('/^[0-9A-Za-z_]+$/', $bo_table) && !nextjs_default_seo_board_excluded($bo_table)) {
             $boards[] = $bo_table;

@@ -435,10 +435,23 @@ if (!function_exists('webapp_admin_dbupgrade')) {
                 `closed_by`    VARCHAR(20) NULL DEFAULT NULL,
                 `closed_at`    DATETIME NULL DEFAULT NULL,
                 `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `hide_prev_option` VARCHAR(255) NULL DEFAULT NULL COMMENT '자동 가림 전 wr_option (가림을 일으킨 신고 행만)',
+                `hide_prev_wr10`   VARCHAR(255) NULL DEFAULT NULL COMMENT '자동 가림 전 wr_10',
                 UNIQUE KEY `uniq_one_per_reporter` (`target_type`, `target_key`, `reporter_mb`, `reporter_dev`),
                 KEY `idx_target_status` (`target_type`, `target_key`, `status`),
                 KEY `idx_status_created` (`status`, `created_at`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci", false);
+            $changed = true;
+        }
+        // 자동 가림 전 값 — 관리자가 신고를 기각하면 이 값으로 글을 되돌린다(api/lib/report_hide.php).
+        if (webapp_table_exists($content_report) && !webapp_column_exists($content_report, 'hide_prev_option')) {
+            sql_query("ALTER TABLE `{$content_report}`
+                       ADD COLUMN `hide_prev_option` VARCHAR(255) NULL DEFAULT NULL AFTER `created_at`", false);
+            $changed = true;
+        }
+        if (webapp_table_exists($content_report) && !webapp_column_exists($content_report, 'hide_prev_wr10')) {
+            sql_query("ALTER TABLE `{$content_report}`
+                       ADD COLUMN `hide_prev_wr10` VARCHAR(255) NULL DEFAULT NULL AFTER `hide_prev_option`", false);
             $changed = true;
         }
 
@@ -735,7 +748,56 @@ if (!function_exists('webapp_admin_dbupgrade')) {
             }
         }
 
+        // 에디터 이미지 옆의 예전 정보 파일(.meta.json — 웹에서 그대로 열렸다)을 .meta.php 로 옮긴다.
+        if (webapp_migrate_editor_meta(2000) > 0) {
+            $changed = true;
+        }
+
         // 실제 변경이 일어났을 때만 true 로 전환. 이전 훅 결과($is_check)는 보존.
         return $changed ? true : $is_check;
+    }
+}
+
+if (!function_exists('webapp_migrate_editor_meta')) {
+    /**
+     * data/editor/<yymm>/<그림>.meta.json(올린 사람 HMAC · 올린 시각, 웹에서 그대로 열렸다)을 같은 내용의
+     * <그림>.meta.php(맨 앞 exit — api/v1/upload.php 와 같은 머리말)로 옮긴다. 한 번에 $limit 개까지 — 남으면 다음
+     * DB 업그레이드(관리자 화면 · 스키마 자가 점검) 때 이어서 옮긴다.
+     *
+     * @return int 옮기거나 지운 예전 파일 수
+     */
+    function webapp_migrate_editor_meta(int $limit = 2000): int
+    {
+        if (!defined('G5_DATA_PATH') || $limit <= 0) {
+            return 0;
+        }
+        if (!defined('API_UPLOAD_META_GUARD')) {
+            define('API_UPLOAD_META_GUARD', "<?php exit; ?>\n");
+        }
+
+        $done = 0;
+        foreach (glob(G5_DATA_PATH . '/editor/*', GLOB_ONLYDIR) ?: array() as $dir) {
+            foreach (glob($dir . '/*.meta.json') ?: array() as $legacy) {
+                if ($done >= $limit) {
+                    return $done;
+                }
+                $target = substr($legacy, 0, -strlen('.meta.json')) . '.meta.php';
+                if (!is_file($target)) {
+                    // 읽지 못했거나 새 파일을 쓰지 못했으면 예전 파일을 남긴다(지우면 올린 사람 정보를 잃는다).
+                    // 빈 파일은 옮길 것이 없으니 지운다.
+                    $raw = @file_get_contents($legacy);
+                    if (!is_string($raw)) {
+                        continue;
+                    }
+                    if ($raw !== '' && @file_put_contents($target, API_UPLOAD_META_GUARD . $raw, LOCK_EX) === false) {
+                        continue;
+                    }
+                }
+                @unlink($legacy);
+                $done++;
+            }
+        }
+
+        return $done;
     }
 }

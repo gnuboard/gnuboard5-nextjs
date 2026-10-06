@@ -416,3 +416,41 @@ function shop_payment_confirm_verify_pg(string $pg_service, array &$input, array
 
     return $verifyResult;
 }
+
+/**
+ * PG 승인 뒤 주문 확정이 실패했을 때 손님에게 보일 문구. $pgCancelled: PG 취소 요청 성공 true / 실패 false /
+ * 이 PG 에는 자동 취소 경로가 없음 null. 운영자용 자세한 내용은 주문 기록 · 서버 로그에만 남긴다.
+ */
+function shop_payment_confirm_failure_message(bool $couponConflict, ?bool $pgCancelled): string
+{
+    $message = $couponConflict
+        ? '이미 다른 주문에 사용한 쿠폰이 있어 주문을 완료하지 못했습니다.'
+        : '주문 처리 중 오류가 나 주문을 완료하지 못했습니다.';
+    if ($pgCancelled === true) {
+        return $message . ' 결제는 자동으로 취소되었습니다.' . ($couponConflict ? '' : ' 잠시 후 다시 주문해 주세요.');
+    }
+    return $message . ' 결제가 승인된 채 남아 있을 수 있으니 주문번호와 함께 고객센터로 문의해 주세요.';
+}
+
+/** PG 취소 결과를 주문 기록 · 로그용 한 줄로 — 응답 원문(가상계좌 secret · 계좌번호 등)은 싣지 않는다. */
+function shop_payment_cancel_result_summary(?array $result): string
+{
+    if ($result === null) {
+        return '자동 취소 경로 없음';
+    }
+    $body = is_array($result['body'] ?? null) ? $result['body'] : [];
+    $parts = [!empty($result['ok']) ? '요청 성공' : '요청 실패'];
+    if (isset($result['http'])) {
+        $parts[] = 'http=' . (int) $result['http'];
+    }
+    foreach (['status', 'code'] as $key) {
+        if (isset($body[$key]) && is_scalar($body[$key]) && (string) $body[$key] !== '') {
+            $parts[] = $key . '=' . (string) $body[$key];
+        }
+    }
+    if (!empty($result['error'])) {
+        $error = (string) $result['error'];
+        $parts[] = 'error=' . (function_exists('mb_substr') ? mb_substr($error, 0, 200, 'UTF-8') : substr($error, 0, 200));
+    }
+    return implode(' ', $parts);
+}

@@ -61,25 +61,44 @@ function api_upload_editor_file_path_from_url($fileUrl)
     return $candidateDir . DIRECTORY_SEPARATOR . basename($candidate);
 }
 
+// 그림 옆에 두는 올린 사람 정보(owner_hash 등). .php 로 두고 맨 앞에 exit 를 넣는다 — 원본 data/.htaccess 가
+// .php 를 막고, 그 규칙이 없는 서버(nginx 등)에서 PHP 로 실행돼도 아무것도 내보내지 않는다. 예전 .meta.json 은
+// 웹에서 그대로 열렸다(회원별 고정 값 · 올린 시각) — 읽기 · 지우기만 한다.
+if (!defined('API_UPLOAD_META_GUARD')) {
+    // 예전 .meta.json 을 옮기는 설치기(plugin/webapp/notify/tables.php)도 같은 머리말을 쓴다.
+    define('API_UPLOAD_META_GUARD', "<?php exit; ?>\n");
+}
+
 function api_upload_editor_meta_path($filePath)
+{
+    return $filePath . '.meta.php';
+}
+
+function api_upload_editor_legacy_meta_path($filePath)
 {
     return $filePath . '.meta.json';
 }
 
 function api_upload_read_editor_meta($filePath)
 {
-    $metaPath = api_upload_editor_meta_path($filePath);
-    if (!is_file($metaPath)) {
-        return [];
+    foreach ([api_upload_editor_meta_path($filePath), api_upload_editor_legacy_meta_path($filePath)] as $metaPath) {
+        if (!is_file($metaPath)) {
+            continue;
+        }
+
+        $raw = @file_get_contents($metaPath);
+        if (!is_string($raw) || $raw === '') {
+            return [];
+        }
+        if (strpos($raw, API_UPLOAD_META_GUARD) === 0) {
+            $raw = substr($raw, strlen(API_UPLOAD_META_GUARD));
+        }
+
+        $decoded = json_decode($raw, true);
+        return is_array($decoded) ? $decoded : [];
     }
 
-    $raw = @file_get_contents($metaPath);
-    if (!is_string($raw) || $raw === '') {
-        return [];
-    }
-
-    $decoded = json_decode($raw, true);
-    return is_array($decoded) ? $decoded : [];
+    return [];
 }
 
 function api_upload_owner_hash($member)
@@ -142,6 +161,7 @@ if ($action === 'delete') {
         $deleted = @unlink($filePath);
     }
     @unlink(api_upload_editor_meta_path($filePath));
+    @unlink(api_upload_editor_legacy_meta_path($filePath));
 
     Response::success(['deleted' => (bool) $deleted]);
 }
@@ -216,6 +236,10 @@ if ($imageWidth <= 0 || $imageHeight <= 0) {
 $maxImageSide = 20000;
 $maxImagePixels = 40000000;
 if ($imageWidth > $maxImageSide || $imageHeight > $maxImageSide || $imageWidth * $imageHeight > $maxImagePixels) {
+    Response::error('Image dimensions are too large.', 400);
+}
+// 상한 안이라도 이 서버의 메모리로 풀 수 없으면 거절한다 — 풀다 죽으면 재인코딩 전 원본이 남는다.
+if (function_exists('api_image_memory_fits') && !api_image_memory_fits($imageWidth * $imageHeight)) {
     Response::error('Image dimensions are too large.', 400);
 }
 
@@ -307,7 +331,7 @@ $finalSize = filesize($destPath);
 $fileUrl = G5_DATA_URL . '/editor/' . $ym . '/' . $newFilename;
 @file_put_contents(
     api_upload_editor_meta_path($destPath),
-    json_encode([
+    API_UPLOAD_META_GUARD . json_encode([
         'owner_hash' => api_upload_owner_hash($member),
         'file_name' => $newFilename,
         'file_url' => $fileUrl,

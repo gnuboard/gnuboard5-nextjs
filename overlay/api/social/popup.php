@@ -123,4 +123,7 @@ if ($signupUrl === '') {
     nextjs25_social_popup_fail('signup_redirect_failed', $usePopup);
 }
 
+// 이번 시도의 브리지 state 는 다 썼으니 지운다(10분 동안 다시 쓰지 못하게). challenge · 돌아갈 주소는
+// signup.php 가 가입 ticket 에 묶어야 하므로 남긴다.
+nextjs25_social_clear_bridge_state();
 nextjs25_social_echo_popup_redirect($signupUrl, $usePopup);

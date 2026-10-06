@@ -311,6 +311,39 @@ class DB
     /**
      * Get the last inserted auto-increment ID.
      */
+    /** @var bool|null 이 DB 서버가 이름 잠금(GET_LOCK)을 여러 개 함께 들 수 있는지(요청마다 한 번 본다) */
+    private static $multipleNamedLocks = null;
+
+    /**
+     * 이름 잠금을 여러 개 함께 들 수 있는가 — MySQL 5.7.5+ · MariaDB 10.0.2+.
+     * 그 전 서버는 연결마다 하나만 든다: 두 번째 GET_LOCK 이 첫 잠금을 말없이 푼다(원본 그누보드 5.6.39 가 피해 간
+     * 제약). 잠금을 겹쳐 잡는 곳은 이것이 false 면 두 번째 잠금을 건너뛰어, 이미 든 잠금을 잃지 않는다.
+     * 버전을 알 수 없으면 false(겹치지 않는 쪽).
+     */
+    public static function supportsMultipleNamedLocks(): bool
+    {
+        if (self::$multipleNamedLocks !== null) {
+            return self::$multipleNamedLocks;
+        }
+
+        try {
+            $row = self::fetch('SELECT VERSION() AS v');
+            $version = (string) ($row['v'] ?? '');
+        } catch (\Throwable $e) {
+            $version = '';
+        }
+
+        if (preg_match('/(\d+\.\d+\.\d+)-MariaDB/i', $version, $m)) {
+            self::$multipleNamedLocks = version_compare($m[1], '10.0.2', '>=');
+        } elseif (preg_match('/^(\d+\.\d+\.\d+)/', $version, $m)) {
+            self::$multipleNamedLocks = version_compare($m[1], '5.7.5', '>=');
+        } else {
+            self::$multipleNamedLocks = false;
+        }
+
+        return self::$multipleNamedLocks;
+    }
+
     public static function lastInsertId(): string
     {
         return self::getPdo()->lastInsertId();

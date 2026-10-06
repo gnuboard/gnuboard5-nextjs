@@ -488,6 +488,21 @@ if (!function_exists('api_image_decodable')) {
             return false;
         }
 
+        return api_image_memory_fits($pixels);
+    }
+}
+
+if (!function_exists('api_image_memory_fits')) {
+    /**
+     * 이 화소 수의 그림을 GD 로 풀 메모리가 남았는지(픽셀 상한은 보지 않는다 — 부르는 쪽이 정한다).
+     * 에디터 업로드처럼 큰 사진을 받아 줄이는 경로도 같은 예산을 쓴다.
+     */
+    function api_image_memory_fits(int $pixels): bool
+    {
+        if ($pixels <= 0) {
+            return false;
+        }
+
         $limit = trim((string) ini_get('memory_limit'));
         if ($limit === '' || $limit === '-1') {
             $configured = get_cfg_var('memory_limit');
@@ -587,7 +602,8 @@ if (!function_exists('api_image_webp_copy')) {
         }
 
         $info = @getimagesize($base_path);
-        if (!$info || (int) $info[0] * (int) $info[1] > API_IMAGE_MAX_PIXELS) {
+        // 픽셀 상한만이 아니라 메모리 예산도 본다 — 다른 변환(api_image_decodable)과 같은 기준.
+        if (!$info || !api_image_decodable((int) $info[0], (int) $info[1])) {
             return '';
         }
 

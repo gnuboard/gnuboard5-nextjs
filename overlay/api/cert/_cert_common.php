@@ -130,8 +130,14 @@ if (!function_exists('cert_allowed_post_message_origins')) {
         if ($forwarded_scheme !== '') {
             $scheme = $forwarded_scheme;
         }
+        // 요청의 Host 로 만든 출처는 로컬 개발 호스트(localhost · 127.x.x.x)일 때만 넣는다 — 그 밖의 Host 는
+        // 누구나 바꿔 보낼 수 있다(결과 페이지 주소를 정하는 cert_result_base_url 과 같은 기준).
         if (!empty($_SERVER['HTTP_HOST'])) {
-            cert_add_allowed_origins($allowedOrigins, $scheme . '://' . $_SERVER['HTTP_HOST']);
+            $requestOrigin = cert_normalize_origin($scheme . '://' . $_SERVER['HTTP_HOST']);
+            $requestHost = strtolower((string) parse_url($requestOrigin, PHP_URL_HOST));
+            if ($requestHost === 'localhost' || preg_match('/^127(\.\d{1,3}){3}$/', $requestHost) === 1) {
+                cert_add_allowed_origins($allowedOrigins, $requestOrigin);
+            }
         }
 
         if (defined('G5_CORS_ALLOWED_ORIGINS') && G5_CORS_ALLOWED_ORIGINS) {
@@ -185,7 +191,8 @@ if (!function_exists('cert_post_message_origin')) {
             }
         }
 
-        return '*';
+        // 대상 출처를 정하지 못하면 '*'(아무 창) 대신 빈 값 — 결과 페이지는 opener 로 본인확인 결과를 보내지 않는다.
+        return '';
     }
 }
 
@@ -281,7 +288,7 @@ if (!function_exists('cert_emit_result_and_close')) {
         set_session('ss_nextjs25_cert_return_origin', '');
         $targetOriginJson = json_encode($targetOrigin);
         if ($targetOriginJson === false) {
-            $targetOriginJson = '"*"';
+            $targetOriginJson = '""';
         }
 
         if (!headers_sent()) {
@@ -314,7 +321,7 @@ if (!function_exists('cert_emit_result_and_close')) {
         bridgeDebug("app postMessage failed", e);
     }
     try {
-        if (window.opener && !window.opener.closed) {
+        if (targetOrigin && window.opener && !window.opener.closed) {
             window.opener.postMessage(payload, targetOrigin);
         }
     } catch (e) {

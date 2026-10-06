@@ -143,7 +143,84 @@ if (!function_exists('shop_api_validate_order_stock')) {
 }
 
 if (!function_exists('shop_api_decrement_order_stock')) {
+    /**
+     * 주문 줄의 재고를 줄인다(상품 · 선택옵션별로 합쳐서, 재고가 모자라지 않을 때만). 중간 상품이 모자라거나(동시에 마지막
+     * 재고를 산 경우) DB 오류가 나면 앞에서 줄인 재고를 되돌린 뒤 멈춘다 — 쇼핑 테이블이 MyISAM 이면 트랜잭션 되돌리기가
+     * 듣지 않는다.
+     */
     function shop_api_decrement_order_stock(array $cartItems): void
+    {
+        $done = [];
+        try {
+            foreach (shop_api_order_stock_groups($cartItems) as $group) {
+                if (shop_api_change_stock_group($group, -1) !== 1) {
+                    throw new RuntimeException(shop_api_order_stock_label($group) . ' 의 재고수량이 부족합니다. 장바구니에서 다시 확인해 주세요.');
+                }
+                $done[] = $group;
+            }
+        } catch (\Throwable $e) {
+            foreach ($done as $taken) {
+                try {
+                    shop_api_change_stock_group($taken, 1);
+                } catch (\Throwable $restoreError) {
+                    error_log('[stock] restore failed ' . $taken['it_id'] . ': ' . $restoreError->getMessage());
+                }
+            }
+            throw $e;
+        }
+    }
+}
+
+if (!function_exists('shop_api_restore_order_stock')) {
+    /** shop_api_decrement_order_stock() 이 줄인 재고를 그대로 되돌린다 — 주문을 끝내지 못했을 때. */
+    function shop_api_restore_order_stock(array $cartItems): void
+    {
+        foreach (shop_api_order_stock_groups($cartItems) as $group) {
+            shop_api_change_stock_group($group, 1);
+        }
+    }
+}
+
+if (!function_exists('shop_api_change_stock_group')) {
+    /** 한 상품 · 선택옵션의 재고를 $direction(-1 줄임, 1 되돌림) 만큼. 줄일 때는 재고가 모자라면 바꾸지 않는다. @return int 바뀐 행 수 */
+    function shop_api_change_stock_group(array $group, int $direction): int
+    {
+        $qty = (int) $group['qty'];
+        if ($group['io_id'] !== '') {
+            return DB::execute(
+                "UPDATE " . DB::table('g5_shop_item_option_table') . "
+                 SET io_stock_qty = io_stock_qty " . ($direction < 0 ? '-' : '+') . " ?
+                 WHERE it_id = ? AND io_id = ? AND io_type = ?"
+                    . ($direction < 0 ? " AND io_use = 1 AND io_stock_qty >= ?" : ''),
+                $direction < 0
+                    ? [$qty, $group['it_id'], $group['io_id'], $group['io_type'], $qty]
+                    : [$qty, $group['it_id'], $group['io_id'], $group['io_type']]
+            );
+        }
+        return DB::execute(
+            "UPDATE " . DB::table('g5_shop_item_table') . "
+             SET it_stock_qty = it_stock_qty " . ($direction < 0 ? '-' : '+') . " ?
+             WHERE it_id = ?"
+                . ($direction < 0 ? " AND it_use = 1 AND it_soldout = 0 AND it_stock_qty >= ?" : ''),
+            $direction < 0 ? [$qty, $group['it_id'], $qty] : [$qty, $group['it_id']]
+        );
+    }
+}
+
+if (!function_exists('shop_api_order_stock_label')) {
+    function shop_api_order_stock_label(array $group): string
+    {
+        $label = $group['it_name'];
+        if ($group['io_id'] !== '') {
+            $label .= '(' . ($group['ct_option'] !== '' ? $group['ct_option'] : $group['io_id']) . ')';
+        }
+        return $label;
+    }
+}
+
+if (!function_exists('shop_api_order_stock_groups')) {
+    /** 주문 줄을 상품 · 선택옵션별 수량으로 합친다(재고를 줄이고 되돌리는 단위). */
+    function shop_api_order_stock_groups(array $cartItems): array
     {
         $groups = [];
 
@@ -170,34 +247,6 @@ if (!function_exists('shop_api_decrement_order_stock')) {
             $groups[$key]['qty'] += $qty;
         }
 
-        foreach ($groups as $group) {
-            $qty = (int) $group['qty'];
-            $label = $group['it_name'];
-            if ($group['io_id'] !== '') {
-                $label .= '(' . ($group['ct_option'] !== '' ? $group['ct_option'] : $group['io_id']) . ')';
-                $affected = DB::execute(
-                    "UPDATE " . DB::table('g5_shop_item_option_table') . "
-                     SET io_stock_qty = io_stock_qty - ?
-                     WHERE it_id = ? AND io_id = ? AND io_type = ?
-                       AND io_use = 1
-                       AND io_stock_qty >= ?",
-                    [$qty, $group['it_id'], $group['io_id'], $group['io_type'], $qty]
-                );
-            } else {
-                $affected = DB::execute(
-                    "UPDATE " . DB::table('g5_shop_item_table') . "
-                     SET it_stock_qty = it_stock_qty - ?
-                     WHERE it_id = ?
-                       AND it_use = 1
-                       AND it_soldout = 0
-                       AND it_stock_qty >= ?",
-                    [$qty, $group['it_id'], $qty]
-                );
-            }
-
-            if ($affected !== 1) {
-                throw new RuntimeException($label . ' 의 재고수량이 부족합니다. 장바구니에서 다시 확인해 주세요.');
-            }
-        }
+        return array_values($groups);
     }
 }

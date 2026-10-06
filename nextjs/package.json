@@ -168,6 +168,8 @@
     "test:resilience": "playwright test tests/resilience.spec.ts",
     "test:qa-api": "playwright test tests/qa-api.spec.ts",
     "test:cart-api": "playwright test tests/cart-api.spec.ts",
+    "test:cart-e2e": "playwright test tests/order-cart-changed.spec.ts",
+    "check:cart-races": "php scripts/smoke/check_cart_order_races.php",
     "test:ui-smoke:mobile": "node scripts/run-mobile-ui-smoke.mjs",
     "test:ui-smoke:auth": "node scripts/require-auth-smoke-env.mjs && playwright test tests/login.spec.ts tests/login-persist.spec.ts tests/login-user-flow.spec.ts",
     "test:ui-smoke:shop": "playwright test tests/shop-ui-flow.spec.ts tests/shop-checkout.spec.ts",

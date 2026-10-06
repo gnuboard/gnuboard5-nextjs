@@ -605,6 +605,49 @@ if (!function_exists('shop_api_truthy')) {
     }
 }
 
+if (!function_exists('shop_api_clean_order_input')) {
+    /**
+     * 주문서 입력 정리 — 원본 shop/orderformupdate.php(584-601줄)와 같은 정리. 원본 관리자 주문 화면은 이 정리를 믿고
+     * 일부 값(od_email 등)을 그대로 출력하므로, API 로 들어온 주문도 같은 모양으로 저장해야 한다.
+     */
+    function shop_api_clean_order_input($input): array
+    {
+        $input = is_array($input) ? $input : [];
+        $clean = static function ($value, ...$args): string {
+            $value = trim((string) $value);
+            return function_exists('clean_xss_tags') ? clean_xss_tags($value, ...$args) : strip_tags($value);
+        };
+
+        if (array_key_exists('od_email', $input)) {
+            $email = trim((string) $input['od_email']);
+            $input['od_email'] = function_exists('get_email_address')
+                ? get_email_address($email)
+                : (preg_match('/[0-9a-z._-]+@[a-z0-9._-]{4,}/i', $email, $m) ? $m[0] : '');
+        }
+        foreach (['od_name', 'od_tel', 'od_hp', 'od_addr1', 'od_addr2', 'od_addr3',
+                  'od_b_name', 'od_b_tel', 'od_b_hp', 'od_b_addr1', 'od_b_addr2', 'od_b_addr3', 'od_deposit_name'] as $field) {
+            if (array_key_exists($field, $input) && !is_array($input[$field])) {
+                $input[$field] = $clean($input[$field]);
+            }
+        }
+        if (array_key_exists('od_memo', $input) && !is_array($input['od_memo'])) {
+            $input['od_memo'] = $clean($input['od_memo'], 1, 1, 0, 0);
+        }
+        foreach (['od_zip', 'od_zip1', 'od_zip2', 'od_b_zip', 'od_b_zip1', 'od_b_zip2'] as $field) {
+            if (array_key_exists($field, $input) && !is_array($input[$field])) {
+                $input[$field] = preg_replace('/[^0-9]/', '', (string) $input[$field]);
+            }
+        }
+        foreach (['od_addr_jibeon', 'od_b_addr_jibeon'] as $field) {
+            if (array_key_exists($field, $input)) {
+                $input[$field] = preg_match('/^(N|R|J)$/', (string) $input[$field]) ? (string) $input[$field] : '';
+            }
+        }
+
+        return $input;
+    }
+}
+
 if (!function_exists('shop_api_guest_order_password')) {
     function shop_api_guest_order_password(array $input)
     {

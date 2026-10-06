@@ -11,11 +11,15 @@ import {
 
 export type OrderMember = Record<string, string | number | undefined>;
 
+/**
+ * 주문서가 장바구니를 받는 조건 — 선택 주문(ct_ids) · 바로구매(direct) 면 그 줄만, 아니면 장바구니 전부를 모아서(gather=1:
+ * 그누보드 화면 · 다른 기기에 담긴 이 회원의 상품도 이 장바구니로). 주문은 이렇게 받은 줄만 보낸다(shownOrderCtIds).
+ */
 export function buildCartRequestOptions(
   directCheckout: boolean,
   directCtIds: string
 ): { params?: Record<string, unknown> } | undefined {
-  if (!directCtIds && !directCheckout) return undefined;
+  if (!directCtIds && !directCheckout) return { params: { gather: 1 } };
 
   return {
     params: {

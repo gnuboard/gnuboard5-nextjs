@@ -16,10 +16,16 @@ $id = isset($printSegments[0]) && ctype_digit((string) $printSegments[0])
     ? (int) $printSegments[0]
     : 0;
 
-function print_decode_review(array $row): array
+function print_decode_review(array $row, ?array $viewer = null): array
 {
     $row['rating'] = (int) $row['rating'];
     unset($row['client_uid']);
+    // 공개 목록에 로그인 아이디를 내지 않는다(원본 상품 후기도 이름만 보인다) — 본인 · 최고관리자만 보고, 나머지는 is_mine 으로.
+    $viewerId = $viewer && !empty($viewer['mb_id']) ? (string) $viewer['mb_id'] : '';
+    $row['is_mine'] = $viewerId !== '' && $viewerId === (string) ($row['mb_id'] ?? '');
+    if (!$row['is_mine'] && !($viewer && Auth::adminRole($viewer) === 'super')) {
+        unset($row['mb_id']);
+    }
     return $row;
 }
 
@@ -32,6 +38,7 @@ if (!$id && $apiMethod === 'GET') {
         Response::error('product 파라미터가 필요합니다.', 422);
     }
     [$page, $limit, $offset] = api_page_params(20, 100, 'limit');
+    $viewer = Auth::getUser();
 
     $total = (int) DB::count("SELECT COUNT(*) FROM {$reviewTable} WHERE product_slug = ?", [$product]);
     $avgRow = DB::fetch("SELECT AVG(rating) AS avg_rating FROM {$reviewTable} WHERE product_slug = ?", [$product]);
@@ -42,7 +49,7 @@ if (!$id && $apiMethod === 'GET') {
         [$product]
     );
     Response::success([
-        'items'      => array_map('print_decode_review', $rows),
+        'items'      => array_map(static fn(array $row): array => print_decode_review($row, $viewer), $rows),
         'total'      => $total,
         'avg_rating' => $avg,
         'page'       => $page,
@@ -86,7 +93,7 @@ if (!$id && $apiMethod === 'POST') {
             [$me['mb_id'], $clientUid]
         );
         if ($existing && !empty($existing['review_id'])) {
-            Response::success(print_decode_review($existing), 200);
+            Response::success(print_decode_review($existing, $me), 200);
         }
     }
 
@@ -97,7 +104,7 @@ if (!$id && $apiMethod === 'POST') {
     );
     $newId = (int) DB::lastInsertId();
     $row = DB::fetch("SELECT * FROM {$reviewTable} WHERE review_id = ? LIMIT 1", [$newId]);
-    Response::success(print_decode_review($row), 201);
+    Response::success(print_decode_review($row, $me), 201);
 }
 
 // -------------------------------------------------------------------------

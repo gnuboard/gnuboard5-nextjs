@@ -9,41 +9,19 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { LoginForm } from "@/components/auth/LoginForm";
+import { emailVerifyNoticeFor, type EmailVerifyNotice } from "@/lib/email-verify-notice";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 
-function safeRedirectPath(value: string | null): string | null {
-  if (!value) return null;
-  try {
-    const url = new URL(value, window.location.origin);
-    if (url.origin !== window.location.origin) return null;
-    return `${url.pathname}${url.search}${url.hash}`;
-  } catch {
-    return null;
-  }
-}
-
-// 메일 인증 링크(GET /api/v1/auth/verify-email)를 브라우저로 열면 API 가 ?email_verify=<결과> 로 이리 보낸다.
-const EMAIL_VERIFY_NOTICES: Record<string, { text: string; ok: boolean }> = {
-  ok: { text: "이메일 인증이 완료되었습니다. 로그인해주세요.", ok: true },
-  already: { text: "이미 인증된 이메일입니다. 로그인해주세요.", ok: true },
-  expired: {
-    text: "인증 링크의 유효시간이 지났습니다. 아이디와 비밀번호로 로그인을 시도하면 인증 메일을 다시 받을 수 있습니다.",
-    ok: false,
-  },
-  invalid: { text: "인증 링크가 올바르지 않거나 이미 사용되었습니다.", ok: false },
-};
 
 export default function LoginPageClient() {
   const [redirectAfterLogin, setRedirectAfterLogin] = useState<string | null>(null);
-  const [emailVerifyNotice, setEmailVerifyNotice] = useState<{ text: string; ok: boolean } | null>(null);
+  // 메일 인증 링크를 열고 돌아온 결과(?email_verify=). 로그인한 채로 열었다면 레이아웃이 따로 보여 준다.
+  const [emailVerifyNotice, setEmailVerifyNotice] = useState<EmailVerifyNotice | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setRedirectAfterLogin(safeRedirectPath(params.get("redirect")));
-    const verifyStatus = params.get("email_verify") ?? "";
-    // hasOwnProperty 로 거른다 — ?email_verify=constructor 같은 값이 Object 의 기본 속성을 집어 오지 않게.
-    setEmailVerifyNotice(
-      Object.prototype.hasOwnProperty.call(EMAIL_VERIFY_NOTICES, verifyStatus) ? EMAIL_VERIFY_NOTICES[verifyStatus] : null
-    );
+    setEmailVerifyNotice(emailVerifyNoticeFor(params.get("email_verify")));
   }, []);
 
   return (

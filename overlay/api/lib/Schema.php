@@ -18,7 +18,7 @@ if (!defined('_GNUBOARD_')) exit;
 class Schema
 {
     /** 이 값이 바뀌면 표식이 무효가 되어 다음 요청에서 다시 점검한다. */
-    const VERSION = '2026-10-02.1'; // member_pref.notify_dday 는 plugin/dday · plugin/baby 가 만든다 (이전: session_family · revoked_remotely) (이전: social_apple_token SC-11, web_ticket, SC-16, SC-07)
+    const VERSION = '2026-10-06.1'; // 에디터 이미지 예전 정보 파일 .meta.json → .meta.php (이전: content_report.hide_prev_option · hide_prev_wr10, 신고 기각 뒤 되돌리기) (이전: member_pref.notify_dday 는 plugin/dday · plugin/baby 가 만든다) (이전: session_family · revoked_remotely) (이전: social_apple_token SC-11, web_ticket, SC-16, SC-07)
 
     /**
      * 테이블 키 → 그 키를 등록하는 extend 파일. 키가 없으면 어떤 파일이 빠졌는지 안내한다.
@@ -86,10 +86,31 @@ class Schema
             return self::$report = $cached;
         }
 
-        $report = self::inspect(true);
-        $report['stamp'] = $stamp;
-        if ($report['ok']) {
-            self::writeMarker($marker, $report);
+        // 설치기는 한 번에 하나만 돈다 — 배포 직후 한꺼번에 들어온 요청(로그인 없는 요청 포함)이 같은 ALTER · 정리
+        // 문장을 겹쳐 돌리지 않게. 기다리는 동안 앞 요청이 표식을 써 두었으면 그것을 쓰고, 끝내 못 잡으면 고치지 않고 본다.
+        // 잠금이 오류(이름 잠금을 못 쓰는 DB · 프록시)면 예전처럼 설치기를 돌린다 — 새 설치본의 표가 안 생기면 안 된다.
+        $lockName = 'g5_api_schema_' . substr(sha1(dirname(__DIR__, 2)), 0, 12);
+        $lock = self::lock($lockName);
+        try {
+            if ($lock !== null) {
+                $cached = self::readMarker($marker);
+                if ($cached !== null && isset($cached['stamp']) && $cached['stamp'] === $stamp && !empty($cached['ok'])) {
+                    return self::$report = $cached;
+                }
+                if ($lock === 0) {
+                    return self::$report = self::inspect(false) + array('stamp' => $stamp);
+                }
+            }
+
+            $report = self::inspect(true);
+            $report['stamp'] = $stamp;
+            if ($report['ok']) {
+                self::writeMarker($marker, $report);
+            }
+        } finally {
+            if ($lock === 1) {
+                self::unlock($lockName);
+            }
         }
 
         return self::$report = $report;
@@ -214,6 +235,30 @@ class Schema
         }
 
         return rtrim($dir, '/' . chr(92)) . '/api-schema-' . substr(sha1(dirname(__DIR__, 2)), 0, 12) . '.json';
+    }
+
+    /** @return int|null 1 = 잡음, 0 = 다른 요청이 설치 중(10초 기다림), null = 잠금 오류 */
+    private static function lock($name)
+    {
+        try {
+            $row = DB::fetch('SELECT GET_LOCK(?, 10) AS got', array($name));
+        } catch (Throwable $e) {
+            return null;
+        }
+        if (!is_array($row) || !isset($row['got'])) {
+            return null;
+        }
+
+        return (int) $row['got'] === 1 ? 1 : 0;
+    }
+
+    private static function unlock($name)
+    {
+        try {
+            DB::fetch('SELECT RELEASE_LOCK(?) AS released', array($name));
+        } catch (Throwable $e) {
+            // 연결이 끝나면 풀린다.
+        }
     }
 
     private static function readMarker($path)

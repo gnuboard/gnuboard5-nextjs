@@ -428,13 +428,44 @@ if (!function_exists('shop_api_reevaluate_cart_line_coupons')) {
      */
     function shop_api_reevaluate_cart_line_coupons(array $rows, string $mbId): array
     {
-        return array_map(static function (array $row) use ($mbId): array {
+        // 쿠폰 한 장은 한 줄에만 인정한다 — 같은 쿠폰이 여러 줄에 붙어 있으면(예전 카트 · 동시 요청) 먼저 인정된
+        // 줄만 남기고 나머지 줄의 할인은 지운다. 주문 합계가 줄마다의 cp_price 를 더하므로 여기서 막아야 N배가 안 된다.
+        $usedCoupons = [];
+        $out = [];
+        foreach ($rows as $row) {
             if ((int) ($row['cp_price'] ?? 0) <= 0 && (string) ($row['ct_history'] ?? '') === '') {
-                return $row;
+                $out[] = $row;
+                continue;
+            }
+            $cpId = function_exists('shop_api_coupon_marker_extract')
+                ? shop_api_coupon_marker_extract((string) ($row['ct_history'] ?? ''))
+                : '';
+            if ($cpId !== '' && isset($usedCoupons[$cpId])) {
+                DB::execute(
+                    "UPDATE " . DB::table('g5_shop_cart_table') . " SET cp_price = 0, ct_history = '' WHERE ct_id = ?",
+                    [(int) $row['ct_id']]
+                );
+                $out[] = array_merge($row, ['cp_price' => 0, 'ct_history' => '']);
+                continue;
             }
             $discount = shop_api_reevaluate_line_coupon((int) $row['ct_id'], $mbId);
-            return array_merge($row, ['cp_price' => $discount, 'ct_history' => $discount > 0 ? $row['ct_history'] : '']);
-        }, $rows);
+            if ($discount > 0 && $cpId !== '') {
+                $usedCoupons[$cpId] = true;
+            }
+            $out[] = array_merge($row, ['cp_price' => $discount, 'ct_history' => $discount > 0 ? $row['ct_history'] : '']);
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('shop_api_member_order_lock_name')) {
+    /**
+     * 회원의 주문 만들기(무통장)와 결제 확정이 함께 줄을 서는 잠금 이름.
+     * 쿠폰 "이미 썼나" 확인은 읽기라, 장바구니를 여러 개 만들어 동시에 주문하면 같은 쿠폰이 여러 주문에 들어갔다.
+     */
+    function shop_api_member_order_lock_name(string $mbId): string
+    {
+        return 'g5_shop_member_order_' . md5($mbId);
     }
 }
 

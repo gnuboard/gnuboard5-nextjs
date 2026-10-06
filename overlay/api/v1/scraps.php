@@ -73,6 +73,10 @@ function api_scrap_normalize($row)
     $row['wr_id']       = (int) $row['wr_id'];
     $row['bo_subject']  = $board ? $board['bo_subject'] : '[게시판 없음]';
     $row['wr_subject']  = $post && $post['wr_subject'] ? $post['wr_subject'] : '[글 없음]';
+    // 스크랩한 뒤 신고로 숨겨진 글은 목록에서도 제목을 가린다(목록 · 글보기와 같이 — 숨김은 이 API 가 더한 기능).
+    if ($post && (string) ($post['wr_10'] ?? '') === 'report_hidden') {
+        $row['wr_subject'] = '[신고로 숨겨진 글]';
+    }
     $row['wr_seo_title']= $post && isset($post['wr_seo_title']) ? $post['wr_seo_title'] : '';
     $row['wr_datetime'] = $post && isset($post['wr_datetime']) ? $post['wr_datetime'] : '';
     $row['wr_name']     = $post && isset($post['wr_name']) ? $post['wr_name'] : '';

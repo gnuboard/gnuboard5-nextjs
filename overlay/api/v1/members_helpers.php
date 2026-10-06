@@ -135,8 +135,16 @@ function api_member_require_current_password(array $input, array $member): void
         ]);
     }
 
+    // 로그인 · 탈퇴와 같은 실패 횟수 제한 — 토큰만 가진 사람이 이 경로로 비밀번호를 대입하지 못하게.
+    $mbId = (string) ($member['mb_id'] ?? '');
+    $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+    $lockedMsg = Throttle::checkLoginAttempt($mbId, $ip);
+    if ($lockedMsg !== null) {
+        Response::error($lockedMsg, 429);
+    }
     $hash = isset($member['mb_password']) ? (string) $member['mb_password'] : '';
     if ($hash === '' || !Auth::verifyPassword($currentPassword, $hash)) {
+        Throttle::recordLoginFailure($mbId, $ip);
         Response::error('Current password is incorrect.', 401, [
             'mb_password_current' => 'Current password is incorrect.',
         ]);

@@ -33,7 +33,13 @@ if (!function_exists('api_apple_provider_enabled')) {
     function api_apple_verified_claims(array $input): array
     {
         try {
-            return AppleIdToken::verify((string) $input['identity_token'], AppleClient::audiences(), (string) $input['nonce']);
+            $claims = AppleIdToken::verify((string) $input['identity_token'], AppleClient::audiences(), (string) $input['nonce']);
+            // 토큰 · nonce 를 둘 다 요청에서 받으므로, 가로챈 한 쌍을 만료 전까지 다시 보내면 또 로그인된다. 검증을
+            // 통과한 토큰은 한 번만 받는다(앱은 로그인할 때마다 Apple 에서 새 토큰을 받는다). 기록은 1시간 남는다.
+            if (Throttle::checkMemberQuota('appletoken', hash('sha256', (string) $input['identity_token']), 1, 1, true, false) !== null) {
+                Response::error('Apple identity token already used.', 401, ['code' => 'token_reused']);
+            }
+            return $claims;
         } catch (AppleIdTokenException $e) {
             error_log('[apple] identity token rejected: ' . $e->getMessage());
         } catch (\Throwable $e) {

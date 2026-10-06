@@ -1,0 +1,6 @@
+# 개발 저장소의 nextjs/ 를 웹서버가 그대로 내보낼 때 .env 파일(API 주소 · 비밀값)이 열리지 않게 막는다.
+# 지금은 루트 .htaccess 의 테마 규칙이 막지만, 그 규칙은 Next.js 테마를 적용했을 때만 들어간다.
+# (공개 패키지에는 nextjs/ 폴더가 없어 설치본과는 상관없다. api/.htaccess 와 같은 규칙.)
+<FilesMatch "^\.env(\..*)?$">
+Require all denied
+</FilesMatch>

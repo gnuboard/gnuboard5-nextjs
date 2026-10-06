@@ -79,10 +79,9 @@ function nextjs_default_rewrite_runtime_route_sentinel($text)
     foreach ($patterns as $pattern) {
         if (preg_match($pattern, $route, $match)) {
             $value = rawurldecode((string) $match[1]);
-            // 제어문자 · " · ' · / · \ 가 든 값은 넣지 않는다. 문자는 PCRE 16진 이스케이프로만 쓴다 —
-            // 작은따옴표 PHP 문자열에서 '\\\x00' 은 역슬래시 뒤 "x00" 이 되어 "0-\x1F" 거꾸로 된 범위로
-            // 읽히고, 그 Warning 이 gzip 본문 앞에 찍혀 /mypage/memos/new 같은 화면이 하얗게 떴다.
-            if ($value !== '' && !preg_match('/[\x00-\x1F\x7F\x22\x27\x2F\x5C]/', $value)) {
+            // 영문 · 숫자 · _ · - 만 넣는다(실제 값은 쪽지 · 문의 번호). 값이 HTML 의 스크립트 문자열 안에 그대로
+            // 들어가므로, 금지 문자를 고르는 대신 허용 문자만 받는다 — < > & = 등도 들어가지 않게.
+            if (preg_match('/^[A-Za-z0-9_-]{1,64}$/', $value)) {
                 return str_replace('__g5_static__', $value, $text);
             }
         }

@@ -148,6 +148,10 @@ function api_qa_save_uploaded_file($file, $qaConfig, $isAdmin)
 
     @mkdir(G5_DATA_PATH . '/qa', defined('G5_DIR_PERMISSION') ? G5_DIR_PERMISSION : 0755, true);
     @chmod(G5_DATA_PATH . '/qa', defined('G5_DIR_PERMISSION') ? G5_DIR_PERMISSION : 0755);
+    // 서버가 폴더 목록을 보여 주게 설정돼 있어도 남의 문의 첨부 이름이 드러나지 않게(에디터 업로드 폴더와 같이).
+    if (!is_file(G5_DATA_PATH . '/qa/index.php') && !is_file(G5_DATA_PATH . '/qa/index.html')) {
+        @file_put_contents(G5_DATA_PATH . '/qa/index.html', '');
+    }
 
     $source = $filename;
     $storedBase = preg_replace(

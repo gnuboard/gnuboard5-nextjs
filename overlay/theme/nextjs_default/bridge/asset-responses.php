@@ -328,11 +328,27 @@ function nextjs_default_static_html_candidates($path = null)
     return nextjs_default_static_file_candidates($path, 'html');
 }
 
+/**
+ * 앱 폴더 안에 실제로 있는 파일의 경로. 밖으로 해석되면(요청 경로에 .. 가 섞인 경우 등) ''.
+ * _next 자산 처리와 같은 realpath 격리 — 웹서버가 .. 를 걸러 주지 않는 환경에서도 앱 밖 파일을 내보내지 않는다.
+ */
+function nextjs_default_static_app_file($relative)
+{
+    $app_root = realpath(nextjs_default_static_app_path());
+    $real_path = realpath(nextjs_default_static_app_path($relative));
+
+    if (!$app_root || !$real_path || strpos($real_path, $app_root . DIRECTORY_SEPARATOR) !== 0 || !is_file($real_path)) {
+        return '';
+    }
+
+    return $real_path;
+}
+
 function nextjs_default_static_html_path($path = null)
 {
     foreach (nextjs_default_static_html_candidates($path) as $candidate) {
-        $html_path = nextjs_default_static_app_path($candidate);
-        if (is_file($html_path)) {
+        $html_path = nextjs_default_static_app_file($candidate);
+        if ($html_path !== '') {
             return $html_path;
         }
     }
@@ -343,8 +359,8 @@ function nextjs_default_static_html_path($path = null)
 function nextjs_default_static_payload_path($path = null)
 {
     foreach (nextjs_default_static_file_candidates($path, 'txt') as $candidate) {
-        $payload_path = nextjs_default_static_app_path($candidate);
-        if (is_file($payload_path)) {
+        $payload_path = nextjs_default_static_app_file($candidate);
+        if ($payload_path !== '') {
             return $payload_path;
         }
     }

@@ -223,6 +223,32 @@ if ($common_loaded && isset($config) && is_array($config)) {
     );
 }
 
+// 비밀번호 찾기 · 메일 인증 메일 — API 는 링크 주소가 정해졌을 때만 이 메일을 보낸다(요청의 Host 로 만든
+// 주소는 쓰지 않는다). API 와 같은 판단을 쓰도록 api/lib/mail_link.php 를 읽는다. 없으면(예전 API) 건너뛴다.
+$mail_link_lib = $root . '/api/lib/mail_link.php';
+if ($common_loaded && is_file($mail_link_lib)) {
+    include_once $mail_link_lib;
+    $mail_link_base = function_exists('api_mail_link_base') ? api_mail_link_base() : '';
+    nextjs25_add_check(
+        $checks,
+        '메일',
+        '비밀번호 찾기 · 인증 메일 링크 주소',
+        $mail_link_base !== '',
+        $mail_link_base !== ''
+            ? $mail_link_base
+            : 'api/.env 에 NEXT_PUBLIC_APP_URL=https://내사이트 (또는 config.php 의 G5_DOMAIN)를 적어야 이 메일이 나갑니다. 하위 폴더면 폴더까지 적으세요.',
+        'warning'
+    );
+    nextjs25_add_check(
+        $checks,
+        '메일',
+        '메일발송 사용',
+        isset($config['cf_email_use']) && !empty($config['cf_email_use']),
+        '관리자 > 환경설정 > 기본환경설정의 "메일발송 사용"',
+        'warning'
+    );
+}
+
 $prefix = defined('G5_TABLE_PREFIX') ? G5_TABLE_PREFIX : 'g5_';
 $tables = array(
     'user_dday',
@@ -238,6 +264,31 @@ $tables = array(
     'member_pref',
     'social_mobile_ticket',
 );
+
+// 결제 확정 · 주문 만들기는 이름 잠금(GET_LOCK)을 둘 겹쳐 잡는다. MySQL 5.7.5 · MariaDB 10.0.2 보다 옛 DB 는
+// 연결마다 잠금을 하나만 들어 둘째(회원) 잠금을 건너뛴다. /api/v1/status 의 database.multiple_named_locks 와 같은 판단.
+if ($common_loaded && function_exists('sql_fetch')) {
+    $db_version_row = @sql_fetch('SELECT VERSION() AS v', false);
+    $db_version = is_array($db_version_row) && isset($db_version_row['v']) ? (string) $db_version_row['v'] : '';
+    if (preg_match('/(\d+\.\d+\.\d+)-MariaDB/i', $db_version, $db_version_match)) {
+        $db_multiple_locks = version_compare($db_version_match[1], '10.0.2', '>=');
+    } elseif (preg_match('/^(\d+\.\d+\.\d+)/', $db_version, $db_version_match)) {
+        $db_multiple_locks = version_compare($db_version_match[1], '5.7.5', '>=');
+    } else {
+        $db_multiple_locks = false;
+    }
+    nextjs25_add_check(
+        $checks,
+        'DB',
+        'DB 버전 (이름 잠금 여러 개)',
+        $db_multiple_locks,
+        $db_multiple_locks
+            ? $db_version
+            : ($db_version !== '' ? $db_version . ' — ' : '')
+                . 'MySQL 5.7.5 / MariaDB 10.0.2 이상을 권장합니다. 더 옛 DB 에서는 같은 회원의 주문 · 결제 확정을 함께 묶는 잠금을 건너뜁니다(쿠폰 중복 사용은 그래도 막습니다).',
+        'warning'
+    );
+}
 
 if ($common_loaded) {
     foreach ($tables as $suffix) {

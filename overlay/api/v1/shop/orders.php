@@ -479,6 +479,14 @@ if ($apiMethod === 'PATCH' && $od_id !== '') {
         Response::error('취소사유는 100자 이내로 입력해 주세요.', 422);
     }
 
+    // 같은 주문의 취소 · 구매확정이 겹치지 않게 주문 단위 잠금(구매확정과 같은 이름). 잠근 뒤에 주문을 읽어야
+    // 동시에 들어온 두 취소가 둘 다 "주문" 상태를 보고 재고 · 포인트를 두 번 되돌리지 않는다.
+    // 잠금은 요청이 끝나 DB 연결이 닫히면 풀린다.
+    $cancelLock = DB::fetch('SELECT GET_LOCK(?, 3) AS l', ['shop_order_' . $od_id]);
+    if ((int) ($cancelLock['l'] ?? 0) !== 1) {
+        Response::error('주문을 처리하는 중입니다. 잠시 후 다시 시도해 주세요.', 409, ['code' => 'lock_busy']);
+    }
+
     if ($member) {
         $order = DB::fetch(
             "SELECT * FROM " . DB::table('g5_shop_order_table') . "
@@ -610,6 +618,15 @@ if ($apiMethod === 'PATCH' && $od_id !== '') {
     );
     foreach ($cartRestore as $ci) {
         if ((int) ($ci['ct_stock_use'] ?? 0) !== 1) {
+            continue;
+        }
+        // 이 줄의 재고 복구를 차지한(ct_stock_use 1 → 0 으로 바꾼) 요청만 재고를 더한다 — 잠금이 풀린 뒤라도
+        // 같은 줄의 재고를 두 번 되돌리지 않는다.
+        $claimed = DB::execute(
+            "UPDATE " . DB::table('g5_shop_cart_table') . " SET ct_stock_use = 0 WHERE ct_id = ? AND ct_stock_use = 1",
+            [(int) $ci['ct_id']]
+        );
+        if ($claimed !== 1) {
             continue;
         }
         $optionId = trim((string) ($ci['io_id'] ?? ''));
