@@ -14,6 +14,7 @@ import { MobileNav } from "@/components/layout/MobileNav";
 import { CompareTray } from "@/components/shop/CompareTray";
 import { PWAProvider } from "@/components/providers/PWAProvider";
 import { WebVitals } from "@/components/WebVitals";
+import { MaintenanceBeacon } from "@/components/MaintenanceBeacon";
 import { API_BASE_URL, APP_BASE_URL, CLIENT_API_BASE_URL, G5_BASE_URL, rootPublicAssetUrl } from "@/lib/config";
 import { runtimeConfigScriptSource } from "@/lib/runtime-config-script";
 import { usesServerRuntime } from "@/lib/next-runtime";
@@ -164,6 +165,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <CompareTray />
             <PWAProvider />
             <WebVitals />
+            <MaintenanceBeacon />
             <LegacyRouteBridge />
             <RuntimeNavigationBridge />
             <Suspense fallback={null}>

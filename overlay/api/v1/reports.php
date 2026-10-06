@@ -25,6 +25,71 @@ $action = isset($apiSegments[0]) ? $apiSegments[0] : '';
 require_once __DIR__ . '/../lib/report_hide.php'; // 자동 가림 · 기각 뒤 되돌리기(관리자 신고 화면과 같이 쓴다)
 
 /**
+ * 이미지 신고 키 — "게시판/글번호|이미지 경로"(앱 2026-10-06 판부터). 경로는 이 사이트 주소의 경로 부분만(호스트·쿼리
+ * 없이) — 관리자가 원래 글을 열고 사진을 볼 수 있게 한다. 옛 앱은 이미지 주소 전체만 보낸다(원래 글은 모른다).
+ *
+ * @return array{0:string,1:int,2:string}|null [bo_table, wr_id, path]
+ */
+function api_report_image_parts(string $key): ?array
+{
+    if (!preg_match('#^([A-Za-z0-9_]{1,20})/([0-9]{1,10})\|(/[A-Za-z0-9._~%/+=-]+)$#', $key, $m)) {
+        return null;
+    }
+    if (strpos($m[3], '..') !== false) {
+        return null;
+    }
+    return [$m[1], (int) $m[2], $m[3]];
+}
+
+/** 관리자 화면에 띄울 신고 이미지 주소 — 이 사이트의 이미지만(바깥 이미지는 추적 우려로 띄우지 않는다). */
+function api_report_image_url(string $key): ?string
+{
+    $origin = rtrim((string) api_current_origin(), '/');
+    if ($origin === '') {
+        return null;
+    }
+    $parts = api_report_image_parts($key);
+    if ($parts) {
+        return $origin . $parts[2];
+    }
+    return strpos($key, $origin . '/') === 0 ? $key : null;
+}
+
+/**
+ * 새 신고를 최고관리자에게 푸시로 알린다 — 같은 대상의 첫 신고와 자동 가림 때만(신고가 몰려도 알림이 쏟아지지 않게).
+ * 신고 내용·작성자는 싣지 않는다(잠금화면). data {type:'admin.report.created'} — 앱은 누르면 신고 관리를 연다.
+ * 응답을 먼저 내보낸 뒤 보낸다(Expo 호출이 신고 응답을 늦추지 않게).
+ */
+function api_report_notify_admin(string $type, string $reason, int $openCount, bool $autoHidden, ?string $reporterMb): void
+{
+    if ($openCount !== 1 && !$autoHidden) {
+        return;
+    }
+    register_shutdown_function(static function () use ($type, $reason, $autoHidden, $reporterMb) {
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+        }
+        try {
+            if (!class_exists('Notify') && is_file(G5_PATH . '/plugin/webapp/notify/Notify.php')) {
+                require_once G5_PATH . '/plugin/webapp/notify/Notify.php';
+            }
+            $config = DB::fetch("SELECT cf_admin FROM " . DB::table('config_table') . " LIMIT 1");
+            $admin = trim((string) ($config['cf_admin'] ?? ''));
+            if (!class_exists('Notify') || $admin === '' || $admin === (string) $reporterMb) {
+                return;
+            }
+            $subject = ['post' => '글이', 'comment' => '댓글이', 'image' => '이미지가'][$type] ?? '콘텐츠가';
+            $reasons = ['spam' => '스팸/광고', 'abuse' => '욕설/비방', 'adult' => '음란/성인', 'illegal' => '불법 정보'];
+            $title = $autoHidden ? "[신고] {$subject} 자동으로 가려졌어요" : "[신고] {$subject} 신고되었어요";
+            $body = '사유: ' . ($reasons[$reason] ?? '기타') . ' · 신고 관리에서 확인하세요';
+            Notify::emit('admin.report.created', $admin, $title, $body, ['type' => 'admin.report.created', 'target_type' => $type]);
+        } catch (\Throwable $e) {
+            error_log('[reports] admin notify failed: ' . $e->getMessage());
+        }
+    });
+}
+
+/**
  * 신고할 글 · 댓글이 있고 신고하는 사람이 그 글을 읽을 수 있는지 — 읽지 못하는 글(권한 밖 게시판 · 남의 비밀글)은
  * 신고도, 자동 가림 집계도 하지 못한다. 댓글은 원글을 읽을 수 있어야 한다.
  */
@@ -85,6 +150,12 @@ function api_report_target_summary(string $type, string $key): array
         'target_hidden' => false,
     ];
 
+    if ($type === 'image') {
+        // 새 키는 원래 글의 요약(제목·작성자·가림 여부)을 같이 준다. 옛 키(주소만)는 사진 주소만.
+        $imageParts = api_report_image_parts($key);
+        $base = $imageParts ? api_report_target_summary('post', $imageParts[0] . '/' . $imageParts[1]) : $summary;
+        return array_merge($base, ['target_image_url' => api_report_image_url($key)]);
+    }
     if (!in_array($type, ['post', 'comment'], true)) {
         return $summary;
     }
@@ -189,6 +260,13 @@ if ($apiMethod === 'POST' && $action === '') {
     if (($type === 'post' || $type === 'comment') && !api_report_target_readable($viewer ?: null, $type, $key)) {
         Response::error('Report target not found.', 404);
     }
+    // 이미지 신고의 원래 글도 같은 기준 — 읽을 수 없는 글의 사진은 신고하지 못한다(옛 키는 원래 글을 모르니 그대로).
+    if ($type === 'image') {
+        $imageParts = api_report_image_parts($key);
+        if ($imageParts && !api_report_target_readable($viewer ?: null, 'post', $imageParts[0] . '/' . $imageParts[1])) {
+            Response::error('Report target not found.', 404);
+        }
+    }
 
     $table = DB::table('content_report_table');
     if ($reporterMb) {
@@ -237,6 +315,7 @@ if ($apiMethod === 'POST' && $action === '') {
     $autoHidden = $authenticatedOpenCount >= API_REPORT_AUTO_HIDE_THRESHOLD
         ? api_report_auto_hide_target($type, $key, $reportId)
         : false;
+    api_report_notify_admin($type, $reason, $openCount, (bool) $autoHidden, $reporterMb);
 
     Response::success([
         'report_id'  => $reportId,

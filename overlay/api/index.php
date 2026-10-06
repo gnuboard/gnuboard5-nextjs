@@ -638,6 +638,7 @@ $handlers = [
     'reports'       => __DIR__ . '/v1/reports.php',
     'blocks'        => __DIR__ . '/v1/blocks.php',
     'account-deletion-requests' => __DIR__ . '/v1/account-deletion-requests.php',
+    'maintenance'   => __DIR__ . '/v1/maintenance.php', // 화면이 다 뜬 뒤의 백그라운드 신호 — 주기 작업
 ];
 
 if (!$resource || !isset($handlers[$resource])) {
