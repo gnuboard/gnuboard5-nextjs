@@ -61,6 +61,45 @@ if (!function_exists('shop_api_format_my_qna_row')) {
     }
 }
 
+if (!function_exists('shop_api_review_reply_columns')) {
+    /**
+     * 후기 표에 있는 관리자 답변 칸(is_reply_subject · is_reply_content · is_reply_name). 새 설치 SQL 에는 셋 다
+     * 있지만 예전 영카트에서 올라온 DB 에는 없을 수 있다 — 원본 화면은 SELECT * 라 빈 값으로 넘어간다.
+     * @return string[]
+     */
+    function shop_api_review_reply_columns(): array
+    {
+        static $columns = null;
+        if ($columns === null) {
+            try {
+                $found = array_map(static function (array $row): string {
+                    return strtolower((string) ($row['c'] ?? ''));
+                }, DB::fetchAll(
+                    "SELECT COLUMN_NAME AS c FROM INFORMATION_SCHEMA.COLUMNS
+                      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?",
+                    [DB::table('g5_shop_item_use_table')]
+                ));
+            } catch (Throwable $e) {
+                $found = []; // 표 정보를 못 읽으면 답변 없이 — 목록 · 쓰기는 그대로 된다
+            }
+            $columns = array_values(array_intersect(['is_reply_subject', 'is_reply_content', 'is_reply_name'], $found));
+        }
+        return $columns;
+    }
+}
+
+if (!function_exists('shop_api_review_reply_select')) {
+    /** 후기 SELECT 의 답변 칸 — 표에 없는 칸은 빈 문자열로 읽는다. */
+    function shop_api_review_reply_select(string $alias, array $existing): string
+    {
+        $parts = [];
+        foreach (['is_reply_subject', 'is_reply_content', 'is_reply_name'] as $column) {
+            $parts[] = in_array($column, $existing, true) ? "{$alias}.{$column}" : "'' AS {$column}";
+        }
+        return implode(', ', $parts);
+    }
+}
+
 if (!function_exists('shop_api_review_author_name')) {
     function shop_api_review_author_name(array $member): string
     {

@@ -336,10 +336,12 @@ if ($apiMethod === 'GET' && $subAction === '') {
         $params
     );
 
+    // 관리자 답변 칸은 예전 영카트 DB 에 없을 수 있다 — 있는 칸만 읽고 없으면 빈 값(shop_api_review_reply_columns).
+    $replySelect = shop_api_review_reply_select('r', shop_api_review_reply_columns());
     $rows = DB::fetchAll(
         "SELECT r.is_id, r.it_id, r.mb_id, r.is_subject, r.is_content, r.is_score,
                 r.is_name, r.is_confirm, r.is_time,
-                r.is_reply_subject, r.is_reply_content, r.is_reply_name,
+                {$replySelect},
                 i.it_name, i.ca_id, i.it_price, i.it_img1, i.it_seo_title
          FROM {$reviewTable} r
          LEFT JOIN {$itemTable} i ON i.it_id = r.it_id
@@ -443,6 +445,12 @@ if ($apiMethod === 'POST' && $subAction === '') {
     $isName = shop_api_review_author_name($member);
     $isPassword = (string) ($member['mb_password'] ?? '');
 
+    // 관리자 답변 칸은 있는 것만 비워 넣는다(예전 영카트 DB 에는 없을 수 있다). 칸 이름은 정해진 셋 중에서만 온다.
+    $replySetSql = '';
+    foreach (shop_api_review_reply_columns() as $replyColumn) {
+        $replySetSql .= "{$replyColumn} = '', ";
+    }
+
     DB::execute(
         "INSERT INTO " . DB::table('g5_shop_item_use_table') . " SET
             it_id      = ?,
@@ -453,9 +461,7 @@ if ($apiMethod === 'POST' && $subAction === '') {
             is_name    = ?,
             is_password = ?,
             is_confirm = ?,
-            is_reply_subject = '',
-            is_reply_content = '',
-            is_reply_name = '',
+            {$replySetSql}
             is_time    = ?,
             is_ip      = ?",
         [

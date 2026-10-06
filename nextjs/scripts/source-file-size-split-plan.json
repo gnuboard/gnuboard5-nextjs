@@ -79,11 +79,6 @@
     "targetLines": 700,
     "nextStep": "Move paging, member media/icon URLs, board file URLs, and board post change-guard helpers into focused api/lib/*_helpers.php files like board_access_helpers.php."
   },
-  "../overlay/api/v1/shop/common_session_helpers.php": {
-    "priority": "medium",
-    "targetLines": 650,
-    "nextStep": "Separate cart-id cookie helpers, guest order password/cookie helpers, and LG/cash receipt URL builders into their own shop helper files."
-  },
   "../overlay/api/v1/members.php": {
     "priority": "medium",
     "targetLines": 650,

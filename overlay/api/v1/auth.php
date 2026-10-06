@@ -111,6 +111,7 @@ if (!function_exists('api_auth_send_password_reset_mail')) {
 }
 
 require_once __DIR__ . '/auth_account_routes.php';
+require_once __DIR__ . '/auth_email_verify_routes.php'; // 메일 인증 링크 확인 · 인증 메일 다시 보내기
 require_once __DIR__ . '/auth_session_routes.php';
 require_once __DIR__ . '/auth_web_ticket_route.php'; // 앱 → 레거시 웹 1회용 입장권 (T-P2-09)
 require_once __DIR__ . '/auth_social_apple_route.php'; // Sign in with Apple — 네이티브 앱 전용 (SC-11)
