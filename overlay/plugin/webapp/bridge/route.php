@@ -1,4 +1,7 @@
 <?php
+// 세션 — 공유 호스팅(/tmp)의 세션 청소 멈춤과 쿠키 없는 요청의 빈 세션 파일을 막는다(코어보다 먼저 감싸야 한다).
+require_once dirname(__DIR__) . '/session_guard.php';
+webapp_session_guard_install();
 require_once dirname(__DIR__, 3) . '/common.php';
 
 if (!defined('_GNUBOARD_')) {

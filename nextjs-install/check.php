@@ -22,7 +22,7 @@ function nextjs25_h($value)
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
 
-function nextjs25_render_page($title, $checks, $manual_links = array())
+function nextjs25_render_page($title, $checks, $manual_links = array(), $actions_html = '')
 {
     $counts = array('ok' => 0, 'warning' => 0, 'error' => 0);
     foreach ($checks as $check) {
@@ -52,7 +52,8 @@ function nextjs25_render_page($title, $checks, $manual_links = array())
     th { background: #f9fafb; font-size: 13px; color: #4b5563; }
     tr:last-child td { border-bottom: 0; }
     code { background: #f3f4f6; border-radius: 4px; padding: 2px 5px; }
-    .links { margin-top: 24px; background: #fff; border: 1px solid #e5e7eb; padding: 16px; }
+    .links, .actions { margin-top: 24px; background: #fff; border: 1px solid #e5e7eb; padding: 16px; }
+    .actions button { margin-top: 8px; padding: 8px 14px; font-weight: 700; cursor: pointer; }
     .links a { color: #075985; }
   </style>
 </head>
@@ -85,6 +86,8 @@ function nextjs25_render_page($title, $checks, $manual_links = array())
     <?php } ?>
     </tbody>
   </table>
+
+  <?php echo $actions_html; // 이 파일이 만든 양식만(값은 nextjs25_h 로 감쌌다) ?>
 
   <?php if (!empty($manual_links)) { ?>
   <div class="links">
@@ -126,6 +129,64 @@ function nextjs25_relative_exists(&$checks, $root, $path, $label, $type = 'file'
     $absolute = $root . '/' . $path;
     $ok = $type === 'dir' ? is_dir($absolute) : is_file($absolute);
     nextjs25_add_check($checks, '파일', $label, $ok, $path, $level);
+}
+
+/** PHP 가 세션 파일을 두는 폴더 — save_path 의 "N;/path" 꼴도 풀고, 비면 시스템 임시 폴더. */
+function nextjs25_session_dir()
+{
+    $path = (string) session_save_path();
+    if ($path === '') {
+        $path = (string) ini_get('session.save_path');
+    }
+    if (strpos($path, ';') !== false) {
+        $parts = explode(';', $path);
+        $path = (string) end($parts);
+    }
+    if ($path === '') {
+        $path = sys_get_temp_dir();
+    }
+    return rtrim($path, '/\\');
+}
+
+/**
+ * 세션 폴더를 시간 한도 안에서 한 번 훑는다 — PHP 세션 청소(GC)가 하는 일(목록 + 파일마다 수정 시각)과 같아서
+ * 걸린 시간이 곧 청소가 걸리는 요청이 멈추는 시간이다. $delete 면 만료된 이 계정의 sess_ 파일을 지운다.
+ */
+function nextjs25_scan_sessions($dir, $max_lifetime, $budget_seconds, $delete)
+{
+    $result = array('readable' => false, 'files' => 0, 'expired' => 0, 'deleted' => 0, 'complete' => false, 'seconds' => 0.0);
+    $started = microtime(true);
+    $handle = @opendir($dir);
+    if (!$handle) {
+        return $result;
+    }
+    $result['readable'] = true;
+    $cutoff = time() - max(60, (int) $max_lifetime);
+    $uid = function_exists('posix_geteuid') ? posix_geteuid() : null;
+    $complete = true;
+    while (($name = readdir($handle)) !== false) {
+        if (strncmp($name, 'sess_', 5) !== 0) {
+            continue;
+        }
+        $result['files']++;
+        $file = $dir . '/' . $name;
+        $mtime = @filemtime($file);
+        if ($mtime !== false && $mtime < $cutoff) {
+            $result['expired']++;
+            if ($delete && preg_match('/^sess_[A-Za-z0-9,-]+$/', $name)
+                && ($uid === null || @fileowner($file) === $uid) && @unlink($file)) {
+                $result['deleted']++;
+            }
+        }
+        if (($result['files'] & 255) === 0 && microtime(true) - $started > $budget_seconds) {
+            $complete = false;
+            break;
+        }
+    }
+    closedir($handle);
+    $result['complete'] = $complete;
+    $result['seconds'] = microtime(true) - $started;
+    return $result;
 }
 
 function nextjs25_sql_escape_value($value)
@@ -249,6 +310,59 @@ if ($common_loaded && is_file($mail_link_lib)) {
     );
 }
 
+// PHP 세션 파일 — 그누보드 코어는 요청마다 세션을 열고(쿠키 없이 오는 앱 · 봇 요청도 빈 세션 파일을 하나씩 만든다)
+// 요청 1%마다 세션 폴더 전체를 훑어 오래된 파일을 지운다(gc_probability 1/100). 파일이 아주 많으면 그 1% 요청이
+// 폴더를 훑는 동안 수 초씩 멈춘다. 셸 없는 호스팅에서도 여기서 상태를 보고 만료된 파일을 지울 수 있다.
+$session_actions_html = '';
+if ($common_loaded && session_status() === PHP_SESSION_ACTIVE) {
+    $session_handler = (string) ini_get('session.save_handler');
+    if ($session_handler !== 'files') {
+        nextjs25_add_check($checks, '세션', 'PHP 세션 저장 방식', true, $session_handler . ' — 파일 세션이 아니라 이 점검은 해당 없음');
+    } else {
+        $session_dir = nextjs25_session_dir();
+        $session_lifetime = (int) ini_get('session.gc_maxlifetime');
+        if (empty($_SESSION['nextjs25_check_token'])) {
+            $_SESSION['nextjs25_check_token'] = bin2hex(random_bytes(16));
+        }
+        $session_token = (string) $_SESSION['nextjs25_check_token'];
+        $session_cleanup = isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST'
+            && isset($_POST['nextjs25_session_cleanup'], $_POST['token'])
+            && hash_equals($session_token, (string) $_POST['token']);
+        if ($session_cleanup) {
+            $cleaned = nextjs25_scan_sessions($session_dir, $session_lifetime, 20, true);
+            nextjs25_add_check(
+                $checks,
+                '세션',
+                '만료된 세션 파일 지우기',
+                $cleaned['readable'],
+                $cleaned['deleted'] . '개 지움(' . round($cleaned['seconds'], 1) . '초' . ($cleaned['complete'] ? '' : ' — 시간 한도로 중간에 멈춤, 다시 누르세요') . ')'
+            );
+        }
+        $scan = nextjs25_scan_sessions($session_dir, $session_lifetime, 8, false);
+        nextjs25_add_check($checks, '세션', 'PHP 세션 폴더', $scan['readable'], $session_dir . ($scan['readable'] ? '' : ' — 읽을 수 없음'), 'warning');
+        if ($scan['readable']) {
+            $session_slow = !$scan['complete'] || $scan['seconds'] > 1.0 || $scan['files'] > 20000;
+            nextjs25_add_check(
+                $checks,
+                '세션',
+                '세션 파일 수 · 한 번 훑는 시간',
+                !$session_slow,
+                ($scan['complete'] ? '' : '8초 안에 다 못 셈 — 최소 ') . number_format($scan['files']) . '개, 그중 만료(' . round($session_lifetime / 3600, 1) . '시간 넘음) '
+                    . number_format($scan['expired']) . '개 · 훑는 데 ' . round($scan['seconds'], 2) . '초'
+                    . ($session_slow ? ' — 요청 ' . ini_get('session.gc_probability') . '/' . ini_get('session.gc_divisor') . '마다 이만큼 멈춥니다' : ''),
+                'warning'
+            );
+            if ($scan['expired'] > 0) {
+                $session_actions_html = '<form class="actions" method="post"><strong>만료된 세션 파일 지우기</strong>'
+                    . '<p>' . nextjs25_h(number_format($scan['expired'])) . '개 이상이 만료됐습니다. 이 계정 소유의 만료된 sess_ 파일만 지웁니다'
+                    . '(한 번에 최대 20초 — 남으면 다시 누르세요). 로그인 중인 회원의 세션은 만료 전이라 지워지지 않습니다.</p>'
+                    . '<input type="hidden" name="token" value="' . nextjs25_h($session_token) . '">'
+                    . '<button type="submit" name="nextjs25_session_cleanup" value="1">만료된 세션 파일 지우기</button></form>';
+            }
+        }
+    }
+}
+
 $prefix = defined('G5_TABLE_PREFIX') ? G5_TABLE_PREFIX : 'g5_';
 $tables = array(
     'user_dday',
@@ -315,4 +429,4 @@ if (defined('G5_URL') && G5_URL) {
     $manual_links[] = $base_url . '/shop';
 }
 
-nextjs25_render_page('G5 Next.js 25 설치 진단', $checks, $manual_links);
+nextjs25_render_page('G5 Next.js 25 설치 진단', $checks, $manual_links, $session_actions_html);
