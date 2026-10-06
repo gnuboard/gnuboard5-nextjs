@@ -19,6 +19,11 @@ RedirectMatch 301 ^/mobile/shop/?$ /shop
 RedirectMatch 301 ^/shop/$ /shop
 </IfModule>
 
+# Home. The root is a real directory, so the passthrough would send it straight to
+# Gnuboard's index.php; through the bridge it gets the session guard
+# (plugin/webapp/session_guard.php — no session-folder scan stalls on shared hosting).
+RewriteRule ^$ theme/nextjs_default/route.php [QSA,L]
+
 # Mobile Gnuboard home routes handled by the Next.js 25 bridge before the real
 # /mobile directory or file can win.
 RewriteRule ^mobile/?$ theme/nextjs_default/route.php [QSA,L]

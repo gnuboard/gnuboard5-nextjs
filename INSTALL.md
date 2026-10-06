@@ -42,6 +42,16 @@ gnuboard5-nextjs-vX.Y.Z.zip
 필수 파일, 활성 테마, runtime 테이블, Apache rewrite/캐시 파일 상태를 한 번에
 점검할 수 있습니다. 배포가 끝나면 외부 노출을 줄이기 위해 이 파일을 삭제해도 됩니다.
 
+## 업그레이드
+
+1. 기존 Gnuboard 파일과 DB를 백업합니다.
+2. 새 release zip을 같은 Gnuboard 루트에 덮어 풉니다. `api/.env`, `config.php`, `data/`는 zip에 없어
+   그대로 남습니다.
+3. Apache/LiteSpeed는 관리자 > 환경설정 > 테마설정에서 `Next.js Default` 테마를 **한 번 다시 적용**합니다.
+   새 버전이 루트 `.htaccess`의 rewrite 블록에 규칙을 더했을 때(예: v0.1.12의 홈 규칙) 이렇게 해야 반영됩니다.
+   nginx는 짧은 주소 설정의 "Nginx 설정 코드"와 `nextjs-install/nginx/`의 예시를 다시 확인합니다.
+4. `/api/v1/status`에서 `schema.ok`가 `true`인지 확인합니다. 바뀐 테이블은 API가 스스로 고칩니다.
+
 ## 포함 파일
 
 Release zip은 Gnuboard 루트에 바로 덮어쓸 수 있는 구조입니다.

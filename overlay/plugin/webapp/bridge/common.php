@@ -341,6 +341,10 @@ if (!function_exists('g5_nextjs_rewrite_pre_patterns')) {
     function g5_nextjs_rewrite_pre_patterns()
     {
         return array(
+            // 홈 — 루트는 실제 폴더라 통과 규칙에 걸려 그누보드 index.php 로 바로 간다. 브리지로 받아
+            // 세션 처리기(session_guard.php)를 거친 뒤 그 index.php 를 그대로 돌린다(bridge/route.php).
+            '',
+            'index\.php',
             'mobile/?',
             'mobile/index\.php',
             'mobile/(content|group)\.php',
@@ -350,6 +354,17 @@ if (!function_exists('g5_nextjs_rewrite_pre_patterns')) {
             'shop/?',
             'shop/(index|cart|wishlist|couponzone|search|largeimage|mypage|orderinquiry|personalpay|category|event|item|iteminfo|list|listtype|orderform|orderinquirycancel|orderinquiryview|personalpayform|personalpayresult)\.php',
         );
+    }
+}
+
+if (!function_exists('g5_nextjs_is_home_request')) {
+    /** 이 요청이 설치 폴더의 홈(/ · /index.php)인지 — 하위 폴더 설치면 그 폴더 기준. */
+    function g5_nextjs_is_home_request()
+    {
+        $path = (string) parse_url(isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '', PHP_URL_PATH);
+        $base = defined('G5_URL') ? rtrim((string) parse_url(G5_URL, PHP_URL_PATH), '/') : '';
+
+        return in_array($path, array($base . '/', $base . '/index.php', $base === '' ? '/' : $base), true);
     }
 }
 

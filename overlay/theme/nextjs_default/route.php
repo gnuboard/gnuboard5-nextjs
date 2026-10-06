@@ -1,4 +1,10 @@
 <?php
+// 세션 — 공유 호스팅(/tmp)의 세션 청소 멈춤을 막는다(plugin/webapp/session_guard.php). nginx 예시는 테마 화면과
+// 홈을 이 파일로 바로 보낸다. 브리지(bridge/route.php)를 거쳐 왔으면 이미 감싸져 있어 아무 일도 하지 않는다.
+if (is_file(dirname(__DIR__, 2) . '/plugin/webapp/session_guard.php')) {
+    require_once dirname(__DIR__, 2) . '/plugin/webapp/session_guard.php';
+    webapp_session_guard_install();
+}
 require_once dirname(__DIR__, 2) . '/common.php';
 
 if (!defined('_GNUBOARD_')) {

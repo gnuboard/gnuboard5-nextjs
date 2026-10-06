@@ -10,6 +10,17 @@ if (!defined('_GNUBOARD_')) {
 
 require_once __DIR__ . '/common.php';
 
+// 홈(/ · /index.php) — .htaccess 가 위의 세션 처리기를 거치게 하려고 이리 보낸다. 그리는 일은 원래처럼 그누보드
+// index.php 가 한다(테마 index · 설치 안내 · 커뮤니티 끔 처리 그대로). 전역 변수를 쓰므로 함수 밖에서 읽는다.
+if (g5_nextjs_is_home_request() && is_file(G5_PATH . '/index.php')) {
+    $g5_nextjs_home_script = rtrim((string) parse_url(G5_URL, PHP_URL_PATH), '/') . '/index.php';
+    $_SERVER['SCRIPT_NAME'] = $_SERVER['PHP_SELF'] = $g5_nextjs_home_script;
+    $_SERVER['SCRIPT_FILENAME'] = G5_PATH . '/index.php';
+    chdir(G5_PATH); // index.php 는 './_common.php' 처럼 현재 폴더 기준으로 읽는다
+    require G5_PATH . '/index.php';
+    exit;
+}
+
 g5_nextjs_redirect_legacy_admin_request();
 
 $g5_nextjs_theme = g5_nextjs_runtime_active_theme();
