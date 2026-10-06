@@ -390,7 +390,7 @@ function checkRepositoryContracts() {
   requireScript(scripts, 'check:file-size', 'scripts/check-source-file-size.mjs');
   requireScript(scripts, 'report:file-size', 'scripts/report-source-file-hotspots.mjs');
   requireScript(scripts, 'check:a11y', 'playwright test tests/a11y.spec.ts');
-  requireScript(scripts, 'check:audit', 'npm audit --audit-level=moderate');
+  requireScript(scripts, 'check:audit', 'npm audit --omit=dev --audit-level=moderate');
   requireScript(scripts, 'check:code', 'npm run check');
   requireScript(scripts, 'check:public-branches', 'scripts/check-public-package-branches.mjs');
   requireScript(

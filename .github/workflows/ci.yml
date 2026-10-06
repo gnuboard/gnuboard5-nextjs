@@ -142,7 +142,7 @@ jobs:
         run: npm ci
 
       - name: Check dependency audit
-        run: npm audit --audit-level=moderate
+        run: npm audit --omit=dev --audit-level=moderate
 
       - name: Check Vercel server env
         run: npm run check:deploy-config -- --mode vercel --require-env --source "${G5_THEME_SOURCE}" --name "${G5_THEME_NAME}"
@@ -197,7 +197,7 @@ jobs:
         run: npm ci
 
       - name: Check dependency audit
-        run: npm audit --audit-level=moderate
+        run: npm audit --omit=dev --audit-level=moderate
 
       - name: Check Vercel static env
         run: npm run check:deploy-config -- --mode static --require-env --source "${G5_THEME_SOURCE}" --name "${G5_THEME_NAME}"

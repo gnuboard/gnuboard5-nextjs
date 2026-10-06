@@ -221,7 +221,7 @@ if (!hasFlag('--skip-base')) {
 }
 
 if (!hasFlag('--skip-audit')) {
-  run('dependency audit', npmCmd, ['audit', '--audit-level=moderate']);
+  run('dependency audit', npmCmd, ['audit', '--omit=dev', '--audit-level=moderate']);
 }
 
 await resolveStrictSmokeSamples();

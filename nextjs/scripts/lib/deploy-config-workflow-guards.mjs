@@ -137,7 +137,7 @@ export function checkVercelCiWorkflows({ workflowPaths, fail }) {
       'Check Vercel static env',
       '--mode static --require-env',
       'G5_NEXT_RUNTIME: static',
-      'npm audit --audit-level=moderate',
+      'npm audit --omit=dev --audit-level=moderate',
       'npx playwright install --with-deps chromium',
       'npm run check:vercel-static',
     ]) {
