@@ -89,7 +89,42 @@ function pg_append_order_history(string $orderId, string $message): void {
     );
 }
 
+/**
+ * 가상계좌 입금통보 반영 — 결제 확인 · 주문 취소(PATCH /orders/{id}) · 결제 취소와 같은 주문 잠금(pg_payment_confirm_lock_name)
+ * 안에서 다시 읽고 바꾼다. 쇼핑 표가 MyISAM 이라 트랜잭션은 막아 주지 않는다 — 잠금 없이 읽고 쓰면 취소가 재고 · 포인트 ·
+ * 쿠폰을 되돌린 뒤 이 통보가 '입금'으로 덮어써, 돈은 받았는데 할인은 돌려준 주문이 된다.
+ * 잠금 이름은 요청 값이 아니라 DB 의 주문번호로 만든다(od_id 는 숫자 열이라 앞에 0 을 붙인 값도 같은 주문을 찾는다).
+ * 잠금을 못 잡으면 실패로 답한다 — PG 가 통보를 다시 보낸다.
+ */
 function pg_mark_vbank_deposited(string $provider, string $orderId, string $tno, int $amount, string $paidAt, string $depositName = '', string $bankAccount = '', array $cashReceipt = []): array {
+    $found = DB::fetch(
+        "SELECT od_id FROM " . DB::table('g5_shop_order_table') . "
+         WHERE od_id = ? LIMIT 1",
+        [$orderId]
+    );
+    if (!$found) {
+        return ['ok' => false, 'error' => 'Order not found.'];
+    }
+    $lock = pg_payment_confirm_acquire_lock((string) $found['od_id'], 5);
+    if (empty($lock['ok'])) {
+        return ['ok' => false, 'error' => 'Order is busy. Please retry shortly.'];
+    }
+    try {
+        $result = pg_mark_vbank_deposited_locked($provider, $orderId, $tno, $amount, $paidAt, $depositName, $bankAccount, $cashReceipt);
+    } finally {
+        pg_payment_confirm_release_lock((string) ($lock['lock'] ?? ''));
+    }
+
+    // 알림은 잠금을 푼 뒤에 — 메일 발송이 느려도 취소 · 확인을 붙잡지 않게(결제 확인과 같은 순서).
+    if (!empty($result['ok']) && empty($result['already'])) {
+        shop_api_send_order_mail($orderId, 'paid');
+        shop_api_defer_order_push((string) $orderId, 'paid');
+    }
+    return $result;
+}
+
+/** pg_mark_vbank_deposited() 가 주문 잠금을 잡은 뒤에만 부른다. */
+function pg_mark_vbank_deposited_locked(string $provider, string $orderId, string $tno, int $amount, string $paidAt, string $depositName = '', string $bankAccount = '', array $cashReceipt = []): array {
     if (trim($paidAt) === '') {
         $paidAt = date('Y-m-d H:i:s');
     }
@@ -161,7 +196,8 @@ function pg_mark_vbank_deposited(string $provider, string $orderId, string $tno,
         $params[] = $memo;
         $params[] = $orderId;
 
-        DB::execute(
+        // 상태 가드 — 잠금을 잡지 않는 쓰기(관리자 화면 등)가 그사이 상태를 바꿨으면 덮어쓰지 않는다.
+        $updated = DB::execute(
             "UPDATE " . DB::table('g5_shop_order_table') . "
              SET od_status = ?, od_receipt_price = ?, od_misu = ?, od_receipt_time = ?, od_deposit_name = ?,
                  od_tno = ?, od_bank_account = ?
@@ -170,9 +206,12 @@ function pg_mark_vbank_deposited(string $provider, string $orderId, string $tno,
                      WHEN od_shop_memo = '' THEN ?
                      ELSE CONCAT(od_shop_memo, '\n', ?)
                  END
-             WHERE od_id = ?",
+             WHERE od_id = ? AND od_status = '주문'",
             $params
         );
+        if ($updated !== 1) {
+            throw new RuntimeException('Order status changed before the deposit was applied.');
+        }
         DB::execute(
             "UPDATE " . DB::table('g5_shop_cart_table') . "
              SET ct_status = ?
@@ -185,8 +224,6 @@ function pg_mark_vbank_deposited(string $provider, string $orderId, string $tno,
         return ['ok' => false, 'error' => $e->getMessage()];
     }
 
-    shop_api_send_order_mail($orderId, 'paid');
-    shop_api_defer_order_push((string) $orderId, 'paid');
     return ['ok' => true, 'already' => false, 'status' => '입금'];
 }
 

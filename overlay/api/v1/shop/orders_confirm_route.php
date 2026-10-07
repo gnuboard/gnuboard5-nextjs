@@ -86,8 +86,8 @@ $confirmInput = json_decode((string) file_get_contents('php://input'), true);
 $confirmInput = is_array($confirmInput) ? $confirmInput : [];
 $confirmUid = trim((string) ($confirmInput['uid'] ?? ($_GET['uid'] ?? '')));
 
-// 이중 클릭·동시 요청에 이중 적립이 없도록 주문 단위 락. 응답(exit) 전에 반드시 푼다.
-$confirmLock = 'shop_order_' . $od_id;
+// 이중 클릭·동시 요청에 이중 적립이 없도록 주문 단위 락(주문 취소 · 결제 확인과 같은 이름). 응답(exit) 전에 반드시 푼다.
+$confirmLock = shop_api_order_lock_name((string) $od_id);
 $lock = DB::fetch('SELECT GET_LOCK(?, 3) AS l', [$confirmLock]);
 if ((int) ($lock['l'] ?? 0) !== 1) {
     Response::error('Order is busy. Please retry shortly.', 409, ['code' => 'lock_busy']);

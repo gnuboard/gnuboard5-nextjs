@@ -479,10 +479,11 @@ if ($apiMethod === 'PATCH' && $od_id !== '') {
         Response::error('취소사유는 100자 이내로 입력해 주세요.', 422);
     }
 
-    // 같은 주문의 취소 · 구매확정이 겹치지 않게 주문 단위 잠금(구매확정과 같은 이름). 잠근 뒤에 주문을 읽어야
-    // 동시에 들어온 두 취소가 둘 다 "주문" 상태를 보고 재고 · 포인트를 두 번 되돌리지 않는다.
+    // 같은 주문의 취소 · 구매확정 · 결제 확인 · 입금통보가 겹치지 않게 주문 단위 잠금(shop_api_order_lock_name — 모두 같은 이름).
+    // 잠근 뒤에 주문을 읽어야 동시에 들어온 두 취소가 둘 다 "주문" 상태를 보고 재고 · 포인트를 두 번 되돌리지 않고,
+    // 결제 확인이 "준비"를 본 뒤에 상품 줄을 장바구니로 옮기거나 입금통보가 취소를 덮어쓰지 않는다.
     // 잠금은 요청이 끝나 DB 연결이 닫히면 풀린다.
-    $cancelLock = DB::fetch('SELECT GET_LOCK(?, 3) AS l', ['shop_order_' . $od_id]);
+    $cancelLock = DB::fetch('SELECT GET_LOCK(?, 3) AS l', [shop_api_order_lock_name((string) $od_id)]);
     if ((int) ($cancelLock['l'] ?? 0) !== 1) {
         Response::error('주문을 처리하는 중입니다. 잠시 후 다시 시도해 주세요.', 409, ['code' => 'lock_busy']);
     }

@@ -10,6 +10,7 @@ import { shopProductHref } from "@/lib/product-url";
 import { htmlToPlainText } from "@/lib/sanitize";
 import { cn, formatPrice } from "@/lib/utils";
 import { ProductPurchaseControls, type ProductPurchaseControlsProps } from "./ProductPurchaseControls";
+import { isProductDetailSoldOut } from "@/components/shop/productDetailHelpers";
 import { formatProductPrice } from "@/lib/shop-product-state";
 
 type ShippingPaymentDisplay = {
@@ -226,7 +227,7 @@ export function ProductPurchasePanel({
       <div className="product-stock text-sm">
         {isTelInquiry ? (
           <span className="font-medium text-primary">전화문의 상품</span>
-        ) : product.it_soldout === "1" ? (
+        ) : isProductDetailSoldOut(product) ? (
           <span className="font-medium text-red-700">품절</span>
         ) : product.it_stock_qty > 0 ? (
           <span className="text-green-700">재고: {product.it_stock_qty}개</span>

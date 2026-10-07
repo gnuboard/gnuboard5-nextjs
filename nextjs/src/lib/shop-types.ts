@@ -173,8 +173,13 @@ export interface ShopCartItem {
   it_name: string;
   it_seo_title?: string;
   ct_price: number;
+  // 담을 때의 상품 가격(옵션 금액 빼고) — 장바구니의 판매가. ct_price 는 줄 금액 ÷ 수량.
+  ct_base_price?: number;
+  // 줄 포인트(개당) — 장바구니의 포인트는 Σ ct_point × ct_qty.
+  ct_point?: number;
   ct_qty: number;
   ct_option: string;
+  io_id?: string;
   io_type?: number;
   io_price?: number;
   ct_direct?: number;

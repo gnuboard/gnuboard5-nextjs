@@ -61,6 +61,11 @@ if ($action === 'confirm' && $apiMethod === 'POST') {
         ]);
     }
 
+    // 결제를 기다리는 주문만 승인한다 — 취소 · 제작 중인 주문에 돈을 받고 'paid' 로 되돌리지 않게(토스를 부르기 전에 막는다).
+    if ((string) $order['status'] !== 'pending') {
+        Response::error('This order is not waiting for payment.', 409, ['code' => 'not_pending']);
+    }
+
     if ((int) $order['total_amount'] !== $amount) {
         Response::error('Payment amount does not match the order amount.', 422);
     }
@@ -108,7 +113,7 @@ if ($action === 'confirm' && $apiMethod === 'POST') {
     DB::execute(
         "UPDATE {$orderTable}
          SET status = 'paid', pg_service = ?, pg_tno = ?, paid_at = NOW()
-         WHERE order_id = ?",
+         WHERE order_id = ? AND status = 'pending'",
         ['toss', $tno, (int) $order['order_id']]
     );
 

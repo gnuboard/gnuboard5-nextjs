@@ -109,6 +109,13 @@ function copyOutToTemp() {
   cpSync(outDir, tempDir, { recursive: true });
 }
 
+// --if-present: theme/<이름>/ 이 있을 때만 넣는다. 공개 저장소(gnuboard5-nextjs)는 기본 테마를 overlay/ 에 두고
+// 루트의 npm run package 가 묶으므로 theme/ 이 없다 — create-theme 로 만든 내 테마(theme/<이름>)만 여기로 넣는다.
+if (process.argv.includes('--if-present') && !existsSync(themeRootDir)) {
+  console.log(`[sync-static-theme] theme/${THEME_NAME} 이 없어 넣지 않습니다(--if-present).`);
+  process.exit(0);
+}
+
 assertInside(nextRoot, outDir, 'outDir');
 assertInside(join(repoRoot, 'theme'), themeAppDir, 'themeAppDir');
 assertInside(parentDir, tempDir, 'tempDir');

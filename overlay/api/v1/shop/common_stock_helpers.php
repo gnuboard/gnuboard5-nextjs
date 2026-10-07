@@ -250,3 +250,97 @@ if (!function_exists('shop_api_order_stock_groups')) {
         return array_values($groups);
     }
 }
+
+if (!function_exists('shop_api_order_buy_qty_problem')) {
+    /**
+     * 주문할 줄들이 상품마다 최소 · 최대 구매수량에 맞는가 — 영카트 shop_validate_cart_rows()(lib/shop.cartvalidate.lib.php)와
+     * 같은 규칙: 본품(선택옵션 · 옵션 없는 줄) 수량의 합이 1 이상, 최소 이상, 최대 이하(추가옵션은 세지 않는다).
+     * 담을 때만 보면 줄 하나 지우기 · 다른 기기 장바구니 모으기로 규칙을 벗어난 장바구니가 그대로 주문된다.
+     * 맞지 않는 첫 상품을 돌려준다(모두 맞으면 null). DB 없이 계산만 한다.
+     *
+     * @param array $cartItems [['it_id', 'it_name', 'io_type', 'ct_qty'], ...]
+     * @param array $limits    it_id => ['it_buy_min_qty' => int, 'it_buy_max_qty' => int, 'it_name'?]
+     */
+    function shop_api_order_buy_qty_problem(array $cartItems, array $limits): ?array
+    {
+        $baseQty = [];
+        $names = [];
+        foreach ($cartItems as $row) {
+            $itId = (string) ($row['it_id'] ?? '');
+            if ($itId === '') {
+                continue;
+            }
+            $names[$itId] = $names[$itId] ?? (string) ($row['it_name'] ?? $itId);
+            $baseQty[$itId] = ($baseQty[$itId] ?? 0)
+                + ((int) ($row['io_type'] ?? 0) === 1 ? 0 : max(0, (int) ($row['ct_qty'] ?? 0)));
+        }
+
+        foreach ($baseQty as $itId => $qty) {
+            $min = max(0, (int) ($limits[$itId]['it_buy_min_qty'] ?? 0));
+            $max = max(0, (int) ($limits[$itId]['it_buy_max_qty'] ?? 0));
+            if ($qty < 1 || ($min > 0 && $qty < $min) || ($max > 0 && $qty > $max)) {
+                return [
+                    'it_id' => (string) $itId,
+                    'it_name' => (string) ($limits[$itId]['it_name'] ?? $names[$itId]),
+                    'qty' => $qty,
+                    'min' => $min,
+                    'max' => $max,
+                ];
+            }
+        }
+
+        return null;
+    }
+}
+
+if (!function_exists('shop_api_validate_order_buy_qty')) {
+    /**
+     * 주문 · 결제 준비 직전에 최소 · 최대 구매수량을 다시 본다(shop_api_order_buy_qty_problem). 결제 승인 때는 보지 않는다 —
+     * 손님이 이미 결제한 뒤라, 그사이 관리자가 수량 제한을 바꿨다고 승인을 거절하면 "돈은 냈는데 주문 실패"가 된다.
+     */
+    function shop_api_validate_order_buy_qty(array $cartItems): void
+    {
+        $itIds = array_values(array_unique(array_filter(array_map(
+            static function ($row) {
+                return (string) ($row['it_id'] ?? '');
+            },
+            $cartItems
+        ))));
+        if (!$itIds) {
+            return;
+        }
+
+        $limits = [];
+        $rows = DB::fetchAll(
+            "SELECT it_id, it_name, it_buy_min_qty, it_buy_max_qty
+             FROM " . DB::table('g5_shop_item_table') . "
+             WHERE it_id IN (" . implode(',', array_fill(0, count($itIds), '?')) . ")",
+            $itIds
+        );
+        foreach ($rows as $row) {
+            $limits[(string) $row['it_id']] = $row;
+        }
+
+        $problem = shop_api_order_buy_qty_problem($cartItems, $limits);
+        if ($problem === null) {
+            return;
+        }
+
+        if ($problem['qty'] < 1) {
+            $message = $problem['it_name'] . ' 상품은 선택옵션을 함께 주문해야 합니다. 장바구니에서 다시 확인해 주세요.';
+        } elseif ($problem['min'] > 0 && $problem['qty'] < $problem['min']) {
+            $message = $problem['it_name'] . ' 상품은 ' . number_format($problem['min']) . '개 이상 주문해야 합니다. 지금 '
+                . number_format($problem['qty']) . '개입니다. 장바구니에서 수량을 확인해 주세요.';
+        } else {
+            $message = $problem['it_name'] . ' 상품은 ' . number_format($problem['max']) . '개까지 주문할 수 있습니다. 지금 '
+                . number_format($problem['qty']) . '개입니다. 장바구니에서 수량을 확인해 주세요.';
+        }
+        Response::error($message, 400, [
+            'code' => 'BUY_QTY_LIMIT',
+            'it_id' => $problem['it_id'],
+            'qty' => $problem['qty'],
+            'min_qty' => $problem['min'],
+            'max_qty' => $problem['max'],
+        ]);
+    }
+}

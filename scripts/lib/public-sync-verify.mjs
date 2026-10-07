@@ -39,7 +39,10 @@ export function verifySyncedPublicNextjsTree(repoRoot) {
   assertPublicPackageThemeMaps(themeManifest, themeMap);
   const publicTheme = publicInstallThemeName(themeManifest);
 
-  if (nextPackageJson.scripts?.['build:theme'] !== 'npm run build') {
+  // 기본 테마는 overlay/ 에 있어 theme/ 으로 넣지 않는다. --if-present 는 create-theme 로 만든 내 테마(theme/<이름>)가
+  // 있을 때만 그 app/ 에 넣으므로 기본 테마 꾸러미는 그대로 안전하다.
+  const packageSafeBuildTheme = ['npm run build', 'npm run build && node scripts/sync-static-theme.mjs --if-present'];
+  if (!packageSafeBuildTheme.includes(nextPackageJson.scripts?.['build:theme'])) {
     throw new Error('nextjs/package.json build:theme must stay package-safe and avoid syncing theme/app');
   }
   if (!nextPackageJson.scripts?.['check:release:vercel:strict']) {

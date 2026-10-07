@@ -281,10 +281,8 @@ if (!function_exists('shop_orders_kcp_cancel_payment')) {
 
         $homeDir = G5_SHOP_PATH . '/kcp';
         $keyDir = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN' ? $homeDir . '/bin/pub.key' : '';
-        $logDir = getenv('SHOP_KCP_LOG_DIR') ?: (defined('G5_DATA_PATH') ? G5_DATA_PATH . '/log/kcp' : $homeDir . '/log');
-        if (!is_dir($logDir)) {
-            @mkdir($logDir, 0755, true);
-        }
+        require_once __DIR__ . '/kcp_log_helpers.php';
+        $logDir = shop_api_kcp_log_dir($homeDir . '/log'); // 웹에서 못 열게 막은 뒤의 로그 폴더
         if (!is_dir($logDir) || !is_writable($logDir)) {
             return ['ok' => false, 'error' => 'KCP 로그 디렉터리에 쓰기 권한이 없습니다: ' . $logDir];
         }

@@ -175,6 +175,7 @@ if ($apiMethod === 'POST' && $od_id === '') {
         shop_api_enforce_cert_access($itemIdForCert, 'item', $member);
     }
     shop_api_validate_order_stock($cartItems);
+    shop_api_validate_order_buy_qty($cartItems);
 
     $totalPrice = 0;
     $totalQty   = 0;
@@ -258,6 +259,17 @@ if ($apiMethod === 'POST' && $od_id === '') {
     $settleCase = isset($input['od_settle_case']) ? trim($input['od_settle_case']) : '무통장';
     if (!in_array($settleCase, $allowedSettleCases, true)) {
         $settleCase = '무통장';
+    }
+    // 이 경로는 PG 를 거치지 않는다 — PG 수단(카드 · 가상계좌 · 계좌이체 · 휴대폰 · 간편결제)을 받으면 결제 없이
+    // "입금액 = 결제액 · 미수금 0" 인 주문이 생겨 관리자에게 돈을 낸 주문처럼 보인다. PG 결제는 결제 준비
+    // (/shop/payment/prepare) → PG 승인 → 확인으로만 만든다. 앱(payload.ts) · Next.js(createBankOrder)는 무통장만 보낸다.
+    if ($settleCase !== '무통장') {
+        Response::error('카드 · 가상계좌 등 PG 결제는 결제 준비 단계로 주문해 주세요.', 422, ['od_settle_case' => 'Only 무통장 orders can be created here.']);
+    }
+    // 입금 계좌는 상점이 정한 계좌 중 하나만 — 관리자 주문서가 이 값을 그대로 출력한다.
+    $orderBankAccount = shop_api_order_bank_account($input['od_bank_account'] ?? '');
+    if ($orderBankAccount === null) {
+        Response::error('입금 계좌를 다시 선택해 주세요.', 422, ['od_bank_account' => 'Unknown bank account.']);
     }
 
     // Goods name (e.g. "상품명1 외 2건")
@@ -438,7 +450,7 @@ if ($apiMethod === 'POST' && $od_id === '') {
             $od_receipt_price,
             $od_misu,
             $settleCase,
-            $input['od_bank_account'] ?? '',
+            $orderBankAccount,
             $input['od_deposit_name'] ?? '',
             $od_status,
             $od_hope_date,

@@ -250,6 +250,22 @@ if (!function_exists('shop_api_cart_has_foreign_owner')) {
     }
 }
 
+if (!function_exists('shop_api_client_cart_id_is_order')) {
+    /**
+     * 앱이 보낸 카트 id 가 주문번호인가 — 주문 · 임시 주문(준비)의 상품 줄도 장바구니 표에 od_id = 주문번호로 남는다.
+     * 이것을 카트 id 로 받으면 남의 비회원 임시 주문 줄(아직 '쇼핑' 상태)을 읽고 바꾸거나, 남의 주문에 '쇼핑' 줄을 끼워
+     * 넣을 수 있다(결제 확인이 그 od_id 의 줄을 모두 주문으로 바꾸고, 주문 취소는 '주문' 아닌 줄을 보고 막힌다).
+     * 주문번호는 날짜시각 + 숫자 몇 자리라 짐작할 수 있다. 서버가 발급하는 카트 id 는 주문번호가 되지 않는다.
+     */
+    function shop_api_client_cart_id_is_order(string $cartId): bool
+    {
+        return (bool) DB::fetch(
+            "SELECT od_id FROM " . DB::table('g5_shop_order_table') . " WHERE od_id = ? LIMIT 1",
+            [$cartId]
+        );
+    }
+}
+
 if (!function_exists('shop_api_valid_client_cart_id')) {
     /** SC-02: 앱이 보내는 카트 id 형식(get_uniqid 16자리 ~ 20자리 숫자). 형식이 틀리면 빈 문자열(4xx 아님). */
     function shop_api_valid_client_cart_id($value): string
@@ -326,9 +342,10 @@ if (!function_exists('shop_api_cart_id')) {
 
         // SC-02 해석 순서: 1 헤더 → 2 본문 cart_id → 3 쿠키 → 4 세션 → 5 회원 활성 카트 → 6 신규.
         // 다른 회원 소유 카트면 그 후보만 버리고 다음 순위로 간다(쿠키·세션 후보는 기존처럼 지운다).
+        // 주문번호인 후보도 버린다(shop_api_client_cart_id_is_order).
         $fromClient = false;
         foreach (shop_api_client_cart_ids() as $candidate) {
-            if (!shop_api_cart_has_foreign_owner($candidate, $mbId)) {
+            if (!shop_api_cart_has_foreign_owner($candidate, $mbId) && !shop_api_client_cart_id_is_order($candidate)) {
                 $cartId = $candidate;
                 $fromClient = true;
                 break;

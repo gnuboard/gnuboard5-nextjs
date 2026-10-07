@@ -63,12 +63,17 @@ if (!function_exists('api_apple_provider_enabled')) {
         return $row ? (string) $row['mb_id'] : '';
     }
 
-    /** 가입 ticket 에 담을 프로필 — Apple 은 이름·이메일을 첫 로그인 때 한 번만 준다. 토큰의 email 클레임이 우선. */
+    /**
+     * 가입 ticket 에 담을 프로필 — Apple 은 이름을 첫 로그인 때 한 번만 준다. 이메일은 서명을 확인한 토큰의 email 클레임만
+     * 쓴다: 가입(auth_account_routes)이 "소셜 계정이 알려 준 주소"면 메일 인증을 건너뛰므로, 요청 본문의 email 을 받으면
+     * 아무 주소나 인증 없이 선점할 수 있다. 토큰에 없으면 비워 두어 가입 화면에서 적게 한다(그 주소는 메일 인증을 받는다).
+     */
     function api_apple_signup_profile(array $claims, array $input): array
     {
-        $email = (string) ($claims['email'] ?? '');
-        if ($email === '' && isset($input['email']) && is_string($input['email'])) {
-            $email = trim($input['email']);
+        $email = trim((string) ($claims['email'] ?? ''));
+        $emailVerified = $claims['email_verified'] ?? true;
+        if ($emailVerified === false || $emailVerified === 'false') {
+            $email = '';
         }
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $email = '';

@@ -96,7 +96,8 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
         ]);
     }
 
-    $lock = pg_payment_confirm_acquire_lock((string) $order_id);
+    // 잠금 이름은 DB 의 주문번호로(shop_api_order_lock_name 과 같은 이유 — 앞에 0 을 붙인 order_id 도 같은 주문을 찾는다).
+    $lock = pg_payment_confirm_acquire_lock((string) $order['od_id']);
     if (empty($lock['ok'])) {
         // SC-14: confirm_in_progress(다른 확인이 진행 중 — 2/4/8초 백오프) | lock_busy(락 오류 — 짧게 재시도)
         Response::error('Payment confirmation is already in progress. Please retry shortly.', 409, [
@@ -344,10 +345,21 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
         $finalReceiptPrice = 0;
         $finalMisu = $confirmedAmount;
         $finalReceiptTime = '1000-01-01 00:00:00';
-        $bankname  = trim((string) ($input['bankname']  ?? $verifyResult['bankname'] ?? ''));
-        $account   = trim((string) ($input['account']   ?? $verifyResult['account'] ?? ''));
-        $depositor = trim((string) ($input['depositor'] ?? $verifyResult['depositor'] ?? ''));
-        $vaDate    = trim((string) ($input['va_date']   ?? $verifyResult['va_date'] ?? ''));
+        // 계좌 안내는 PG 가 돌려준 값이 먼저 — 요청 본문 값은 PG 가 주지 않을 때만 쓴다(KCP 는 승인 결과를 $input 에 넣는다).
+        // 관리자 주문 화면(adm/shop_admin/orderform.php)이 가상계좌의 od_bank_account 를 그대로 출력하고 주문 메일도 HTML 이라,
+        // 태그 · 따옴표 · 제어문자를 지우고 길이를 자른다(od_deposit_name 은 20자 열).
+        $vbankText = static function (string $key, int $limit) use ($verifyResult, $input): string {
+            $value = trim((string) ($verifyResult[$key] ?? ''));
+            if ($value === '' && isset($input[$key]) && is_scalar($input[$key])) {
+                $value = (string) $input[$key];
+            }
+            $value = (string) preg_replace('/[<>"\'\x00-\x1F\x7F]/u', '', shop_api_plain_text($value));
+            return trim(function_exists('mb_substr') ? mb_substr($value, 0, $limit, 'UTF-8') : substr($value, 0, $limit));
+        };
+        $bankname  = $vbankText('bankname', 40);
+        $account   = $vbankText('account', 80);
+        $depositor = $vbankText('depositor', 20);
+        $vaDate    = $vbankText('va_date', 30);
         if ($bankname !== '' || $account !== '') {
             $bankAccount = trim($bankname . ' ' . $account . ($depositor !== '' ? ' (' . $depositor . ')' : ''));
         }
@@ -362,11 +374,12 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
     // 결제 결과 반영 — 가상계좌면 od_bank_account 에 은행/계좌 정보 저장.
     $finalPgService = $pg_service === 'kakaopay' ? 'KAKAOPAY' : $pg_service;
 
-    DB::execute(
+    // 상태 가드 — 잠금을 잡지 않는 쓰기(관리자 화면 등)가 그사이 '준비'를 바꿨으면 덮어쓰지 않고 catch 로(PG 취소 · 대사).
+    $finalized = DB::execute(
         "UPDATE " . DB::table('g5_shop_order_table') . "
          SET od_status = ?, od_settle_case = ?, od_pg = ?, od_tno = ?, od_bank_account = ?, od_deposit_name = ?,
              od_receipt_price = ?, od_misu = ?, od_receipt_time = ?
-         WHERE od_id = ?",
+         WHERE od_id = ? AND od_status = '준비'",
         [
             $finalStatus,
             $settleCase,
@@ -380,6 +393,9 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
             $order_id,
         ]
     );
+    if ($finalized !== 1) {
+        throw new RuntimeException('Order status changed during confirmation.');
+    }
     DB::execute(
         "UPDATE " . DB::table('g5_shop_cart_table') . "
          SET ct_status = ?

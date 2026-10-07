@@ -346,6 +346,16 @@ if (!$seg0 && $apiMethod === 'POST') {
         Response::error('Original Q&A item not found.', 404);
     }
 
+    // 새 문의마다 관리자에게 메일 · 문자(유료)가 나간다(qas_notify.php). 그누보드 화면은 폼 토큰만 보지만 API 는 바로
+    // 부를 수 있으므로 회원별 1분 3건 · 1시간 20건까지(글쓰기와 같은 수 — 앱의 리뷰 · 쪽지 신고도 이 길로 온다).
+    // 문의 표가 아니라 지울 수 없는 기록으로 세어, 대기 중인 문의를 지워 한도를 되돌리지 못한다. 관리자는 빼 준다.
+    if (!api_qa_is_admin($me)) {
+        $qaQuotaMsg = Throttle::checkMemberQuota('qacreate', (string) $me['mb_id'], 3, 20);
+        if ($qaQuotaMsg !== null) {
+            Response::error($qaQuotaMsg, 429);
+        }
+    }
+
     $row = DB::fetch("SELECT COALESCE(MIN(qa_num), 0) - 1 AS next_num FROM {$qaContentTable}");
     $qaNum = $row ? (int) $row['next_num'] : -1;
     $now = defined('G5_TIME_YMDHIS') ? G5_TIME_YMDHIS : date('Y-m-d H:i:s');

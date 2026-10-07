@@ -62,13 +62,35 @@ export function isShopOptionEnabled(option?: ShopProductOption | null) {
 }
 
 export function isShopOptionPurchasable(option?: ShopProductOption | null) {
-  // In the Youngcart backend, io_stock_qty === 0 means "unlimited stock"
-  // (cart.php enforces a quantity limit only when io_stock_qty > 0), so a
-  // stock of 0 must NOT be treated as sold out — doing so hides sellable
-  // options behind a false "[품절]" label. An enabled option is purchasable;
-  // the remaining quantity is capped separately via shopOptionStockQty when
-  // it is greater than 0.
-  return isShopOptionEnabled(option);
+  // 영카트와 같다 — 옵션 재고(io_stock_qty)가 1 미만이면 품절이다. 상품 화면은 그 옵션에 "[품절]"을 붙이고
+  // (lib/shop.lib.php 의 옵션 고르기), 담기는 재고를 넘으면 거절한다(cartupdate.php · 우리 API 의
+  // shop_api_cart_assert_stock). 예전에는 0 을 "무제한"으로 보고 고르게 두어, 담는 순간 품절로 거절됐다.
+  return isShopOptionEnabled(option) && Number(option?.io_stock_qty ?? 0) >= 1;
+}
+
+/** 선택옵션이 있는데 모두 품절인가 — 영카트 is_soldout() 처럼 그 상품은 품절이다(고를 옵션이 없다). */
+export function hasOnlySoldOutBaseOptions(options?: ShopProductOption[] | null) {
+  const baseOptions = (options ?? []).filter(
+    (option) => Number(option.io_type) === 0 && isShopOptionEnabled(option)
+  );
+  return baseOptions.length > 0 && baseOptions.every((option) => !isShopOptionPurchasable(option));
+}
+
+/**
+ * 상품 상세의 품절 — 영카트 is_soldout() 과 같다: 품절 표시(it_soldout), 선택옵션 상품은 선택옵션이 모두 품절,
+ * 옵션 없는 상품(추가옵션만 있는 상품 포함)은 상품 재고 0 이하. 상세 응답에는 옵션 목록이 있어 목록 카드의
+ * isProductSoldOut 보다 정확하다. 서버도 이 상품들은 담기에서 품절로 거절한다(shop_api_cart_assert_stock).
+ */
+export function isProductDetailSoldOut(
+  product: Pick<ShopProduct, "it_soldout" | "it_stock_qty" | "options">
+) {
+  if (String(product.it_soldout ?? "0") === "1") return true;
+  const hasBaseOptions = (product.options ?? []).some(
+    (option) => Number(option.io_type) === 0 && isShopOptionEnabled(option)
+  );
+  return hasBaseOptions
+    ? hasOnlySoldOutBaseOptions(product.options)
+    : Number(product.it_stock_qty ?? 0) <= 0;
 }
 
 export function buyQtyLimitMessage(product: ShopProduct, submittedBaseQty: number) {

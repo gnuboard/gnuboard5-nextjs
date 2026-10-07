@@ -1,53 +1,31 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
+/** 장바구니 표(ClientPage · CartTable)와 같은 자리 — 제목, 위가 짙은 표의 상품 줄, 합계 막대. */
 export default function CartLoading() {
   return (
     <div className="py-6">
       <Skeleton className="h-4 w-32 mb-4" />
       <Skeleton className="h-8 w-32 mb-6" />
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        {/* Cart Items */}
-        <div className="space-y-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="flex gap-4 rounded-lg border bg-card p-4">
-              <Skeleton className="h-24 w-24 rounded-md shrink-0" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-5 w-3/4" />
-                <Skeleton className="h-4 w-24" />
-                <div className="flex items-center gap-2">
-                  <Skeleton className="h-8 w-8 rounded-md" />
-                  <Skeleton className="h-8 w-12 rounded-md" />
-                  <Skeleton className="h-8 w-8 rounded-md" />
-                </div>
-              </div>
-              <div className="text-right space-y-2">
-                <Skeleton className="h-5 w-20 ml-auto" />
-                <Skeleton className="h-8 w-8 ml-auto rounded-md" />
-              </div>
+      <div className="border-t-2 border-foreground/80">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex items-start gap-4 border-b py-6">
+            <Skeleton className="mt-1 h-[18px] w-[18px] shrink-0 rounded-sm" />
+            <Skeleton className="h-20 w-20 shrink-0 rounded-md" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-5 w-3/4 max-w-sm" />
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-8 w-24 rounded-md" />
             </div>
-          ))}
-        </div>
+            <Skeleton className="hidden h-5 w-24 md:block" />
+          </div>
+        ))}
+      </div>
 
-        {/* Summary */}
-        <div className="rounded-lg border bg-card p-6 h-fit space-y-4">
-          <Skeleton className="h-6 w-24" />
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <Skeleton className="h-4 w-16" />
-              <Skeleton className="h-4 w-20" />
-            </div>
-            <div className="flex justify-between">
-              <Skeleton className="h-4 w-12" />
-              <Skeleton className="h-4 w-20" />
-            </div>
-          </div>
-          <div className="border-t pt-4 flex justify-between">
-            <Skeleton className="h-5 w-16" />
-            <Skeleton className="h-6 w-24" />
-          </div>
-          <Skeleton className="h-12 w-full rounded-md" />
-        </div>
+      <Skeleton className="mt-8 h-16 w-full rounded-md" />
+      <div className="mx-auto mt-8 flex max-w-sm gap-2">
+        <Skeleton className="h-12 flex-1 rounded-md" />
+        <Skeleton className="h-12 flex-1 rounded-md" />
       </div>
     </div>
   );

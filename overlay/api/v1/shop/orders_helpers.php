@@ -609,5 +609,28 @@ if (!function_exists('shop_orders_list_filter')) {
     }
 }
 
+if (!function_exists('shop_api_order_bank_account')) {
+    /**
+     * 무통장 주문의 입금 계좌 — 상점 설정(de_bank_account)의 한 줄과 같을 때만 그 줄을 돌려준다. 빈 값은 ''(전액 포인트 등),
+     * 목록에 없는 값은 null. 관리자 주문서가 이 값을 그대로 출력하므로 클라이언트가 고른 문자열을 그대로 저장하지 않는다.
+     * 줄 나누기 · 정리는 앱이 받는 목록(payment_helpers.php pg_bank_accounts)과 같다.
+     */
+    function shop_api_order_bank_account($value): ?string
+    {
+        $value = is_scalar($value) ? trim((string) $value) : '';
+        if ($value === '') {
+            return '';
+        }
+        $row = DB::fetch("SELECT de_bank_account FROM " . DB::table('g5_shop_default_table') . " LIMIT 1");
+        foreach (preg_split('/\r\n|\r|\n/', (string) ($row['de_bank_account'] ?? '')) as $line) {
+            $account = trim(html_entity_decode(strip_tags((string) $line), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            if ($account !== '' && $account === $value) {
+                return $account;
+            }
+        }
+        return null;
+    }
+}
+
 require_once __DIR__ . '/orders_payment_cancel_helpers.php';
 require_once __DIR__ . '/orders_create_undo.php';

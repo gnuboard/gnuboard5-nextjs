@@ -36,6 +36,19 @@ if (!function_exists('shop_api_stale_draft_lock_name')) {
     }
 }
 
+if (!function_exists('shop_api_order_lock_name')) {
+    /**
+     * 주문 하나를 바꾸는 쪽(결제 확인 · 입금통보 · 주문 취소 · 결제 취소 · 구매확정 · 자동 취소)이 함께 쓰는 잠금 이름 —
+     * 위 이름과 같다. 이름이 다르면 서로를 보지 못한다(예전 주문 취소 · 구매확정은 shop_order_{id} 를 따로 썼다).
+     * 요청 값이 아니라 DB 의 주문번호로 만든다 — od_id 는 숫자 열이라 앞에 0 을 붙인 값도 같은 주문을 찾는데 이름은 달라진다.
+     */
+    function shop_api_order_lock_name(string $odId): string
+    {
+        $row = DB::fetch('SELECT od_id FROM ' . DB::table('g5_shop_order_table') . ' WHERE od_id = ? LIMIT 1', [$odId]);
+        return shop_api_stale_draft_lock_name($row ? (string) $row['od_id'] : $odId);
+    }
+}
+
 if (!function_exists('shop_api_is_stale_draft')) {
     /** 락을 잡은 뒤 다시 읽은 행으로 판정 — 그 사이 결제가 끝났으면(상태·tno 변경) 건드리지 않는다. */
     function shop_api_is_stale_draft(array $order, int $now): bool

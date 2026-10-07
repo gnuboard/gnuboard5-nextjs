@@ -94,6 +94,21 @@ if ($bo_table && !$subResource && $apiMethod === 'GET') {
     // 누구나 부를 수 있는 응답이라 화면이 쓰지 않는 관리용 칸은 뺀다 — 게시판 관리자 아이디(공격 대상이 된다),
     // 서버에 있는 상단 · 하단 파일 경로.
     unset($board['bo_admin'], $board['bo_include_head'], $board['bo_include_tail']);
+    // 목록도 글쓰기도 못 하는 사람(등급 · 그룹 · 본인인증)에게는 그누보드가 게시판 화면을 아예 열어 주지 않으므로
+    // 그 화면에만 나오는 칸(공지 글 번호 · 상단/하단 문구 · 글쓰기 기본 내용 · 여분 필드 bo_1~10)을 뺀다.
+    // 등급 · 인증 · 비밀글 · 포인트 칸은 남긴다 — 앱이 403 전에 "로그인 · 등급 · 인증 필요"를 안내하는 데 쓴다.
+    $boardViewer = Auth::getUser();
+    if (!api_can_access_board_list($boardViewer, $bo_table, $board)
+        && !api_can_write_board_post($boardViewer, $bo_table, $board)) {
+        unset(
+            $board['bo_notice'], $board['bo_insert_content'],
+            $board['bo_content_head'], $board['bo_content_tail'],
+            $board['bo_mobile_content_head'], $board['bo_mobile_content_tail']
+        );
+        for ($extra = 1; $extra <= 10; $extra++) {
+            unset($board['bo_' . $extra], $board['bo_' . $extra . '_subj']);
+        }
+    }
     Response::success($board);
 }
 

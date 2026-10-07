@@ -130,6 +130,7 @@ if ($apiMethod === 'POST' && $action === 'prepare') {
         shop_api_enforce_cert_access($itemIdForCert, 'item', $member);
     }
     shop_api_validate_order_stock($cartItems);
+    shop_api_validate_order_buy_qty($cartItems);
 
     $totalPrice = 0;
     $totalQty   = 0;

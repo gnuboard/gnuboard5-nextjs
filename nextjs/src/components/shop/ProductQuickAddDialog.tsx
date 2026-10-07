@@ -21,14 +21,13 @@ import { normalizeG5ImageSrc, shouldBypassImageOptimization } from "@/lib/image"
 import { toastError } from "@/lib/toast";
 import { getShopProductResult } from "@/services/shop";
 import { ProductOptionPicker } from "./ProductOptionPicker";
-import { productShippingPayment } from "./productDetailHelpers";
+import { isProductDetailSoldOut, productShippingPayment } from "./productDetailHelpers";
 import { useProductOptions } from "./useProductOptions";
 import { addProductToCart, toastAddedToCart } from "./addProductToCart";
 import {
   formatProductPrice,
   hasProductDiscount,
   isTelInquiry,
-  isProductSoldOut,
   productDiscountPercent,
 } from "@/lib/shop-product-state";
 import { formatPrice } from "@/lib/utils";
@@ -87,7 +86,7 @@ export function ProductQuickAddDialog({ product, href, open, onOpenChange }: Pro
     ? ""
     : isTelInquiry(detail)
       ? "전화문의 상품은 온라인 주문할 수 없습니다."
-      : isProductSoldOut({ ...detail, has_options: options.baseOptions.length > 0 })
+      : isProductDetailSoldOut(detail)
         ? "품절된 상품입니다."
         : "";
 

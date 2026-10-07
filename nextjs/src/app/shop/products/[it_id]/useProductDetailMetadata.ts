@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { isProductDetailSoldOut } from "@/components/shop/productDetailHelpers";
 import type { ShopProduct } from "@/lib/api";
 import type { BbsRewriteMode } from "@/lib/board-url";
 import {
@@ -50,7 +51,7 @@ export function useProductDetailMetadata(
         priceCurrency: "KRW",
         price: product.it_price,
         availability:
-          product.it_soldout !== "1" && product.it_stock_qty !== 0
+          !isProductDetailSoldOut(product)
             ? "https://schema.org/InStock"
             : "https://schema.org/OutOfStock",
         itemCondition: "https://schema.org/NewCondition",

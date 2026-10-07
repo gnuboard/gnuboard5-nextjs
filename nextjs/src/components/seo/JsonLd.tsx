@@ -1,4 +1,5 @@
 import type { ShopProduct, ShopReview } from "@/lib/api";
+import { isProductDetailSoldOut } from "@/components/shop/productDetailHelpers";
 import type { ContentData } from "@/lib/schemas";
 import type { PostDetail } from "@/services/boards";
 import { APP_BASE_URL, rootPublicAssetUrl } from "@/lib/config";
@@ -62,8 +63,7 @@ export function ProductJsonLd({
   reviews?: ShopReview[];
 }) {
   const url = absolutePageUrl(`/shop/${product.it_id}`);
-  const inStock =
-    product.it_soldout !== "1" && (product.it_stock_qty ?? 0) !== 0;
+  const inStock = !isProductDetailSoldOut(product);
   const imageUrls = (product.images?.length ? product.images : [product.image_url])
     .map(absoluteUrl)
     .filter(Boolean) as string[];

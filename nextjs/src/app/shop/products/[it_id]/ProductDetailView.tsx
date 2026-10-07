@@ -15,6 +15,7 @@ import type {
 import type { BbsRewriteMode } from "@/lib/board-url";
 import { g5ShortHref } from "@/lib/g5-short-url";
 import {
+  isProductDetailSoldOut,
   productPointLabel,
   type SelectedCartOption,
 } from "@/components/shop/productDetailHelpers";
@@ -264,7 +265,8 @@ export function ProductDetailView({
 
   const images = product.images?.length ? product.images : [product.image_url];
   const pointLabel = productPointLabel(product);
-  const canPurchaseProduct = !isTelInquiry && product.it_soldout !== "1";
+  // 품절 표시뿐 아니라 선택옵션이 모두 품절 · 옵션 없는 상품의 재고 0 도 품절이다(영카트 is_soldout — 서버도 담기를 거절).
+  const canPurchaseProduct = !isTelInquiry && !isProductDetailSoldOut(product);
   const hasDiscount = hasProductDiscount(product);
   const discountPercent = productDiscountPercent(product);
 

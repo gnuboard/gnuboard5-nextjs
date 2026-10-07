@@ -83,12 +83,36 @@ export function addCartItems(
   });
 }
 
+export interface CartOptionLineInput {
+  io_id: string;
+  io_type: number;
+  ct_qty: number;
+}
+
+/**
+ * 장바구니의 선택사항수정 — 한 상품의 줄을 고친 뒤 목록으로 한 번에 바꾼다(POST /shop/cart/options).
+ * 서버가 고친 뒤의 모습(최소 · 최대 구매수량 합계 · 재고 · 본품)을 먼저 검사하고, 통과해야 달라진 줄만 고친다.
+ */
+export function replaceCartItemOptions(itId: string, options: CartOptionLineInput[]) {
+  return apiClient.post("/shop/cart/options", { it_id: itId, options });
+}
+
 export function updateCartItemQuantity(ctId: string, qty: number) {
   return apiClient.patch(`/shop/cart/${ctId}`, { ct_qty: qty });
 }
 
 export function removeCartItem(ctId: string) {
   return apiClient.delete(`/shop/cart/${ctId}`);
+}
+
+/** 장바구니의 선택삭제 — 영카트 cartupdate.php(act=seldelete)와 같다. 바로구매 줄은 건드리지 않는다. */
+export function removeCartItems(ctIds: string[]) {
+  return apiClient.post("/shop/cart/legacy-update", { act: "seldelete", ct_id: ctIds });
+}
+
+/** 장바구니 비우기 — 영카트 cartupdate.php(act=alldelete)와 같다. 바로구매 줄은 건드리지 않는다. */
+export function clearCart() {
+  return apiClient.post("/shop/cart/legacy-update", { act: "alldelete" });
 }
 
 export async function getWishlist(): Promise<ShopWishItem[]> {

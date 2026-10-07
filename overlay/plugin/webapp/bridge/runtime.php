@@ -191,6 +191,35 @@ if (!function_exists('g5_nextjs_runtime_first_url')) {
     }
 }
 
+// 활성 테마의 주소 설정(G5_<테마>_G5_URL · _APP_URL · _API_URL)을 정하는 순서 — 테마 이름 키(env), 테마와 상관없는
+// 공용 이름 G5_WEBAPP_<이름>(env, 그다음 PHP define), 마지막으로 NEXT_PUBLIC_<이름>(env). 공용 이름으로 적어 두면
+// create-theme 로 만든 다른 테마로 바꿔도 그대로 쓰인다 — 테마 이름 키는 테마를 바꾸면 이름도 바뀐다.
+if (!function_exists('g5_nextjs_runtime_setting_url')) {
+    function g5_nextjs_runtime_setting_url(array $env, $prefix, $name)
+    {
+        $url = g5_nextjs_runtime_first_url($env, array($prefix . '_' . $name, 'G5_WEBAPP_' . $name));
+        if ($url === '' && defined('G5_WEBAPP_' . $name)) {
+            $url = g5_nextjs_runtime_valid_public_url((string) constant('G5_WEBAPP_' . $name));
+        }
+
+        return $url !== '' ? $url : g5_nextjs_runtime_first_url($env, array('NEXT_PUBLIC_' . $name));
+    }
+}
+
+// 테마와 상관없는 허용 호스트(G5_WEBAPP_ALLOWED_HOSTS — env 와 PHP define). 테마 이름 키(G5_<테마>_ALLOWED_HOSTS)에
+// 더해진다. 공용 이름으로 적어 두면 다른 테마로 바꿔도 www. 같은 별칭 호스트가 거절되지 않는다.
+if (!function_exists('g5_nextjs_runtime_neutral_allowed_hosts')) {
+    function g5_nextjs_runtime_neutral_allowed_hosts(array $env)
+    {
+        $values = array(g5_nextjs_runtime_env_value($env, 'G5_WEBAPP_ALLOWED_HOSTS'));
+        if (defined('G5_WEBAPP_ALLOWED_HOSTS')) {
+            $values[] = trim((string) G5_WEBAPP_ALLOWED_HOSTS);
+        }
+
+        return implode(',', array_filter($values, 'strlen'));
+    }
+}
+
 // 관리자 「짧은 주소 설정」의 Apache/Nginx 설정 코드와 .htaccess 갱신에 테마 브리지
 // 규칙을 보탠다. 훅 함수는 기준 테마가 Next.js 테마일 때만 줄을 내므로 여기서는
 // 활성 테마와 상관없이 건다 — basic 에서 nextjs_default 로 바꾸는 순간에도 있어야 한다.
@@ -252,9 +281,9 @@ g5_nextjs_runtime_add_host_value(
 $g5_nextjs_is_local = isset($g5_nextjs_local_hosts[$g5_nextjs_host]);
 $g5_nextjs_cors_origins = g5_nextjs_runtime_env_value($g5_nextjs_env, 'G5_CORS_ALLOWED_ORIGINS');
 $g5_nextjs_social_hosts = g5_nextjs_runtime_env_value($g5_nextjs_env, 'G5_SOCIAL_WEB_HOSTS');
-$g5_nextjs_public_g5_url = g5_nextjs_runtime_first_url($g5_nextjs_env, array($g5_nextjs_prefix . '_G5_URL', 'NEXT_PUBLIC_G5_URL'));
-$g5_nextjs_public_app_url = g5_nextjs_runtime_first_url($g5_nextjs_env, array($g5_nextjs_prefix . '_APP_URL', 'NEXT_PUBLIC_APP_URL'));
-$g5_nextjs_public_api_url = g5_nextjs_runtime_first_url($g5_nextjs_env, array($g5_nextjs_prefix . '_API_URL', 'NEXT_PUBLIC_API_URL'));
+$g5_nextjs_public_g5_url = g5_nextjs_runtime_setting_url($g5_nextjs_env, $g5_nextjs_prefix, 'G5_URL');
+$g5_nextjs_public_app_url = g5_nextjs_runtime_setting_url($g5_nextjs_env, $g5_nextjs_prefix, 'APP_URL');
+$g5_nextjs_public_api_url = g5_nextjs_runtime_setting_url($g5_nextjs_env, $g5_nextjs_prefix, 'API_URL');
 
 if ($g5_nextjs_is_local && $g5_nextjs_current_origin !== '' && $g5_nextjs_public_app_url === '') {
     $g5_nextjs_public_app_url = $g5_nextjs_current_origin;
@@ -331,6 +360,7 @@ g5_nextjs_runtime_add_host_value(
     $g5_nextjs_allowed_hosts,
     g5_nextjs_runtime_env_value($g5_nextjs_env, $g5_nextjs_prefix . '_ALLOWED_HOSTS')
 );
+g5_nextjs_runtime_add_host_value($g5_nextjs_allowed_hosts, g5_nextjs_runtime_neutral_allowed_hosts($g5_nextjs_env));
 g5_nextjs_runtime_add_host_value($g5_nextjs_allowed_hosts, $g5_nextjs_cors_origins);
 g5_nextjs_runtime_add_host_value($g5_nextjs_allowed_hosts, $g5_nextjs_social_hosts);
 if (defined('G5_URL')) {

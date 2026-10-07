@@ -6,7 +6,7 @@
  * G5_THEME_SOURCE selects this source at build/dev time.
  * G5_THEME_NAME still selects the Gnuboard output folder under theme/<name>/app.
  */
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { activateThemeSource } from './activate-theme-source.mjs';
@@ -74,6 +74,32 @@ function rewriteConfig() {
     .replace(/label:\s*"[^"]*"/, `label: ${escapeTsString(themeLabel())}`);
 
   writeFileSync(configPath, next);
+}
+
+// 테마 CSS 는 body[data-g5-theme-source="<소스 이름>"] 아래로 묶여 있다(src/app/layout.tsx 가 theme.config.ts 의
+// name 을 그 속성에 넣는다). 이름을 바꿔 복사하면 그 묶음도 새 이름으로 바꿔야 디자인이 붙는다 — 안 바꾸면 새 테마는
+// 테마 CSS 가 하나도 걸리지 않은 맨 화면이 된다.
+const SCOPED_EXT = /\.(?:css|ts|tsx|js|mjs)$/i;
+
+function rescopeThemeSelectors(dir) {
+  let changed = 0;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const abs = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      changed += rescopeThemeSelectors(abs);
+      continue;
+    }
+    if (!entry.isFile() || !SCOPED_EXT.test(entry.name)) continue;
+    const content = readFileSync(abs, 'utf8');
+    const next = content
+      .split(`data-g5-theme-source="${from}"`).join(`data-g5-theme-source="${name}"`)
+      .split(`data-g5-theme-source='${from}'`).join(`data-g5-theme-source='${name}'`);
+    if (next !== content) {
+      writeFileSync(abs, next);
+      changed += 1;
+    }
+  }
+  return changed;
 }
 
 function resolveVercelPreviewPair() {
@@ -146,6 +172,7 @@ if (existsSync(destThemeSource) && force) {
 
 cpSync(srcThemeSource, destThemeSource, { recursive: true });
 rewriteConfig();
+const rescoped = rescopeThemeSelectors(destThemeSource);
 const writtenManifestEntry = upsertThemeManifestEntry({
   source: name,
   theme: themeName,
@@ -169,6 +196,7 @@ if (persist) {
 }
 
 console.log(`[create-theme-source] Created nextjs/themes/${name} from nextjs/themes/${from}.`);
+console.log(`  css scope: data-g5-theme-source="${from}" -> "${name}" in ${rescoped} file(s)`);
 console.log(`  manifest: theme/${themeName} -> nextjs/themes/${name}`);
 if (writtenVercelPreview) {
   console.log(`  preview: ${writtenVercelPreview.appUrl} (dev :${writtenVercelPreview.devPort})`);

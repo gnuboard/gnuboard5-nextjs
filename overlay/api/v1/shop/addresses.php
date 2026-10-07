@@ -208,6 +208,16 @@ if ($apiMethod === 'POST' && $ad_id === 0) {
         Response::error('Validation failed.', 422, $errors);
     }
 
+    // 배송지는 회원마다 100개까지 — 이 경로는 주문 없이 바로 행을 만들므로(그누보드는 주문할 때만 쌓는다) 반복 호출로
+    // 표를 끝없이 키우지 못하게 한다.
+    $addressCount = DB::count(
+        "SELECT COUNT(*) FROM " . DB::table('g5_shop_order_address_table') . " WHERE mb_id = ?",
+        [$mb_id]
+    );
+    if ($addressCount >= 100) {
+        Response::error('You can save up to 100 addresses. Please delete one first.', 422, ['ad_id' => 'address limit reached.']);
+    }
+
     $isDefault = !empty($input['ad_default']) ? 1 : 0;
 
     // If setting as default, unset previous default

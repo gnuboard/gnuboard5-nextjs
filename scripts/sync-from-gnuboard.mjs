@@ -399,7 +399,9 @@ function sanitizeNextjsPackageJson(path) {
   }
 
   if (json.scripts) {
-    json.scripts['build:theme'] = 'npm run build';
+    // 기본 테마는 overlay/ 에 있고 루트 npm run package 가 묶는다(theme/ 이 없어 아래 sync 는 건너뛴다).
+    // create-theme 로 만든 내 테마(theme/<이름>)는 빌드 결과를 theme/<이름>/app 에 넣는다 — package:theme 이 그것을 묶는다.
+    json.scripts['build:theme'] = 'npm run build && node scripts/sync-static-theme.mjs --if-present';
     json.scripts.postbuild = 'node scripts/postbuild.mjs';
     json.scripts['check:deploy-config'] = 'node scripts/check-deploy-config.mjs';
     json.scripts['check:route-runtime-policy'] = 'node scripts/check-route-runtime-policy.mjs';

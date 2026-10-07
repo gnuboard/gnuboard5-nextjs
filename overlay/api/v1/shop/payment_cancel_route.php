@@ -36,6 +36,21 @@ if ($apiMethod === 'POST' && $action === 'cancel') {
         Response::error('Order not found.', 404);
     }
 
+    // 결제 확인과 같은 주문 잠금 안에서 다시 읽고 되돌린다 — 확인이 '준비'를 본 바로 뒤에 상품 줄을 장바구니로 옮기면
+    // 결제는 되고 상품 줄은 없는 주문이 된다(shop_api_restore_pending_order_cart_locked 와 같은 이유). 앱은 실패하면
+    // 결제 상태를 다시 조회한다. 잠금은 요청이 끝나 DB 연결이 닫히면 풀린다(orders.php 주문 취소와 같다).
+    $cancelLock = pg_payment_confirm_acquire_lock((string) $order['od_id'], 3);
+    if (empty($cancelLock['ok'])) {
+        Response::error('Payment confirmation is already in progress. Please retry shortly.', 409, [
+            'code' => (string) ($cancelLock['code'] ?? '') !== '' ? (string) $cancelLock['code'] : 'confirm_in_progress',
+        ]);
+    }
+    $order = DB::fetch(
+        "SELECT * FROM " . DB::table('g5_shop_order_table') . "
+         WHERE od_id = ? LIMIT 1",
+        [$order['od_id']]
+    ) ?: $order;
+
     if (($order['od_status'] ?? '') === '취소') {
         Response::success([
             'order_id' => (string) $order_id,

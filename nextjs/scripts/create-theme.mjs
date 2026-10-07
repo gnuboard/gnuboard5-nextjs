@@ -27,7 +27,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, dirname, extname, join, resolve } from 'node:path';
+import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { previewThemeManifestEntry, upsertThemeManifestEntry } from './theme-manifest.mjs';
 
@@ -86,8 +86,12 @@ const NAME = name.toUpperCase();
 const FROM_LOWER = from;
 const FROM_UPPER = from.toUpperCase();
 
-const srcTheme = join(repoRoot, 'theme', from);
+// 본뜰 그누보드 테마 — 그누보드 전체 소스는 theme/<from>, 공개 저장소(gnuboard5-nextjs)는 overlay/theme/<from> 에 둔다.
+// 새 테마는 어느 쪽이든 theme/<name> 에 만든다(빌드 결과를 넣는 곳 · package:theme 이 묶는 곳).
+const srcTheme = [join(repoRoot, 'theme', from), join(repoRoot, 'overlay', 'theme', from)].find((dir) => existsSync(dir))
+  ?? join(repoRoot, 'theme', from);
 const destTheme = join(repoRoot, 'theme', name);
+const srcThemeLabel = relative(repoRoot, srcTheme).split('\\').join('/');
 const srcThemeSource = join(nextRoot, 'themes', sourceFrom);
 const destThemeSource = join(nextRoot, 'themes', name);
 
@@ -177,7 +181,7 @@ function reportPlan() {
   const renames = srcFiles.filter((f) => basename(f) !== rewrite(basename(f)));
 
   console.log(`[create-theme] DRY RUN — no files written.`);
-  console.log(`  from theme : theme/${from}`);
+  console.log(`  from theme : ${srcThemeLabel}`);
   console.log(`  new theme  : theme/${name}${existsSync(destTheme) ? ' (exists — would overwrite)' : ''}`);
   console.log(`  copy       : ${srcFiles.length} files (excluding app/ + transient sync dirs)`);
   console.log(`  rewrite    : ${rewritable.length} text files ("${from}"->"${name}", "${FROM_UPPER}"->"${NAME}")`);
@@ -381,7 +385,7 @@ if (!withSource) {
   writeManifestEntry();
 }
 
-console.log(`[create-theme] Created theme/${name} from theme/${from}.`);
+console.log(`[create-theme] Created theme/${name} from ${srcThemeLabel}.`);
 console.log(`  rewrote ${rewritten} text files, renamed ${renamed} files inside theme/${name}`);
 console.log('  extend : shared plugin/webapp/bridge/runtime.php + plugin/webapp/bridge/social.php');
 console.log(`  nginx  : ${nginxFiles.length} conf(s) under docs/nginx`);

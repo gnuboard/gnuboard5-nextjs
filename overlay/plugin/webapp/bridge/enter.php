@@ -47,7 +47,13 @@ $od = DB::fetch(
 if (!$od || (string) $od['mb_id'] !== (string) $ticket['mb_id'] || !function_exists('get_shop_uid')) {
     webapp_enter_fail();
 }
-session_regenerate_id(false);
+// 이 창에 이미 다른 회원이 로그인해 있으면 주지 않는다 — 남이 자기 입장권을 다른 사이트에서 자동 POST 로 밀어 넣어
+// 로그인한 사람의 세션에 남의 주문 권한을 섞지 못하게(비회원 주문 입장권도 로그인한 세션에는 주지 않는다).
+// 앱은 시크릿 창으로 열어 로그인이 없으므로 영향이 없다.
+if (!empty($member['mb_id']) && (string) $member['mb_id'] !== (string) $od['mb_id']) {
+    webapp_enter_fail();
+}
+session_regenerate_id(true);
 set_session('ss_orderview_uid', get_shop_uid('order', $od['od_id'], $od['od_time'], $od['od_ip']));
 
 goto_url(G5_URL . $target);

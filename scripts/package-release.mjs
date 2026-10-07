@@ -98,6 +98,22 @@ for (const [path, label] of required) {
   assertPath(join(repoRoot, path), label);
 }
 
+// nextjs/out 이 설치 zip 의 테마(공개 테마의 소스)로 빌드한 화면인가. create-theme 로 만든 내 테마를 마지막에
+// 빌드했다면(.env.local 이 내 테마를 가리키면 그냥 npm run build 도 그렇다) 그 화면이 theme/<공개 테마>/app 에
+// 들어가 버린다. 빌드한 화면의 <body data-g5-theme-source="…"> 로 확인한다(속성이 없는 예전 빌드는 넘어간다).
+{
+  const manifest = JSON.parse(readFileSync(join(repoRoot, 'nextjs', 'theme-manifest.json'), 'utf8'));
+  const expectedSource = (manifest.themes || []).find((entry) => entry.theme === PUBLIC_THEME)?.source || '';
+  const builtSource =
+    readFileSync(join(repoRoot, 'nextjs', 'out', 'index.html'), 'utf8').match(/data-g5-theme-source="([^"]+)"/)?.[1] || '';
+  if (expectedSource && builtSource && builtSource !== expectedSource) {
+    fail(
+      `nextjs/out was built from theme source "${builtSource}", but the install zip ships theme/${PUBLIC_THEME} ` +
+        `(source "${expectedSource}"). Build it first: cd nextjs && npm run build:${PUBLIC_THEME}`
+    );
+  }
+}
+
 rmSync(distRoot, { recursive: true, force: true });
 mkdirSync(distRoot, { recursive: true });
 

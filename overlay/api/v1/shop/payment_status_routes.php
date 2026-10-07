@@ -263,6 +263,24 @@ if ($apiMethod === 'POST' && in_array($action, ['notify', 'toss-notify', 'toss-w
             pg_text_response('orderId required', 400);
         }
 
+        // 이 쇼핑몰의 토스 주문일 때만 토스에 묻는다 — 인증이 없는 주소라, 아무 주문번호로나 부르면 그때마다 가맹점 키로
+        // 토스 API 를 불러 호출 한도를 쓰고 응답 차이로 "토스에 그 주문이 있는가" 를 알려 준다. 보낸 IP 마다 분 · 시간
+        // 단위로도 묶는다 — 주문번호로 세면 남이 그 주문의 한도를 미리 채워 진짜 토스 통보를 막을 수 있다(막히면 토스가 다시 보낸다).
+        // 주문 상태는 토스 조회 결과로만 바꾸고 금액 · 거래번호 · 결제수단은 pg_mark_vbank_deposited() 가 다시 대조하므로
+        // 발신 IP 목록은 두지 않는다 — 토스가 고정 목록을 약속하지 않아, 목록이 낡으면 입금 처리가 조용히 멈춘다.
+        $tossOrder = DB::fetch(
+            "SELECT od_id, od_pg FROM " . DB::table('g5_shop_order_table') . "
+             WHERE od_id = ? LIMIT 1",
+            [$orderId]
+        );
+        if (!$tossOrder || !in_array(strtolower(trim((string) $tossOrder['od_pg'])), ['toss', ''], true)) {
+            pg_text_response('FAIL', 404);
+        }
+        $notifyIp = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+        if (Throttle::checkMemberQuota('tossnotify', 'ip:' . $notifyIp, 30, 300) !== null) {
+            pg_text_response('FAIL', 429);
+        }
+
         $query = pg_toss_api_request($cfg, 'GET', '/v1/payments/orders/' . rawurlencode($orderId));
         if (empty($query['ok'])) {
             pg_text_response('FAIL', 502);

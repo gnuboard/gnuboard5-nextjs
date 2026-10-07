@@ -246,18 +246,26 @@ export function createLocalShopCartChecks(context) {
       timeout: 10000,
     });
 
-    const cartItem = page.locator('div.rounded-lg.border.p-4').filter({
-      hasText: product.it_name,
-    }).first();
+    // 장바구니는 영카트 cart.php 처럼 상품마다 한 줄 — 수량은 "선택사항수정" 창에서 고치고, 확인하면 고친 뒤의 목록을
+    // 한 번에 보낸다(POST /shop/cart/options).
+    const cartItem = page.locator('.cart-row').filter({ hasText: product.it_name }).first();
+    await cartItem.locator('.cart-option-edit').click();
+    const optionDialog = page.locator('.cart-option-dialog');
+    // 옵션 상품은 담긴 옵션 줄(이름 + " 수량 증가"), 옵션 없는 상품은 수량 칸의 "수량 증가".
+    const increase = option
+      ? optionDialog.locator('button[aria-label$=" 수량 증가"]').first()
+      : optionDialog.getByRole('button', { name: '수량 증가', exact: true });
+    await increase.click();
     const [cartPatchResponse] = await Promise.all([
       page.waitForResponse(
         (response) =>
-          response.url().includes(`/shop/cart/${cartRow.ct_id}`) &&
-          response.request().method() === 'PATCH'
+          response.url().includes('/shop/cart/options') &&
+          response.request().method() === 'POST'
       ),
-      cartItem.locator('button').nth(1).click(),
+      optionDialog.locator('.product-quick-add-submit').click(),
     ]);
     await assertOkResponse(cartPatchResponse, 'cart quantity update');
+    await optionDialog.waitFor({ state: 'detached', timeout: 10000 });
 
     cartRows = await currentCartRows(token);
     cartRow = cartRows.find((row) => String(row.ct_id) === String(cartRow.ct_id));
@@ -265,14 +273,18 @@ export function createLocalShopCartChecks(context) {
       fail('cart quantity update did not persist through the API', cartRows);
     }
 
-    page.once('dialog', (dialog) => dialog.accept());
+    // 이 상품만 골라 선택삭제 → 확인 창의 삭제(영카트 cartupdate.php act=seldelete 와 같은 요청).
+    const selectAll = page.locator('.cart-table-head .cart-check');
+    if (await selectAll.isChecked()) await selectAll.click();
+    await cartItem.locator('.cart-check').check();
+    await page.locator('.cart-delete-selected').click();
     const [cartDeleteResponse] = await Promise.all([
       page.waitForResponse(
         (response) =>
-          response.url().includes(`/shop/cart/${cartRow.ct_id}`) &&
-          response.request().method() === 'DELETE'
+          response.url().includes('/shop/cart/legacy-update') &&
+          response.request().method() === 'POST'
       ),
-      cartItem.locator('button').last().click(),
+      page.locator('[data-slot="alert-dialog-content"]').getByRole('button', { name: '삭제' }).click(),
     ]);
     await assertOkResponse(cartDeleteResponse, 'cart delete');
 

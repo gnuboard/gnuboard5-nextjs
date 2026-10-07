@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import type { ShopNaverPayConfig, ShopProduct } from "@/lib/api";
 import { ProductOptionPicker, type ProductOptionPickerProps } from "@/components/shop/ProductOptionPicker";
+import { isProductDetailSoldOut } from "@/components/shop/productDetailHelpers";
 
 export type ProductPurchaseControlsProps = ProductOptionPickerProps & {
   product: ShopProduct;
@@ -104,9 +105,10 @@ export function ProductPurchaseControls({
           <Button className="flex-1" size="lg" variant="outline" disabled>
             전화문의
           </Button>
-        ) : product.it_soldout === "1" ? (
+        ) : isProductDetailSoldOut(product) ? (
           <>
-            {product.it_stock_sms !== "1" ? (
+            {/* 재입고 알림은 관리자가 품절로 표시하고 알림을 켠 상품만 받는다(서버 stock-notify 와 같은 조건). */}
+            {product.it_soldout !== "1" || product.it_stock_sms !== "1" ? (
               <Button className="flex-1" size="lg" variant="outline" disabled>
                 품절
               </Button>

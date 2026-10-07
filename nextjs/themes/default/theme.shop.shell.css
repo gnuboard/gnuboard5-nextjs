@@ -31,6 +31,10 @@
   transition: top 0.2s ease;
 }
 .solune-shop-header-sticky.is-shrunk { top: calc(-1 * var(--shop-service-h)); }
+/* 앱 창(대화상자 · 확인 창, z-50)은 이 고정 머리(z 60)보다 위에 — 머리가 창 위쪽을 가리고 어둡게 덮이지도 않던 것.
+   서랍(210) · 분류 판(100)과는 함께 열리지 않으니 그 아래로 둔다. */
+body[data-g5-theme-source="default"]:has(.solune-shop-page)
+  :is([data-slot="dialog-overlay"], [data-slot="dialog-content"], [data-slot="alert-dialog-overlay"], [data-slot="alert-dialog-content"]) { z-index: 70; }
 .solune-shop-header-spacer { height: calc(var(--shop-service-h) + var(--shop-mainbar-h) + 1px); }
 /* :has() 를 못 읽는 옛 브라우저(iOS 15.3 이하)는 앵커 이동이 헤더 밑으로 조금 들어갈 뿐이라 그대로 둔다. */
 html:has(.solune-shop-page) { scroll-padding-top: 72px; }

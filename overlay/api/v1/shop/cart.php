@@ -4,6 +4,7 @@
  *
  * GET    /v1/shop/cart          - Get cart items
  * POST   /v1/shop/cart          - Add to cart
+ * POST   /v1/shop/cart/options  - Replace one product's lines (cart option edit)
  * PATCH  /v1/shop/cart/{ct_id}  - Update cart item qty
  * DELETE /v1/shop/cart/{ct_id}  - Remove cart item
  * DELETE /v1/shop/cart          - Clear entire cart
@@ -94,6 +95,7 @@ if (($apiMethod === 'GET' || $apiMethod === 'POST') && $ct_id === 'order-stock')
     }
 
     shop_api_validate_order_stock($cartItems);
+    shop_api_validate_order_buy_qty($cartItems);
 
     Response::success([
         'ok' => true,
@@ -338,7 +340,7 @@ if ($apiMethod === 'GET' && $ct_id === '') {
 
     $rows = DB::fetchAll(
         "SELECT c.ct_id, c.it_id, c.it_name, c.ct_price, c.ct_qty, c.ct_point,
-                c.ct_option, c.io_type, c.io_price, c.ct_status, c.cp_price, c.ct_history, c.ct_direct,
+                c.ct_option, c.io_id, c.io_type, c.io_price, c.ct_status, c.cp_price, c.ct_history, c.ct_direct,
                 c.ct_send_cost, c.it_sc_type, c.it_sc_method, c.it_sc_price, c.it_sc_minimum, c.it_sc_qty,
                 i.it_price, i.it_cust_price, i.it_img1, i.it_stock_qty, i.it_soldout,
                 i.it_use, i.it_tel_inq, i.it_seo_title
@@ -381,6 +383,7 @@ if ($apiMethod === 'GET' && $ct_id === '') {
             'ct_point'       => (int) ($row['ct_point'] ?? 0),
             'ct_qty'         => (int) $row['ct_qty'],
             'ct_option'      => $row['ct_option'],
+            'io_id'          => (string) ($row['io_id'] ?? ''),
             'io_type'        => (int) $row['io_type'],
             'io_price'       => (int) $row['io_price'],
             'cp_price'       => (int) $row['cp_price'],
@@ -412,6 +415,12 @@ if ($apiMethod === 'GET' && $ct_id === '') {
         'shipping_cost' => $baseSendCost,
     ]);
 }
+
+// =========================================================================
+// POST /v1/shop/cart/options - 선택사항수정(한 상품의 줄을 고친 뒤 목록으로)
+// =========================================================================
+
+require_once __DIR__ . '/cart_option_routes.php';
 
 // =========================================================================
 // POST /v1/shop/cart - Add to cart
@@ -464,11 +473,12 @@ if ($apiMethod === 'PATCH' && $ct_id !== '') {
             shop_api_cart_validate_buy_qty($item, $newQty, $activeBaseQty, true);
         }
     }
-    if (!empty($cartItem['ct_option'])) {
+    // 옵션 줄인지는 io_id 로 본다 — ct_option 은 영카트 화면에서 담으면 "SIZE:L / COLOR:그레이" 같은 표시 글자다.
+    if ((string) ($cartItem['io_id'] ?? '') !== '') {
         $optStock = DB::fetch(
             "SELECT io_stock_qty FROM " . DB::table('g5_shop_item_option_table') . "
              WHERE it_id = ? AND io_id = ? AND io_use = 1 LIMIT 1",
-            [$cartItem['it_id'], $cartItem['ct_option']]
+            [$cartItem['it_id'], $cartItem['io_id']]
         );
         if (!$optStock) {
             Response::error('Selected option is no longer available.', 400);

@@ -270,8 +270,8 @@ if (!function_exists('nextjs25_social_validate_mobile_redirect')) {
         if ($redirect === '' || preg_match('#^https?://#i', $redirect)) {
             return '';
         }
-        // 앱 스킴 주소도 원래 문자열을 돌려주므로 해석이 갈릴 수 있는 문자(\, 제어 · 공백 문자)는 거절한다.
-        if (preg_match('/[\\\\\x00-\x20\x7f]/', $redirect)) {
+        // 앱 스킴 주소도 원래 문자열을 돌려주므로 해석이 갈릴 수 있는 문자(\, 제어 · 공백 문자, 원문 < > ")는 거절한다.
+        if (preg_match('/[\\\\\x00-\x20\x7f<>"]/', $redirect)) {
             return '';
         }
 
@@ -300,7 +300,10 @@ if (!function_exists('nextjs25_social_validate_redirect')) {
             // 허용 호스트인지는 parse_url 로 보지만 돌려주는 것은 원래 문자열이다. PHP 와 브라우저가 다르게 읽는
             // 주소는 거절한다 — "https://evil.example\@허용호스트/" 를 parse_url 은 허용 호스트로 읽지만 브라우저는
             // "\" 를 "/" 로 보아 evil.example 로 간다(그 뒤 로그인 티켓이 붙어 계정 탈취로 이어진다).
-            if (preg_match('/[\\\\\x00-\x20\x7f]/', $redirect)) {
+            // 원문 < > " 도 거절한다 — 브라우저가 만드는 주소에는 %인코딩되어 오므로 정상 주소는 걸리지 않고,
+            // 이 주소를 다시 쓰는 popup 이동 스크립트에서 "</script>" 로 태그를 끊고 나오는 것을 한 겹 더 막는다.
+            // ' 는 거절하지 않는다 — 브라우저가 경로의 ' 는 인코딩하지 않아 정상 주소가 걸리고, 출력 쪽(JSON_HEX_APOS · goto_url)이 이미 이스케이프한다.
+            if (preg_match('/[\\\\\x00-\x20\x7f<>"]/', $redirect)) {
                 return '';
             }
             $parts = parse_url($redirect);
@@ -589,7 +592,8 @@ if (!function_exists('nextjs25_social_echo_popup_redirect')) {
         }
 
         if ($usePopup == 1 || !$usePopup) {
-            $targetJson = json_encode($targetUrl, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            // <script> 안에 그대로 쓰므로 < > & ' " 는 \u 로 바꾼다 — 주소에 원문 "</script>" 가 섞여 와도 태그를 끊지 못한다.
+            $targetJson = json_encode($targetUrl, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
             if ($targetJson === false) {
                 return;
             }

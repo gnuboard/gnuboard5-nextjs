@@ -100,10 +100,8 @@ function pg_kcp_cli_approve(array $cfg, array $input, string $orderId, int $amou
     $homeDir = G5_SHOP_PATH . '/kcp';
     $gwUrl = preg_match('/^(T\d{4}|S\d{4})/', $siteCd) === 1 ? 'testpaygw.kcp.co.kr' : 'paygw.kcp.co.kr';
     $keyDir = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN' ? $homeDir . '/bin/pub.key' : '';
-    $logDir = getenv('SHOP_KCP_LOG_DIR') ?: (defined('G5_DATA_PATH') ? G5_DATA_PATH . '/log/kcp' : sys_get_temp_dir());
-    if (!is_dir($logDir)) {
-        @mkdir($logDir, 0755, true);
-    }
+    require_once __DIR__ . '/kcp_log_helpers.php';
+    $logDir = shop_api_kcp_log_dir(sys_get_temp_dir()); // 웹에서 못 열게 막은 뒤의 로그 폴더
 
     $usePayMethod = (string) ($input['use_pay_method'] ?? ($input['ret_pay_method'] ?? ($input['pay_method'] ?? '')));
     $mappedPayMethod = pg_kcp_bitmask_from_mobile_method($usePayMethod);

@@ -35,10 +35,30 @@ function api_report_image_parts(string $key): ?array
     if (!preg_match('#^([A-Za-z0-9_]{1,20})/([0-9]{1,10})\|(/[A-Za-z0-9._~%/+=-]+)$#', $key, $m)) {
         return null;
     }
-    if (strpos($m[3], '..') !== false) {
+    // %2e%2e 처럼 인코딩해 숨긴 상위 폴더·이중 슬래시·역슬래시·제어문자도 막는다 — 한 번 풀어서 본다.
+    $decoded = rawurldecode($m[3]);
+    if (strpos($decoded, '..') !== false || strpos($decoded, '//') !== false || preg_match('/[\\\\\x00-\x1f\x7f]/', $decoded)) {
         return null;
     }
     return [$m[1], (int) $m[2], $m[3]];
+}
+
+/**
+ * 신고한 사진이 정말 그 글의 사진인지 — 본문에 그 파일 이름이 있어야 한다(에디터 사진은 본문에 주소가 들어 있다).
+ * 아무 글 번호에 아무 사이트 사진을 붙여 신고하지 못하게 한다.
+ */
+function api_report_image_in_post(string $bo_table, int $wr_id, string $path): bool
+{
+    $name = basename(rawurldecode($path));
+    if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9_.-]*\.(?:jpe?g|png|gif|webp)$/i', $name) || !api_get_board($bo_table)) {
+        return false;
+    }
+    $row = DB::fetch(
+        "SELECT wr_content FROM " . DB::writeTable($bo_table) . " WHERE wr_id = ? AND wr_is_comment = 0 LIMIT 1",
+        [$wr_id]
+    );
+    $content = (string) ($row['wr_content'] ?? '');
+    return $content !== '' && (strpos($content, $name) !== false || strpos($content, rawurlencode($name)) !== false);
 }
 
 /** 관리자 화면에 띄울 신고 이미지 주소 — 이 사이트의 이미지만(바깥 이미지는 추적 우려로 띄우지 않는다). */
@@ -52,7 +72,22 @@ function api_report_image_url(string $key): ?string
     if ($parts) {
         return $origin . $parts[2];
     }
-    return strpos($key, $origin . '/') === 0 ? $key : null;
+    $legacyPath = api_report_legacy_image_path($key);
+    return $legacyPath !== null ? $origin . $legacyPath : null;
+}
+
+/**
+ * 옛 앱(2026-10-06 이전)의 사진 신고 키 — 사진 주소만 보낸다. 옛 앱도 에디터 사진에만 이 키를 만들었으므로 이 사이트의
+ * /data/editor/{연월}/{파일}.{사진 확장자} 꼴만 받는다(앱 editorImages.ts 와 같은 모양). 아니면 null.
+ */
+function api_report_legacy_image_path(string $key): ?string
+{
+    $origin = rtrim((string) api_current_origin(), '/');
+    if ($origin === '' || strpos($key, $origin . '/') !== 0) {
+        return null;
+    }
+    $path = substr($key, strlen($origin));
+    return preg_match('#^/(?:data/)?editor/[0-9]{4}/[A-Za-z0-9][A-Za-z0-9_.-]*\.(?:jpe?g|png|gif|webp)$#i', $path) ? $path : null;
 }
 
 /**
@@ -263,7 +298,14 @@ if ($apiMethod === 'POST' && $action === '') {
     // 이미지 신고의 원래 글도 같은 기준 — 읽을 수 없는 글의 사진은 신고하지 못한다(옛 키는 원래 글을 모르니 그대로).
     if ($type === 'image') {
         $imageParts = api_report_image_parts($key);
-        if ($imageParts && !api_report_target_readable($viewer ?: null, 'post', $imageParts[0] . '/' . $imageParts[1])) {
+        // 옛 키(주소만)는 이 사이트의 에디터 사진 주소일 때만 받는다 — 아무 주소나 관리자 화면에 심지 못하게.
+        if (!$imageParts && api_report_legacy_image_path($key) === null) {
+            Response::error('Report target not found.', 404);
+        }
+        if ($imageParts && (
+            !api_report_target_readable($viewer ?: null, 'post', $imageParts[0] . '/' . $imageParts[1])
+            || !api_report_image_in_post($imageParts[0], $imageParts[1], $imageParts[2])
+        )) {
             Response::error('Report target not found.', 404);
         }
     }
