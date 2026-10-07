@@ -4,7 +4,7 @@ import type {
   SavedAddress,
 } from "./orderAddressHelpers";
 import type { AddressFieldUpdater, PostcodeTarget } from "./OrderAddressFields";
-import type { PaymentConfig } from "./orderPaymentHelpers";
+import type { HopeDateRule, PaymentConfig } from "./orderPaymentHelpers";
 import type { MyCoupon } from "./orderPricingHelpers";
 
 export const ORDER_INPUT_CLASS_NAME =
@@ -42,10 +42,6 @@ type DeliveryRequestState = {
   setMemo: (value: string) => void;
   hopeDate: string;
   setHopeDate: (value: string) => void;
-  taxRequest: boolean;
-  setTaxRequest: (checked: boolean) => void;
-  cashRequest: boolean;
-  setCashRequest: (checked: boolean) => void;
 };
 
 type BuildRecipientInfoPropsInput = {
@@ -58,6 +54,7 @@ type BuildRecipientInfoPropsInput = {
   isMemberOrder: boolean;
   addressSave: AddressSaveState;
   deliveryRequest: DeliveryRequestState;
+  hopeDateRule: HopeDateRule | null;
 };
 
 type BuildPaymentMethodSectionPropsInput = {

@@ -15,7 +15,7 @@
   "scripts/lib/g5-url-shape-live-guards.mjs": 724,
   "scripts/lib/local-order-scope-checks.mjs": 718,
   "src/app/(auth)/register/ClientPage.tsx": 775,
-  "src/app/shop/orders/[od_id]/ClientPage.tsx": 766,
+  "src/app/shop/orders/[od_id]/ClientPage.tsx": 712,
   "themes/default/layout-shell.tsx": 670,
   "themes/default/theme.shell.css": 700,
   "themes/default/theme.shop.home.css": 653

@@ -8,8 +8,6 @@ export function useOrderFormState() {
   const [submitting, setSubmitting] = useState(false);
   const [memo, setMemo] = useState("");
   const [hopeDate, setHopeDate] = useState("");
-  const [taxRequest, setTaxRequest] = useState(false);
-  const [cashRequest, setCashRequest] = useState(false);
   const [guestPassword, setGuestPassword] = useState("");
   const [addressSelection, setAddressSelection] =
     useState<AddressSelection>("same");
@@ -26,10 +24,6 @@ export function useOrderFormState() {
     setMemo,
     hopeDate,
     setHopeDate,
-    taxRequest,
-    setTaxRequest,
-    cashRequest,
-    setCashRequest,
   };
   const addressSave = {
     saveAsNewAddress,

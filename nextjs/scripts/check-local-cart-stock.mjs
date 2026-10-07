@@ -107,6 +107,14 @@ async function main() {
   const optionRow = (await api('/shop/cart')).data?.items?.find((row) => String(row.io_id) === String(option.io_id) && Number(row.io_type) === 0);
   if (!optionRow) throw new Error('option cart row not found');
   await api(`/shop/cart/${optionRow.ct_id}`, { method: 'PATCH', body: { ct_qty: 5 } });
+
+  // 영카트 화면처럼 다른 줄만 고르면(act=buy) 나머지 줄은 ct_select = 0 이 된다. 영카트 화면에서 담은 줄도 ct_select = 0 으로
+  // 들어온다. 앱의 주문하기 검사는 그 줄을 다시 골라(ct_select = 1) 검사해야 한다 — "장바구니가 비어 있습니다" 가 아니다.
+  await api('/shop/cart/legacy-update', { method: 'POST', body: { act: 'buy', ct_id: [optionRow.ct_id] } });
+  check('주문하기 앞 검사: 영카트에서 고르지 않은 줄(ct_select 0)도 골라서 검사한다', await api('/shop/cart/order-stock', { method: 'POST', body: { ct_ids: [ctId] } }), { status: 200 });
+  // 그때 고르지 않은 줄(옵션 줄)은 영카트 act=buy 처럼 ct_select 0 으로 돌아간다 — 줄 번호 없는 검사는 고른 한 줄만 센다.
+  const onlyChosen = await api('/shop/cart/order-stock');
+  results.push({ name: '주문하기 앞 검사: 고르지 않은 줄은 영카트처럼 선택이 풀린다', ok: onlyChosen.status === 200 && Number(onlyChosen.data?.checked_count) === 1, status: onlyChosen.status, message: `checked_count=${onlyChosen.data?.checked_count}` });
   const shrink = seedStock([`--product-id=${optionItem.it_id}`, `--io-id-b64=${ioIdB64}`, '--io-type=0', '--stock=2']);
   try {
     check('재고가 줄어든 뒤에도 수량 줄이기는 된다', await api(`/shop/cart/${optionRow.ct_id}`, { method: 'PATCH', body: { ct_qty: 3 } }), { status: 200 });

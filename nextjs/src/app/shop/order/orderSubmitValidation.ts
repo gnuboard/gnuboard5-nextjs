@@ -4,6 +4,7 @@ import {
 } from "./orderAddressHelpers";
 import {
   PAYMENT_METHODS,
+  type HopeDateRule,
   type PayMethodDef,
 } from "./orderPaymentHelpers";
 import {
@@ -20,6 +21,9 @@ type ValidateOrderSubmissionInput = {
   depositName: string;
   guestPassword: string;
   isMemberOrder: boolean;
+  /** 희망배송일과 그 규칙(결제 설정의 hope_date) — 규칙이 없거나 쓰지 않으면 보지 않는다. */
+  hopeDate?: string;
+  hopeDateRule?: HopeDateRule | null;
 };
 
 export type OrderSubmitValidationResult =
@@ -74,6 +78,8 @@ export function validateOrderSubmission({
   depositName,
   guestPassword,
   isMemberOrder,
+  hopeDate = "",
+  hopeDateRule = null,
 }: ValidateOrderSubmissionInput): OrderSubmitValidationResult {
   if (!hasRequiredAddressFields(orderer)) {
     return { ok: false, message: "주문자 정보를 모두 입력해주세요." };
@@ -122,6 +128,16 @@ export function validateOrderSubmission({
       message:
         "비회원 주문조회에 사용할 비밀번호를 영문/숫자 3자리 이상 입력해주세요.",
     };
+  }
+
+  // 영카트 orderform.sub.php 처럼 희망배송일을 쓰는 쇼핑몰이면 반드시 고른다(고를 수 있는 날은 서버가 준 범위).
+  if (hopeDateRule?.use) {
+    if (!hopeDate) {
+      return { ok: false, message: "희망배송일을 선택하여 주십시오." };
+    }
+    if (hopeDate < hopeDateRule.min || hopeDate > hopeDateRule.max) {
+      return { ok: false, message: `희망배송일은 ${hopeDateRule.min} 부터 ${hopeDateRule.max} 사이에서 선택해 주십시오.` };
+    }
   }
 
   return { ok: true, methodDef, recipient: resolvedRecipient };

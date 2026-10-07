@@ -101,7 +101,8 @@ const FOOTER_LINKS = [
 const SHRINK_AT = 70;
 
 function CartLink() {
-  const { totalQty, fetchCart } = useCartStore();
+  // 영카트처럼 상품 수(같은 상품의 옵션 줄은 1개) — 수량 합계가 아니다.
+  const { itemCount, fetchCart } = useCartStore();
 
   // greenhub 의 CartButton 과 같은 방식: 첫 마운트와 cart:changed 이벤트에서 다시 센다.
   useEffect(() => {
@@ -115,9 +116,9 @@ function CartLink() {
 
   // 이름에 보이는 숫자를 그대로 넣는다 — "장바구니 0" 처럼. 보이는 글자가 이름에 없으면 label-in-name 검사에 걸린다.
   return (
-    <Link href="/shop/cart" className="solune-shop-cart" aria-label={`장바구니 ${totalQty > 99 ? "99+" : totalQty}`}>
+    <Link href="/shop/cart" className="solune-shop-cart" aria-label={`장바구니 ${itemCount > 99 ? "99+" : itemCount}`}>
       <ShoppingBag size={15} aria-hidden />
-      <span className="solune-shop-cart-count">{totalQty > 99 ? "99+" : totalQty}</span>
+      <span className="solune-shop-cart-count">{itemCount > 99 ? "99+" : itemCount}</span>
     </Link>
   );
 }

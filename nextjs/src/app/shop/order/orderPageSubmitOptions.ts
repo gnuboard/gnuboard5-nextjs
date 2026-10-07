@@ -32,8 +32,6 @@ export function buildOrderSubmitOptions({
     email: orderData.email,
     memo: formState.deliveryRequest.memo,
     hopeDate: formState.deliveryRequest.hopeDate,
-    taxRequest: formState.deliveryRequest.taxRequest,
-    cashRequest: formState.deliveryRequest.cashRequest,
     guestPassword: formState.guestPassword,
     isMemberOrder: orderData.isMemberOrder,
     paymentMethod: orderData.paymentMethod,
@@ -49,5 +47,6 @@ export function buildOrderSubmitOptions({
     setSubmitting: formState.setSubmitting,
     setPaymentNotice: formState.paymentNoticeState.setPaymentNotice,
     onCartChanged: orderData.reloadItems,
+    onHopeDateRejected: orderData.reloadPaymentConfig,
   };
 }

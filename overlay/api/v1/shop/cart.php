@@ -47,14 +47,24 @@ if (($apiMethod === 'GET' || $apiMethod === 'POST') && $ct_id === 'order-stock')
         $cartParams[] = $directFilter ? 1 : 0;
     }
 
-    // 앱 장바구니의 "주문하기" — 고른 줄의 선택 시각을 지금으로 갱신한 뒤 검사한다(영카트 cartupdate.php act=buy 가
-    // ct_select_time 을 갱신한 다음 ajax.orderstock.php 가 보는 것과 같다). 갱신하지 않으면 담은 지 몇 시간 된 장바구니는
-    // 아래의 "선택한 지 너무 오래됨" 검사에 잘못 걸린다. 검사만 하는 GET 은 아무것도 바꾸지 않는다.
+    // 앱 장바구니의 "주문하기" — 고른 줄을 "주문할 줄"로 표시하고(ct_select = 1) 선택 시각을 지금으로 갱신한 뒤 검사한다.
+    // 영카트 cartupdate.php act=buy 가 고른 줄을 ct_select = 1 · ct_select_time = 지금으로 바꾼 다음 ajax.orderstock.php 가
+    // 보는 것과 같다. 영카트 화면에서 담은 줄은 ct_select = 0 으로 들어오므로, 이걸 하지 않으면 그 줄은 아래 검사에서
+    // 빠져 "장바구니가 비어 있습니다" 가 되고, 오래 전에 담은 줄은 "선택한 지 너무 오래됨" 에 잘못 걸린다.
+    // 고르지 않은 줄은 영카트처럼 ct_select = 0 으로 돌린다 — 같은 DB 의 영카트 주문서(orderform.php)가 ct_select = 1 인 줄을
+    // 주문하므로, 예전에 골라 둔 줄이 섞이지 않게. 영카트는 바로구매 장바구니가 따로이므로 같은 구분(ct_direct)의 줄만 돌린다.
+    // 검사만 하는 GET 은 아무것도 바꾸지 않는다.
     if ($apiMethod === 'POST' && !empty($filterCtIds)) {
         DB::execute(
             "UPDATE " . DB::table('g5_shop_cart_table') . "
-             SET ct_select_time = NOW()
-             WHERE od_id = ? AND ct_select = 1 AND ct_id IN (" . implode(',', array_fill(0, count($filterCtIds), '?')) . ")
+             SET ct_select = 0
+             WHERE od_id = ? AND ct_direct = ? AND " . shop_api_cart_active_status_sql(),
+            array_merge([$cart_id, $directFilter ? 1 : 0], shop_api_cart_active_statuses())
+        );
+        DB::execute(
+            "UPDATE " . DB::table('g5_shop_cart_table') . "
+             SET ct_select = 1, ct_select_time = NOW()
+             WHERE od_id = ? AND ct_id IN (" . implode(',', array_fill(0, count($filterCtIds), '?')) . ")
                AND " . shop_api_cart_active_status_sql(),
             array_merge([$cart_id], $filterCtIds, shop_api_cart_active_statuses())
         );
@@ -418,7 +428,20 @@ if ($apiMethod === 'GET' && $ct_id === '') {
         ];
     }
 
-    Response::success([
+    // 회원이면 다른 기기 · 영카트 화면에서 담아 아직 이 장바구니로 모이지 않은 상품까지 센 상품 수(읽기만 한다).
+    // 영카트는 쇼핑몰 화면마다 회원의 일반 장바구니를 한 장바구니로 모아(set_cart_id) 머리글이 그 수를 보인다.
+    // 우리는 장바구니 화면에서만 모으므로(위 gather), 머리글 개수는 이 값을 쓴다 — 줄을 옮기지 않아 다른 화면을 흔들지 않는다.
+    $memberItemCount = null;
+    if ($mb_id !== '' && !$directFilter && empty($filterCtIds)) {
+        $memberCountRow = DB::fetch(
+            "SELECT COUNT(DISTINCT it_id) AS cnt FROM " . DB::table('g5_shop_cart_table') . "
+             WHERE mb_id = ? AND ct_direct = 0 AND " . shop_api_cart_active_status_sql(),
+            array_merge([$mb_id], shop_api_cart_active_statuses())
+        );
+        $memberItemCount = (int) ($memberCountRow['cnt'] ?? 0);
+    }
+
+    Response::success(array_merge([
         'cart_id'       => (string) $cart_id,
         'items'         => $items,
         'total_price'   => $totalPrice,
@@ -426,7 +449,7 @@ if ($apiMethod === 'GET' && $ct_id === '') {
         'cart_coupon'   => $totalCpPrice,
         'send_cost'     => $baseSendCost,
         'shipping_cost' => $baseSendCost,
-    ]);
+    ], $memberItemCount === null ? [] : ['member_item_count' => $memberItemCount]));
 }
 
 // =========================================================================

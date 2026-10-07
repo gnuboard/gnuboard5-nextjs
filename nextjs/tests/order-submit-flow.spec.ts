@@ -188,6 +188,37 @@ test.describe("order submit flow", () => {
     expect(setSubmittingCalls).toEqual([false]);
   });
 
+  test("reloads the hope date rule when the server rejects the hope date (bank)", async () => {
+    const setSubmittingCalls: boolean[] = [];
+    let reloads = 0;
+    const message = "희망배송일은 2026-10-10 부터 2026-10-16 사이에서 선택해 주십시오.";
+    const deps = buildDeps({
+      createBankOrder: async () => {
+        throw Object.assign(new Error(message), { code: "HOPE_DATE" });
+      },
+    });
+
+    await submitBankOrder({
+      orderBody: { od_name: "Buyer", ct_ids: "1,2" },
+      bankAccount: "Bank 123",
+      depositName: "Buyer",
+      router: { push: () => undefined, replace: () => undefined },
+      setSubmitting: (submitting) => setSubmittingCalls.push(submitting),
+      onCartChanged: () => {
+        throw new Error("cart reload must not run");
+      },
+      onHopeDateRejected: () => {
+        reloads += 1;
+      },
+      deps,
+    });
+
+    expect(reloads).toBe(1);
+    expect(deps.toastErrors).toEqual([{ message }]);
+    expect(deps.routerCalls).toEqual([]);
+    expect(setSubmittingCalls).toEqual([false]);
+  });
+
   test("rejects bank order responses without an order id", async () => {
     const setSubmittingCalls: boolean[] = [];
     const routerPushes: string[] = [];
@@ -325,6 +356,37 @@ test.describe("order submit flow", () => {
     expect(notices).toEqual([PAYMENT_PREPARING_NOTICE, null]);
     expect(deps.toastErrors).toEqual([
       { message: CART_CHANGED_MESSAGE, duration: PAYMENT_NOTICE_AUTO_DISMISS_MS },
+    ]);
+    expect(setSubmittingCalls).toEqual([false]);
+  });
+
+  test("reloads the hope date rule when payment prepare rejects the hope date", async () => {
+    const notices: Array<PaymentNotice | null> = [];
+    const setSubmittingCalls: boolean[] = [];
+    let reloads = 0;
+    const deps = buildDeps({
+      requestPreparedOrderPayment: async () => {
+        throw Object.assign(new Error("희망배송일을 선택하여 주십시오."), { code: "HOPE_DATE" });
+      },
+    });
+
+    await submitPaymentOrder({
+      orderBody: { od_name: "Buyer", ct_ids: "1,2" },
+      paymentConfig: paymentConfig(),
+      methodDef: paymentMethod(),
+      origin: "https://example.com",
+      setSubmitting: (submitting) => setSubmittingCalls.push(submitting),
+      setPaymentNotice: (notice) => notices.push(notice),
+      onHopeDateRejected: () => {
+        reloads += 1;
+      },
+      deps,
+    });
+
+    expect(reloads).toBe(1);
+    expect(notices).toEqual([PAYMENT_PREPARING_NOTICE, null]);
+    expect(deps.toastErrors).toEqual([
+      { message: "희망배송일을 선택하여 주십시오.", duration: PAYMENT_NOTICE_AUTO_DISMISS_MS },
     ]);
     expect(setSubmittingCalls).toEqual([false]);
   });

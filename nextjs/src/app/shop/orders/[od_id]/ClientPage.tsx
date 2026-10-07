@@ -3,22 +3,18 @@
 import { useEffect, useState, useCallback, useId, useRef, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { G5Link as Link } from "@/components/ui/g5-link";
-import Image from "next/image";
 import { useRuntimeRouteParam } from "@/hooks/use-runtime-route-param";
 import { useAuthStore } from "@/store/auth";
 import { runtimeRouterPush } from "@/lib/runtime-router";
 import type { ShopOrder } from "@/lib/api";
 import type { BbsRewriteMode } from "@/lib/board-url";
-import { shouldBypassImageOptimization } from "@/lib/image";
-import { shopProductHref } from "@/lib/product-url";
-import { formatPrice, formatDate, cn, formatCartOption } from "@/lib/utils";
+import { formatPrice, formatDate, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ProductImageFallback } from "@/components/shop/ProductImageFallback";
 import { ArrowLeft, Check, X } from "lucide-react";
 import { toastSuccess, toastError } from "@/lib/toast";
 import { cancelMyOrder, getMyOrder } from "@/services/member";
 import { getClientPublicSettings } from "@/services/settings";
-import { getShopCartShippingPaymentLabel } from "@/lib/shop-shipping-label";
+import { OrderDetailItems } from "./OrderDetailItems";
 
 // 백엔드의 그누보드5 표준 상태값을 그대로 사용 — UI 라벨만 친절하게 매핑.
 const STATUS_MAP: Record<string, { label: string; variant: string }> = {
@@ -403,58 +399,8 @@ export default function OrderDetailPage() {
           )}
         </section>
 
-        {/* Order Items */}
-        <section className="shop-order-section rounded-lg border p-6">
-          <h2 className="mb-4 text-lg font-bold">주문 상품</h2>
-          <div className="space-y-3">
-            {order.items?.map((item) => (
-              <div
-                key={item.ct_id}
-                className="flex items-center gap-4 rounded-md border p-3"
-              >
-                <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-md bg-muted">
-                  {item.image_url ? (
-                    <Image
-                      src={item.image_url}
-                      alt={item.it_name}
-                      fill
-                      className="object-cover"
-                      sizes="64px"
-                      unoptimized={shouldBypassImageOptimization(item.image_url)}
-                    />
-                  ) : (
-                    <ProductImageFallback compact />
-                  )}
-                </div>
-                <div className="flex-1">
-                  <a
-                    href={shopProductHref(item, productRewriteMode)}
-                    className="text-sm font-medium hover:text-primary"
-                  >
-                    {item.it_name}
-                  </a>
-                  {formatCartOption(item.ct_option, item.it_name) && (
-                    <p className="text-xs text-muted-foreground">
-                      옵션: {formatCartOption(item.ct_option, item.it_name)}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    {formatPrice(item.ct_price)} x {item.ct_qty}개
-                  </p>
-                  <p
-                    className="text-xs text-muted-foreground"
-                    data-shop-order-item-send-cost-label="1"
-                  >
-                    배송비: {getShopCartShippingPaymentLabel(item, order.items ?? [])}
-                  </p>
-                </div>
-                <span className="text-sm font-bold">
-                  {formatPrice(item.line_total ?? item.ct_price * item.ct_qty)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
+        {/* Order Items — 상품별로 묶는다(영카트 orderinquiryview.php) */}
+        <OrderDetailItems items={order.items ?? []} productRewriteMode={productRewriteMode} />
 
         {/* Shipping Info */}
         <section className="shop-order-section rounded-lg border p-6">

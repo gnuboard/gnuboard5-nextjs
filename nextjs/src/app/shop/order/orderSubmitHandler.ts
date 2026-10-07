@@ -33,8 +33,6 @@ export type UseOrderSubmitOptions = {
   email: string;
   memo: string;
   hopeDate: string;
-  taxRequest: boolean;
-  cashRequest: boolean;
   guestPassword: string;
   isMemberOrder: boolean;
   paymentMethod: string;
@@ -52,6 +50,8 @@ export type UseOrderSubmitOptions = {
   setPaymentNotice: SetPaymentNotice;
   /** 서버가 장바구니가 바뀌었다고 멈추면(CART_CHANGED) 주문서의 상품 줄을 다시 불러온다. */
   onCartChanged?: () => void;
+  /** 서버가 희망배송일로 멈추면(HOPE_DATE) 결제 설정을 다시 받는다. */
+  onHopeDateRejected?: () => void;
 };
 
 type SubmitOrderInput = UseOrderSubmitOptions & {
@@ -95,8 +95,6 @@ export async function submitOrder({
   email,
   memo,
   hopeDate,
-  taxRequest,
-  cashRequest,
   guestPassword,
   isMemberOrder,
   paymentMethod,
@@ -112,6 +110,7 @@ export async function submitOrder({
   setSubmitting,
   setPaymentNotice,
   onCartChanged,
+  onHopeDateRejected,
   router,
   origin,
   clientUid,
@@ -128,6 +127,8 @@ export async function submitOrder({
     depositName,
     guestPassword,
     isMemberOrder,
+    hopeDate,
+    hopeDateRule: paymentConfig?.hope_date ?? null,
   });
 
   if (!validation.ok) {
@@ -149,8 +150,6 @@ export async function submitOrder({
     email,
     memo,
     hopeDate,
-    taxRequest,
-    cashRequest,
     guestPassword,
     isMemberOrder,
     methodDef,
@@ -163,7 +162,10 @@ export async function submitOrder({
     clientUid,
   });
 
-  const cartChanged = onCartChanged ? { onCartChanged } : {};
+  const cartChanged = {
+    ...(onCartChanged ? { onCartChanged } : {}),
+    ...(onHopeDateRejected ? { onHopeDateRejected } : {}),
+  };
 
   if (methodDef.value === "bank") {
     await handlerDeps.submitBankOrder({

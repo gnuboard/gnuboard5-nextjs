@@ -522,7 +522,6 @@ export function createLocalOrderStatusChecks(deps) {
           od_settle_case: SETTLE_BANK,
           od_bank_account: 'smoke-bank',
           od_deposit_name: 'NextjsSmoke',
-          od_cash_request: true,
         }),
       });
       orderId = String(orderPayload.data?.od_id || orderPayload.data?.order?.od_id || '');

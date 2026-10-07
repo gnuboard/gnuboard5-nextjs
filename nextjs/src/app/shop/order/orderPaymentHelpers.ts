@@ -20,7 +20,16 @@ export interface PaymentConfig {
   easy_pay_services?: string[];
   bank_accounts?: string[];
   is_test_mode: boolean;
+  /** 희망배송일(영카트 de_hope_date_use · de_hope_date_after) — 고를 수 있는 날은 서버 날짜 기준 */
+  hope_date?: HopeDateRule;
 }
+
+export type HopeDateRule = {
+  use: boolean;
+  after: number;
+  min: string;
+  max: string;
+};
 
 export type PaymentNotice = {
   tone: "info" | "error" | "success";

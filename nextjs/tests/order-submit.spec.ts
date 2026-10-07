@@ -112,6 +112,38 @@ test.describe("order submit validation", () => {
   });
 });
 
+test.describe("order hope date (YoungCart de_hope_date_use · de_hope_date_after)", () => {
+  const base = {
+    orderer: address(),
+    recipient: address({ name: "Recipient" }),
+    addressSelection: "new" as const,
+    paymentMethod: "bank",
+    bankAccount: "Bank 123-456",
+    depositName: "Buyer",
+    guestPassword: "abc123",
+    isMemberOrder: false,
+  };
+  const rule = { use: true, after: 3, min: "2026-10-10", max: "2026-10-16" };
+
+  test("is ignored when the shop does not use it", () => {
+    expect(validateOrderSubmission({ ...base, hopeDate: "", hopeDateRule: { ...rule, use: false } }).ok).toBe(true);
+    expect(validateOrderSubmission({ ...base, hopeDate: "", hopeDateRule: null }).ok).toBe(true);
+  });
+
+  test("must be chosen when used", () => {
+    const result = validateOrderSubmission({ ...base, hopeDate: "", hopeDateRule: rule });
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.message).toBe("희망배송일을 선택하여 주십시오.");
+  });
+
+  test("must fall inside the allowed 7 days", () => {
+    expect(validateOrderSubmission({ ...base, hopeDate: "2026-10-09", hopeDateRule: rule }).ok).toBe(false);
+    expect(validateOrderSubmission({ ...base, hopeDate: "2026-10-17", hopeDateRule: rule }).ok).toBe(false);
+    expect(validateOrderSubmission({ ...base, hopeDate: "2026-10-10", hopeDateRule: rule }).ok).toBe(true);
+    expect(validateOrderSubmission({ ...base, hopeDate: "2026-10-16", hopeDateRule: rule }).ok).toBe(true);
+  });
+});
+
 test.describe("order submit payload", () => {
   test("builds address book payload with zip split and fallback subject", () => {
     const payload = buildAddressBookPayload(
@@ -173,8 +205,6 @@ test.describe("order submit payload", () => {
       email: "buyer@example.com",
       memo: "Leave at door",
       hopeDate: "2026-06-20",
-      taxRequest: true,
-      cashRequest: true,
       guestPassword: "  guest123  ",
       isMemberOrder: false,
       methodDef: bankMethod,
@@ -205,8 +235,6 @@ test.describe("order submit payload", () => {
       point_use: 1200,
       od_hope_date: "2026-06-20",
       payment_device: "mobile",
-      od_tax_flag: 1,
-      od_cash_request: 1,
     });
   });
 
@@ -221,8 +249,6 @@ test.describe("order submit payload", () => {
       email: "member@example.com",
       memo: "",
       hopeDate: "",
-      taxRequest: false,
-      cashRequest: false,
       guestPassword: "guest123",
       isMemberOrder: true,
       methodDef: bankMethod,

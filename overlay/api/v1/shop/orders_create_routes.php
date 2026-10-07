@@ -178,13 +178,18 @@ if ($apiMethod === 'POST' && $od_id === '') {
     shop_api_validate_order_buy_qty($cartItems);
 
     $totalPrice = 0;
-    $totalQty   = 0;
+    // 상품 수 · 상품명은 영카트 orderformupdate.php · orderform.sub.php 처럼 상품마다 하나(COUNT(DISTINCT it_id), group by it_id) —
+    // 같은 상품의 옵션 줄은 한 상품이다. od_cart_count 에 수량 합계를 넣으면 원본 관리자 주문 목록 · "외 N건" 이 틀린다.
     $goodsNames = [];
     foreach ($cartItems as $ci) {
         $totalPrice += shop_api_cart_line_total($ci);
-        $totalQty   += (int) $ci['ct_qty'];
-        $goodsNames[] = $ci['it_name'];
+        $itemKey = (string) $ci['it_id'];
+        if (!isset($goodsNames[$itemKey])) {
+            $goodsNames[$itemKey] = $ci['it_name'];
+        }
     }
+    $goodsNames = array_values($goodsNames);
+    $cartCount  = count($goodsNames);
 
     // 배송비 — 기본 + 지역별(g5_shop_sendcost 도서산간) 분리.
     //   od_send_cost  : 기본 배송비 (50,000원 이상 무료)
@@ -296,18 +301,14 @@ if ($apiMethod === 'POST' && $od_id === '') {
     }
 
     // Use a valid DATE value because local MySQL may run with strict zero-date checks.
-    $od_hope_date = date('Y-m-d');
-    if (!empty($input['od_hope_date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $input['od_hope_date'])) {
-        $od_hope_date = $input['od_hope_date'];
-    }
+    // 희망배송일 — 관리자 "희망배송일사용"일 때만, "희망배송일지정"일 뒤부터 7일 안에서(영카트와 같다).
+    $od_hope_date = shop_api_order_hope_date($input);
     // 모바일 주문 감지 — User-Agent 기반. PC 도 동일 흐름이라 표시 정보만.
     $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
     $od_mobile = preg_match('/Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry/i', $ua) ? 1 : 0;
 
-    // 세금계산서/현금영수증 신청 플래그.
-    //   od_tax_flag=1 — 사업자 세금계산서 발급 신청.
-    //   od_cash=1     — 가상계좌/계좌이체 결제 시 현금영수증 발급 신청
-    //                   (실제 영수증 번호는 PG 가 발급 → confirm 후 od_cash_no/od_cash_info 채워짐)
+    // od_tax_flag — 영카트처럼 복합과세(과세 · 비과세 나눔) 여부. 세금계산서 신청이 아니다.
+    // od_cash     — 영카트에서 "현금영수증이 발급됨"이다. 주문할 때는 0 이고, 발급은 결제 뒤 PG · 관리자가 채운다.
     $taxAmounts = shop_api_order_tax_amounts(
         $cartItems,
         $od_send_cost,
@@ -318,7 +319,7 @@ if ($apiMethod === 'POST' && $od_id === '') {
         $payableAmount
     );
     $od_tax_flag = (int) $taxAmounts['od_tax_flag'];
-    $od_cash     = !empty($input['od_cash_request']) ? 1 : 0;
+    $od_cash     = 0;
 
     // Generate order ID: YmdHis + 4 random digits — 아직 쓰이지 않은 번호로(같은 초에 겹치지 않게).
     $od_id_new = shop_api_new_order_id();
@@ -440,7 +441,7 @@ if ($apiMethod === 'POST' && $od_id === '') {
             $input['od_memo'] ?? '',
             shop_orders_client_uid_marker($clientUid),
             $totalPrice,
-            $totalQty,
+            $cartCount,
             $od_send_cost,
             $od_send_cost2,
             $od_send_coupon,

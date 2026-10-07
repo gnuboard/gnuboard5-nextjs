@@ -15,6 +15,7 @@ import {
   PAYMENT_PREPARING_NOTICE,
   getCreatedOrderPath,
   isCartChangedError,
+  isHopeDateError,
   isPaymentCancelMessage,
 } from "./orderSubmitFeedback";
 import {
@@ -36,6 +37,8 @@ type SubmitBankOrderInput = {
   setSubmitting: (submitting: boolean) => void;
   /** 서버가 장바구니가 바뀌었다고 멈추면(CART_CHANGED) — 주문서의 상품 줄을 다시 불러온다. */
   onCartChanged?: () => void;
+  /** 서버가 희망배송일로 멈추면(HOPE_DATE) — 결제 설정을 다시 받아 희망배송일 칸 · 범위를 맞춘다. */
+  onHopeDateRejected?: () => void;
   deps?: Partial<OrderSubmitFlowDeps>;
 };
 
@@ -49,6 +52,7 @@ type SubmitPaymentOrderInput = {
   setSubmitting: (submitting: boolean) => void;
   setPaymentNotice: (notice: PaymentNotice | null) => void;
   onCartChanged?: () => void;
+  onHopeDateRejected?: () => void;
   deps?: Partial<OrderSubmitFlowDeps>;
 };
 
@@ -81,6 +85,7 @@ export async function submitBankOrder({
   router,
   setSubmitting,
   onCartChanged,
+  onHopeDateRejected,
   deps,
 }: SubmitBankOrderInput): Promise<void> {
   const flowDeps = resolveOrderSubmitFlowDeps(deps);
@@ -103,6 +108,11 @@ export async function submitBankOrder({
       onCartChanged?.();
       return;
     }
+    if (isHopeDateError(err)) {
+      toastError(err instanceof Error ? err.message : "희망배송일을 다시 선택해 주십시오.");
+      onHopeDateRejected?.();
+      return;
+    }
     const message = err instanceof Error ? err.message : "주문에 실패했습니다.";
     toastError(message);
   } finally {
@@ -119,6 +129,7 @@ export async function submitPaymentOrder({
   setSubmitting,
   setPaymentNotice,
   onCartChanged,
+  onHopeDateRejected,
   deps,
 }: SubmitPaymentOrderInput): Promise<void> {
   const flowDeps = resolveOrderSubmitFlowDeps(deps);
@@ -152,6 +163,14 @@ export async function submitPaymentOrder({
       setPaymentNotice(null);
       toastError(CART_CHANGED_MESSAGE, { duration: PAYMENT_NOTICE_AUTO_DISMISS_MS });
       onCartChanged?.();
+      setSubmitting(false);
+      return;
+    }
+    if (isHopeDateError(err)) {
+      // 결제 준비가 멈췄다 — 결제창은 열리지 않았다. 준비 중 안내를 걷고 희망배송일 칸 · 범위를 다시 받는다.
+      setPaymentNotice(null);
+      toastError(err instanceof Error ? err.message : "희망배송일을 다시 선택해 주십시오.", { duration: PAYMENT_NOTICE_AUTO_DISMISS_MS });
+      onHopeDateRejected?.();
       setSubmitting(false);
       return;
     }

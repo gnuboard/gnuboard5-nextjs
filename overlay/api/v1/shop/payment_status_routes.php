@@ -55,6 +55,8 @@ if ($apiMethod === 'GET' && $action === 'config') {
         'easy_pay_services' => pg_easy_pay_services($cfg),
         'bank_accounts'   => $bankAccounts,
         'is_test_mode'    => $isTestMode,
+        // 희망배송일(영카트 de_hope_date_use · de_hope_date_after) — 고를 수 있는 날은 서버 날짜로 계산해 준다.
+        'hope_date'       => shop_api_hope_date_range($cfg),
     ]);
 }
 

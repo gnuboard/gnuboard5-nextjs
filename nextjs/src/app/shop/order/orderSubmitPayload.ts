@@ -19,8 +19,6 @@ type BuildOrderBodyInput = {
   email: string;
   memo: string;
   hopeDate: string;
-  taxRequest: boolean;
-  cashRequest: boolean;
   guestPassword: string;
   isMemberOrder: boolean;
   methodDef: PayMethodDef;
@@ -63,8 +61,6 @@ export function buildOrderBody({
   email,
   memo,
   hopeDate,
-  taxRequest,
-  cashRequest,
   guestPassword,
   isMemberOrder,
   methodDef,
@@ -118,8 +114,6 @@ export function buildOrderBody({
     ...(pointUse > 0 ? { point_use: pointUse } : {}),
     ...(hopeDate ? { od_hope_date: hopeDate } : {}),
     payment_device: paymentDevice,
-    ...(taxRequest ? { od_tax_flag: 1 } : {}),
-    ...(cashRequest ? { od_cash_request: 1 } : {}),
     ...(clientUid ? { client_uid: clientUid } : {}),
   };
 }

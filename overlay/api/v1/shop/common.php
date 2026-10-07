@@ -577,6 +577,7 @@ require_once __DIR__ . '/common_pricing_helpers.php';
 require_once __DIR__ . '/common_session_helpers.php';
 require_once __DIR__ . '/order_push_helpers.php'; // SC-07 주문 상태 푸시
 require_once __DIR__ . '/stale_draft_helpers.php'; // SC-15 결제 초안 24시간 자동 취소
+require_once __DIR__ . '/order_hope_date.php'; // 희망배송일(영카트 de_hope_date_use · de_hope_date_after)
 // SC-15: 크론이 없어 /shop/* 요청 끝에 얹어 10분에 한 번 돈다(락을 잡은 요청 하나만, 응답 뒤).
 register_shutdown_function(static function () {
     shop_api_stale_draft_tick();

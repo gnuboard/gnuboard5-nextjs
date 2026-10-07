@@ -53,3 +53,11 @@ export const CART_CHANGED_MESSAGE =
 export function isCartChangedError(err: unknown): boolean {
   return err instanceof Error && (err as Error & { code?: unknown }).code === "CART_CHANGED";
 }
+
+/**
+ * 주문 · 결제 준비가 희망배송일로 멈췄는가(서버 400, errors.code HOPE_DATE — order_hope_date.php). 주문서를 연 뒤
+ * 날이 바뀌었거나, 결제 설정을 못 받아 희망배송일 칸이 없었을 때. 그러면 결제 설정을 다시 받아 칸 · 범위를 맞춘다.
+ */
+export function isHopeDateError(err: unknown): boolean {
+  return err instanceof Error && (err as Error & { code?: unknown }).code === "HOPE_DATE";
+}

@@ -8,15 +8,51 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCartStore } from "@/store/cart";
+import type { CartItem } from "@/lib/types";
 import { formatPrice, formatCartOption } from "@/lib/utils";
 import { shouldBypassImageOptimization } from "@/lib/image";
+
+type MiniCartProduct = {
+  itId: string;
+  name: string;
+  image?: string;
+  /** 옵션 줄 이름(옵션 없는 줄은 빠진다) */
+  options: string[];
+  qty: number;
+  total: number;
+};
+
+/** 장바구니 줄을 상품별로 묶는다 — 영카트 boxcart · cart.php 처럼 같은 상품의 옵션 줄은 한 칸(담은 순서). */
+function groupMiniCart(items: CartItem[]): MiniCartProduct[] {
+  const byItem = new Map<string, MiniCartProduct>();
+  for (const line of items) {
+    const product = byItem.get(line.it_id) ?? {
+      itId: line.it_id,
+      name: line.it_name,
+      image: line.image_url,
+      options: [],
+      qty: 0,
+      total: 0,
+    };
+    const option = formatCartOption(line.ct_option, line.it_name);
+    byItem.set(line.it_id, {
+      ...product,
+      options: option ? [...product.options, option] : product.options,
+      qty: product.qty + line.ct_qty,
+      total: product.total + (line.line_total ?? line.ct_price * line.ct_qty),
+    });
+  }
+  return Array.from(byItem.values());
+}
 
 /**
  * 헤더 카트 아이콘 — click/keyboard/touch 로 미니 카트 popover를 연다.
  */
 export function CartMiniPopover() {
-  const { items, totalQty, totalPrice, fetchError, fetchCart } = useCartStore();
+  // 개수는 영카트처럼 상품 수(같은 상품의 옵션 줄은 1개).
+  const { items, itemCount, totalPrice, fetchError, fetchCart } = useCartStore();
   const [open, setOpen] = useState(false);
+  const products = groupMiniCart(items);
 
   // 비회원 카트도 쿠키 기반으로 동작하므로 초기 진입과 cart 변경 때 동기화한다.
   // 붙는 순간에는 "지금 상태"만 필요하다 — 화면 이동으로 두 번 붙어도 요청은 한 번만 나간다.
@@ -40,15 +76,15 @@ export function CartMiniPopover() {
           variant="ghost"
           size="icon"
           className="relative"
-          aria-label={`장바구니${totalQty > 0 ? `, 상품 ${totalQty}개` : ""}`}
+          aria-label={`장바구니${itemCount > 0 ? `, 상품 ${itemCount}개` : ""}`}
         >
           <ShoppingCartIcon className="size-4" />
-          {totalQty > 0 && (
+          {itemCount > 0 && (
             <Badge
               variant="destructive"
               className="absolute -right-1 -top-1 size-5 items-center justify-center rounded-full p-0 text-[10px]"
             >
-              {totalQty > 99 ? "99+" : totalQty}
+              {itemCount > 99 ? "99+" : itemCount}
             </Badge>
           )}
           <span className="sr-only">장바구니</span>
@@ -61,7 +97,7 @@ export function CartMiniPopover() {
         aria-label="장바구니 미리보기"
       >
           <div className="mb-2 flex items-center justify-between border-b pb-2 text-sm font-medium">
-            <span>장바구니 ({totalQty})</span>
+            <span>장바구니 ({itemCount})</span>
             <Link
               href="/shop/cart"
               className="text-xs text-primary hover:underline"
@@ -82,36 +118,36 @@ export function CartMiniPopover() {
           ) : (
             <>
               <ul className="max-h-72 space-y-2 overflow-y-auto">
-                {items.slice(0, 5).map((it) => (
-                  <li key={it.ct_id} className="flex items-center gap-2">
-                    {it.image_url ? (
+                {products.slice(0, 5).map((product) => (
+                  <li key={product.itId} className="flex items-center gap-2">
+                    {product.image ? (
                       <Image
-                        src={it.image_url}
-                        alt={it.it_name}
+                        src={product.image}
+                        alt={product.name}
                         width={40}
                         height={40}
                         className="h-10 w-10 flex-shrink-0 rounded object-cover"
-                        unoptimized={shouldBypassImageOptimization(it.image_url)}
+                        unoptimized={shouldBypassImageOptimization(product.image)}
                       />
                     ) : (
                       <div className="h-10 w-10 flex-shrink-0 rounded bg-muted" />
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium">{it.it_name}</p>
-                      {formatCartOption(it.ct_option, it.it_name) && (
+                      <p className="truncate text-xs font-medium">{product.name}</p>
+                      {product.options.length > 0 && (
                         <p className="truncate text-[10px] text-muted-foreground">
-                          {formatCartOption(it.ct_option, it.it_name)}
+                          {product.options.join(" · ")}
                         </p>
                       )}
                       <p className="text-[10px] text-muted-foreground">
-                        {it.ct_qty}개 · {formatPrice(it.line_total ?? it.ct_price * it.ct_qty)}
+                        {product.qty}개 · {formatPrice(product.total)}
                       </p>
                     </div>
                   </li>
                 ))}
-                {items.length > 5 && (
+                {products.length > 5 && (
                   <li className="text-center text-[10px] text-muted-foreground">
-                    외 {items.length - 5}개 상품 더
+                    외 {products.length - 5}개 상품 더
                   </li>
                 )}
               </ul>

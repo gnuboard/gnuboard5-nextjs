@@ -60,6 +60,7 @@ export function buildOrderPageControllerResult({
       isMemberOrder: orderData.isMemberOrder,
       addressSave: formState.addressSave,
       deliveryRequest: formState.deliveryRequest,
+      hopeDateRule: orderData.paymentConfig?.hope_date ?? null,
     }),
     paymentMethodSection: buildPaymentMethodSectionProps({
       paymentMethod: orderData.paymentMethod,

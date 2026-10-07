@@ -21,8 +21,6 @@ export function useOrderSubmit({
   email,
   memo,
   hopeDate,
-  taxRequest,
-  cashRequest,
   guestPassword,
   isMemberOrder,
   paymentMethod,
@@ -38,6 +36,7 @@ export function useOrderSubmit({
   setSubmitting,
   setPaymentNotice,
   onCartChanged,
+  onHopeDateRejected,
 }: UseOrderSubmitOptions) {
   const router = useRouter();
   // Synchronous re-entrancy guard. setSubmitting is async React state, so it
@@ -65,8 +64,6 @@ export function useOrderSubmit({
           email,
           memo,
           hopeDate,
-          taxRequest,
-          cashRequest,
           guestPassword,
           isMemberOrder,
           paymentMethod,
@@ -82,6 +79,7 @@ export function useOrderSubmit({
           setSubmitting,
           setPaymentNotice,
           onCartChanged,
+          onHopeDateRejected,
           router,
           origin: window.location.origin,
           clientUid: clientUidRef.current,
@@ -100,8 +98,6 @@ export function useOrderSubmit({
       email,
       memo,
       hopeDate,
-      taxRequest,
-      cashRequest,
       guestPassword,
       isMemberOrder,
       paymentMethod,
@@ -117,6 +113,7 @@ export function useOrderSubmit({
       setSubmitting,
       setPaymentNotice,
       onCartChanged,
+      onHopeDateRejected,
       router,
     ]
   );

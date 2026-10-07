@@ -9,6 +9,8 @@ interface CartState {
   totalPrice: number;
   totalPoint: number;
   totalQty: number;
+  /** 상품 수 — 같은 상품의 옵션 줄은 1개(영카트 get_boxcart_datas_count · cart.php 의 group by it_id). 머리글 개수. */
+  itemCount: number;
   /**
    * 장바구니를 다시 받는다. 기본은 늘 새로 받는다 — 담기·수량 변경 직후에는 방금 보낸
    * 변경이 반영된 값이어야 하므로 진행 중인 요청을 물려받아서는 안 된다.
@@ -42,6 +44,7 @@ function calculateTotals(items: CartItem[]) {
     ),
     totalPoint: items.reduce((sum, item) => sum + (item.ct_point ?? 0) * item.ct_qty, 0),
     totalQty: items.reduce((sum, item) => sum + item.ct_qty, 0),
+    itemCount: new Set(items.map((item) => item.it_id)).size,
   };
 }
 
@@ -52,6 +55,7 @@ export const useCartStore = create<CartState>((set, get) => ({
   totalPrice: 0,
   totalPoint: 0,
   totalQty: 0,
+  itemCount: 0,
 
   fetchCart: (options) => {
     if (options?.dedupe) {
@@ -62,11 +66,14 @@ export const useCartStore = create<CartState>((set, get) => ({
     const run = (async () => {
       set({ isLoading: true, fetchError: null });
       try {
-        const res = await api.get<{ items: CartItem[]; total_price: number; total_qty: number }>('/shop/cart');
+        const res = await api.get<{ items: CartItem[]; total_price: number; total_qty: number; member_item_count?: number }>('/shop/cart');
         const data = res.data;
         const items = data?.items || [];
         cartFetchedAt = Date.now();
-        set({ items, isLoading: false, fetchError: null, ...calculateTotals(items) });
+        const totals = calculateTotals(items);
+        // 회원은 다른 기기 · 영카트 화면에서 담아 아직 이 장바구니로 모이지 않은 상품도 센다(서버가 읽기만 한 상품 수).
+        const memberItemCount = Number(data?.member_item_count ?? 0);
+        set({ items, isLoading: false, fetchError: null, ...totals, itemCount: Math.max(totals.itemCount, memberItemCount) });
       } catch {
         set({
           isLoading: false,
@@ -131,13 +138,13 @@ export const useCartStore = create<CartState>((set, get) => ({
   clearCart: async () => {
     try {
       await api.delete('/shop/cart');
-      set({ items: [], fetchError: null, totalPrice: 0, totalPoint: 0, totalQty: 0 });
+      set({ items: [], fetchError: null, totalPrice: 0, totalPoint: 0, totalQty: 0, itemCount: 0 });
     } catch {
       throw new Error('장바구니 비우기에 실패했습니다.');
     }
   },
 
   resetLocalCart: () => {
-    set({ items: [], isLoading: false, fetchError: null, totalPrice: 0, totalPoint: 0, totalQty: 0 });
+    set({ items: [], isLoading: false, fetchError: null, totalPrice: 0, totalPoint: 0, totalQty: 0, itemCount: 0 });
   },
 }));

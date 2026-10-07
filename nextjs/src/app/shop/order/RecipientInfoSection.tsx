@@ -1,5 +1,6 @@
 "use client";
 
+import type { HopeDateRule } from "./orderPaymentHelpers";
 import {
   type AddressForm,
   type AddressSelection,
@@ -29,10 +30,7 @@ type RecipientInfoSectionProps = {
   setMemo: (value: string) => void;
   hopeDate: string;
   setHopeDate: (value: string) => void;
-  taxRequest: boolean;
-  setTaxRequest: (checked: boolean) => void;
-  cashRequest: boolean;
-  setCashRequest: (checked: boolean) => void;
+  hopeDateRule: HopeDateRule | null;
 };
 
 export function RecipientInfoSection({
@@ -54,10 +52,7 @@ export function RecipientInfoSection({
   setMemo,
   hopeDate,
   setHopeDate,
-  taxRequest,
-  setTaxRequest,
-  cashRequest,
-  setCashRequest,
+  hopeDateRule,
 }: RecipientInfoSectionProps) {
   return (
     <section className="shop-order-section shop-order-section--recipient rounded-lg border p-6">
@@ -86,11 +81,7 @@ export function RecipientInfoSection({
         setMemo={setMemo}
         hopeDate={hopeDate}
         setHopeDate={setHopeDate}
-        isMemberOrder={isMemberOrder}
-        taxRequest={taxRequest}
-        setTaxRequest={setTaxRequest}
-        cashRequest={cashRequest}
-        setCashRequest={setCashRequest}
+        hopeDateRule={hopeDateRule}
       />
     </section>
   );

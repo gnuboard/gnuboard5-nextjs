@@ -133,13 +133,18 @@ if ($apiMethod === 'POST' && $action === 'prepare') {
     shop_api_validate_order_buy_qty($cartItems);
 
     $totalPrice = 0;
-    $totalQty   = 0;
+    // 상품 수 · 상품명은 영카트 orderformupdate.php · orderform.sub.php 처럼 상품마다 하나(COUNT(DISTINCT it_id), group by it_id) —
+    // 같은 상품의 옵션 줄은 한 상품이다. od_cart_count 에 수량 합계를 넣으면 원본 관리자 주문 목록 · "외 N건" 이 틀린다.
     $goodsNames = [];
     foreach ($cartItems as $ci) {
         $totalPrice += shop_api_cart_line_total($ci);
-        $totalQty   += (int) $ci['ct_qty'];
-        $goodsNames[] = $ci['it_name'];
+        $itemKey = (string) $ci['it_id'];
+        if (!isset($goodsNames[$itemKey])) {
+            $goodsNames[$itemKey] = $ci['it_name'];
+        }
     }
+    $goodsNames = array_values($goodsNames);
+    $cartCount  = count($goodsNames);
 
     // 배송비 — orders.php POST 와 동일 룰 (기본 + 도서산간).
     $sc = shop_api_send_cost($totalPrice, $input['od_b_zip1'] ?? '', $input['od_b_zip2'] ?? '');
@@ -151,10 +156,7 @@ if ($apiMethod === 'POST' && $action === 'prepare') {
     $od_send_cost2 = $sc['extra'];
 
     // 희망배송일 / 모바일 마킹 — orders.php POST 와 동일 룰.
-    $od_hope_date = date('Y-m-d');
-    if (!empty($input['od_hope_date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $input['od_hope_date'])) {
-        $od_hope_date = $input['od_hope_date'];
-    }
+    $od_hope_date = shop_api_order_hope_date($input);
     $requestedPaymentDevice = strtolower(trim((string) ($input['payment_device'] ?? $input['device'] ?? '')));
     $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
     $uaMobile = preg_match('/Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry/i', $ua) ? 1 : 0;
@@ -166,9 +168,9 @@ if ($apiMethod === 'POST' && $action === 'prepare') {
         $od_mobile = $uaMobile;
     }
 
-    // 세금계산서/현금영수증 신청 플래그 (orders POST 와 동일).
+    // od_cash 는 영카트에서 "현금영수증이 발급됨" — 주문할 때는 0(orders POST 와 같다). od_tax_flag 는 아래에서 복합과세로 정한다.
     $od_tax_flag = 0;
-    $od_cash     = !empty($input['od_cash_request']) ? 1 : 0;
+    $od_cash     = 0;
 
     // 카트에 미리 묶인 상품/카테고리 쿠폰 합계.
     $od_cart_coupon = 0;
@@ -344,7 +346,7 @@ if ($apiMethod === 'POST' && $action === 'prepare') {
             // od_mod_history 에 쿠폰 마커 — confirm 단계에서 coupon_log INSERT 할 때 사용.
             ($appliedCoupon ? shop_api_coupon_marker_line($appliedCoupon['cp_id']) : '') .
             ($appliedSendCoupon ? shop_api_coupon_marker_line($appliedSendCoupon['cp_id'], 'send') : ''),
-            $totalPrice, $totalQty, $od_send_cost, $od_send_cost2, $od_send_coupon,
+            $totalPrice, $cartCount, $od_send_cost, $od_send_cost2, $od_send_coupon,
             // 아직 결제 전이다 — 입금액 0 · 미수금 = 결제할 금액으로 둔다. 상태 '준비'는 원본 관리자 목록에서 "상품준비중"이라
             // 입금액을 채워 두면 돈을 낸 주문처럼 보였다(앱에서 결제를 그만두면 24시간 동안 남는다). 결제 확인이 금액을 채운다.
             $od_cart_coupon, $od_coupon, $od_receipt_point, 0, $od_receipt_price,

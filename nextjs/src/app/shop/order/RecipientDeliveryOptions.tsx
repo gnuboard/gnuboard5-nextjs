@@ -1,33 +1,28 @@
 "use client";
 
+import type { HopeDateRule } from "./orderPaymentHelpers";
+
 type RecipientDeliveryOptionsProps = {
   inputClassName: string;
   memo: string;
   setMemo: (value: string) => void;
   hopeDate: string;
   setHopeDate: (value: string) => void;
-  isMemberOrder: boolean;
-  taxRequest: boolean;
-  setTaxRequest: (checked: boolean) => void;
-  cashRequest: boolean;
-  setCashRequest: (checked: boolean) => void;
+  /** 결제 설정의 hope_date — 쓰지 않거나 아직 받지 못했으면 희망배송일 칸을 그리지 않는다. */
+  hopeDateRule: HopeDateRule | null;
 };
 
-function getTomorrowDateInputValue(): string {
-  return new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-}
-
+/**
+ * 전하실 말씀 · 희망배송일 — 영카트 orderform.sub.php 와 같다. 희망배송일은 관리자 "희망배송일사용"일 때만 나오고
+ * 반드시 고르며, "희망배송일지정"일 뒤부터 7일 안에서 고른다(날짜는 서버가 정해 준다).
+ */
 export function RecipientDeliveryOptions({
   inputClassName,
   memo,
   setMemo,
   hopeDate,
   setHopeDate,
-  isMemberOrder,
-  taxRequest,
-  setTaxRequest,
-  cashRequest,
-  setCashRequest,
+  hopeDateRule,
 }: RecipientDeliveryOptionsProps) {
   return (
     <>
@@ -44,42 +39,25 @@ export function RecipientDeliveryOptions({
         />
       </div>
 
-      <div className="mt-4">
-        <label htmlFor="order-hope-date" className="mb-1 block text-sm font-medium">
-          희망 배송일{" "}
-          <span className="text-xs text-muted-foreground">(선택)</span>
-        </label>
-        <input
-          id="order-hope-date"
-          name="hope_date"
-          type="date"
-          value={hopeDate}
-          onChange={(event) => setHopeDate(event.target.value)}
-          min={getTomorrowDateInputValue()}
-          className={`${inputClassName} max-w-[200px]`}
-        />
-      </div>
-
-      {isMemberOrder && (
-        <div className="mt-4 space-y-2">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={taxRequest}
-              onChange={(event) => setTaxRequest(event.target.checked)}
-              className="h-4 w-4 rounded"
-            />
-            세금계산서 신청 (사업자 전용)
+      {hopeDateRule?.use && (
+        <div className="mt-4">
+          <label htmlFor="order-hope-date" className="mb-1 block text-sm font-medium">
+            희망배송일 <span className="text-destructive">*</span>
           </label>
-          <label className="flex items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
             <input
-              type="checkbox"
-              checked={cashRequest}
-              onChange={(event) => setCashRequest(event.target.checked)}
-              className="h-4 w-4 rounded"
+              id="order-hope-date"
+              name="od_hope_date"
+              type="date"
+              required
+              value={hopeDate}
+              onChange={(event) => setHopeDate(event.target.value)}
+              min={hopeDateRule.min}
+              max={hopeDateRule.max}
+              className={`${inputClassName} max-w-[200px]`}
             />
-            현금영수증 신청 (가상계좌/계좌이체 결제 시)
-          </label>
+            <span className="text-sm text-muted-foreground">이후로 배송 바랍니다.</span>
+          </div>
         </div>
       )}
     </>

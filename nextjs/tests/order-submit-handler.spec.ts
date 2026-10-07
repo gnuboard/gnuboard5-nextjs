@@ -59,8 +59,6 @@ function submitOptions(
     email: "buyer@example.com",
     memo: "Leave at door",
     hopeDate: "2026-06-20",
-    taxRequest: true,
-    cashRequest: false,
     guestPassword: "guest123",
     isMemberOrder: false,
     paymentMethod: "bank",

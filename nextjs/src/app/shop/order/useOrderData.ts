@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { type ShopCartItem, type ShopPolicy } from "@/lib/api";
+import { useCallback, useState } from "react";
+import { api, type ShopCartItem, type ShopPolicy } from "@/lib/api";
 import {
   EMPTY_ADDRESS,
   type AddressForm,
@@ -75,6 +75,16 @@ export function useOrderData({
     setCartShippingCost,
   });
 
+  // 결제 설정만 다시 받는다 — 서버가 희망배송일로 멈췄을 때(날이 바뀌었거나 처음에 설정을 못 받았을 때) 칸 · 범위를 새로.
+  const reloadPaymentConfig = useCallback(() => {
+    api
+      .get<PaymentConfig>("/shop/payment/config")
+      .then((response) => {
+        if (response?.data) setPaymentConfig(response.data);
+      })
+      .catch(() => undefined);
+  }, []);
+
   useOrderShippingQuote({
     itemCount: items.length,
     shippingZip,
@@ -88,6 +98,7 @@ export function useOrderData({
     items,
     orderCtIds,
     reloadItems,
+    reloadPaymentConfig,
     loading,
     paymentMethod,
     setPaymentMethod,
