@@ -48,7 +48,7 @@ test.describe("order submit validation", () => {
     expect(shouldPersistAddress(7, true)).toBe(false);
   });
 
-  test("accepts a complete guest bank order with agreements", () => {
+  test("accepts a complete guest bank order", () => {
     const recipient = address({ name: "Recipient" });
     const result = validateOrderSubmission({
       orderer: address(),
@@ -59,8 +59,6 @@ test.describe("order submit validation", () => {
       depositName: "Buyer",
       guestPassword: "abc123",
       isMemberOrder: false,
-      agreeTerms: true,
-      agreePrivacy: true,
     });
 
     expect(result.ok).toBe(true);
@@ -79,8 +77,6 @@ test.describe("order submit validation", () => {
       depositName: "Buyer",
       guestPassword: "abc123",
       isMemberOrder: false,
-      agreeTerms: true,
-      agreePrivacy: true,
     };
 
     expect(
@@ -111,12 +107,6 @@ test.describe("order submit validation", () => {
       validateOrderSubmission({
         ...validInput,
         guestPassword: "ab",
-      }).ok
-    ).toBe(false);
-    expect(
-      validateOrderSubmission({
-        ...validInput,
-        agreePrivacy: false,
       }).ok
     ).toBe(false);
   });

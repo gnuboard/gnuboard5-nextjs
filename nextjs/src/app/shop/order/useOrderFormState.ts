@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { type AddressSelection } from "./orderAddressHelpers";
-import { useOrderAgreements } from "./useOrderAgreements";
 import { useOrderPaymentNotice } from "./useOrderPaymentNotice";
 
 export function useOrderFormState() {
@@ -21,7 +20,6 @@ export function useOrderFormState() {
   const [selectedSendCouponId, setSelectedSendCouponId] = useState("");
   const [pointUseInput, setPointUseInput] = useState("");
 
-  const agreements = useOrderAgreements();
   const paymentNoticeState = useOrderPaymentNotice({ setSubmitting });
   const deliveryRequest = {
     memo,
@@ -60,7 +58,6 @@ export function useOrderFormState() {
     deliveryRequest,
     addressSave,
     couponPoint,
-    agreements,
     paymentNoticeState,
   };
 }

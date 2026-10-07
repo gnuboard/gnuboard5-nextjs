@@ -69,19 +69,22 @@ body[data-g5-theme-source="default"] .solune-shop-page {
 
   /* 옵션 · 수량 */
   .product-options { order: 9; margin-top: 28px; border-top: 1px solid var(--solune-border); padding-top: 22px; }
-  .product-panel > .space-y-2 { order: 10; margin-top: 14px; }
-  .product-options label, .product-panel > .space-y-2 label, .product-quantity label { font-size: 12.5px; font-weight: 600; }
-  .product-options select, .product-panel > .space-y-2 select { height: 44px; border-radius: 8px; border-color: var(--solune-border-strong); background-color: var(--solune-surface); }
+  .product-supply-options { order: 10; margin-top: 14px; }
+  .product-options label, .product-supply-options label { font-size: 12.5px; font-weight: 600; }
+  .product-options select, .product-supply-options select { height: 44px; border-radius: 8px; border-color: var(--solune-border-strong); background-color: var(--solune-surface); }
 
-  /* 수량 · 고른 옵션 · 총 결제금액은 옅은 회색 둥근 상자 하나(레퍼런스 "선택된 옵션" 상자).
-     세 덩어리가 이어 붙어 한 상자로 보이도록 위·가운데·아래의 모서리와 여백을 나눠 준다. */
-  .product-quantity { order: 11; margin-top: 28px; border-top: 0; border-radius: 12px 12px 0 0; padding: 18px 18px 12px; background: var(--solune-surface-soft); }
-  .product-quantity > label { color: var(--solune-muted); font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; }
-  .product-quantity-controls button, .product-quantity-controls input { height: 32px; border-radius: 6px; border-color: var(--solune-border-strong); background: var(--solune-surface); }
-  .product-quantity-controls button { width: 32px; }
-  .product-selected { order: 12; margin-top: 0; padding: 0 18px 4px; background: var(--solune-surface-soft); }
-  .product-selected .rounded-lg { border-radius: 10px; background: var(--solune-surface); }
-  .product-selected > button { height: 32px; border: 1px solid var(--solune-border-strong); border-radius: 6px; background: var(--solune-surface); color: var(--solune-text-soft); font-size: 12.5px; }
+  /* 선택된 옵션 · 총 결제금액은 옅은 회색 둥근 상자 하나(레퍼런스 "선택된 옵션" 상자 #sit_sel_option).
+     두 덩어리가 이어 붙어 한 상자로 보이도록 위·아래의 모서리와 여백을 나눠 준다. 줄마다 흰 카드 —
+     이름, [−][수량][+], 옵션 금액, 오른쪽 위 삭제(×). */
+  .product-selected { order: 12; margin-top: 28px; border-radius: 12px 12px 0 0; padding: 18px 18px 4px; background: var(--solune-surface-soft); }
+  .product-selected .rounded-lg { border-radius: 10px; border-color: var(--solune-border); background: var(--solune-surface); }
+  .product-selected-price { color: var(--solune-text); font-size: 14px; font-weight: 700; }
+  .product-quantity-controls { gap: 0; }
+  .product-quantity-controls > * { height: 32px; border: 1px solid var(--solune-border-strong); border-radius: 0; background: var(--solune-surface); box-shadow: none; }
+  .product-quantity-controls > button { width: 32px; }
+  .product-quantity-controls > button:first-child { border-radius: 6px 0 0 6px; }
+  .product-quantity-controls > button:last-child { border-radius: 0 6px 6px 0; }
+  .product-quantity-controls > input { width: 48px; border-inline: 0; border-radius: 0; color: var(--solune-text); font-weight: 600; }
   .product-total {
     order: 13;
     display: flex;
@@ -136,8 +139,8 @@ body[data-g5-theme-source="default"] .solune-shop-page {
   }
   .solune-pdp-aside-eyebrow { margin: 0 0 14px; color: var(--solune-muted); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; }
   .solune-pdp-aside .product-options { margin-top: 0; border-top: 0; padding-top: 0; }
-  .solune-pdp-aside .product-quantity { margin-top: 0; }
-  .solune-pdp-aside .product-options ~ .product-quantity { margin-top: 16px; }
+  .solune-pdp-aside .product-supply-options { margin-top: 14px; }
+  .solune-pdp-aside .product-selected { margin-top: 16px; }
   .solune-pdp-aside .product-total-value { font-size: 20px; }
   .solune-pdp-aside .product-actions { margin-top: 18px; }
   .solune-pdp-aside .product-actions button { height: 46px; }

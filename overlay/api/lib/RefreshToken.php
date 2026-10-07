@@ -38,6 +38,11 @@ class RefreshToken
         $raw   = bin2hex(random_bytes(32)); // 64-hex chars = 256 bits
         $hash  = hash('sha256', $raw);
         $expiresAt = date('Y-m-d H:i:s', time() + (defined('JWT_REFRESH_EXPIRE_SECONDS') ? JWT_REFRESH_EXPIRE_SECONDS : 30 * 86400));
+        // 기기 이름은 클라이언트가 보내는 값 — 열(VARCHAR(64)) 길이에 맞춰 여기서 자르고 태그 · 제어문자를 뺀다(DB 가 조용히 자르는 것에 기대지 않는다).
+        if ($deviceLabel !== null) {
+            $deviceLabel = mb_substr(trim((string) preg_replace('/[\x00-\x1f\x7f]/u', '', strip_tags($deviceLabel))), 0, 64, 'UTF-8');
+            if ($deviceLabel === '') $deviceLabel = null;
+        }
 
         DB::execute(
             "INSERT INTO `{$table}`

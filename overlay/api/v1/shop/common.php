@@ -330,6 +330,18 @@ if (!function_exists('shop_api_order_tax_amounts')) {
     }
 }
 
+if (!function_exists('shop_api_member_point_lock_name')) {
+    /**
+     * 회원 포인트 잔액을 보고 쓰는 쪽이 함께 줄을 서는 잠금 이름 — 원본 shop/orderformupdate.php 의 'g5pt_order_'.md5(mb_id) 와 같다.
+     * 이름이 다르면 웹 주문과 앱 주문이 서로를 보지 못해 같은 잔액을 두 번 쓴다. (insert_point() 의 'g5pt_'.md5(...) 와는
+     * md5 가 16진수라 'order_' 로 시작할 수 없어 겹치지 않는다.)
+     */
+    function shop_api_member_point_lock_name(string $mbId): string
+    {
+        return 'g5pt_order_' . md5($mbId);
+    }
+}
+
 if (!function_exists('shop_api_debit_member_point')) {
     function shop_api_debit_member_point(
         string $mbId,
@@ -349,7 +361,7 @@ if (!function_exists('shop_api_debit_member_point')) {
             $relAction = 'order_point';
         }
 
-        $lockName = 'g5_shop_point_member_' . md5($mbId);
+        $lockName = shop_api_member_point_lock_name($mbId);
         $lock = DB::fetch('SELECT GET_LOCK(?, 5) AS got_lock', [$lockName]);
         if ((int) ($lock['got_lock'] ?? 0) !== 1) {
             throw new RuntimeException('포인트 처리 중입니다. 잠시 후 다시 시도해 주세요.');
@@ -357,14 +369,16 @@ if (!function_exists('shop_api_debit_member_point')) {
 
         try {
             $member = DB::fetch(
-                "SELECT mb_point FROM " . DB::table('member_table') . "
+                "SELECT mb_id FROM " . DB::table('member_table') . "
                  WHERE mb_id = ? LIMIT 1",
                 [$mbId]
             );
             if (!$member) {
                 throw new RuntimeException('회원 정보를 찾을 수 없습니다.');
             }
-            if ((int) ($member['mb_point'] ?? 0) < $point) {
+            // 잔액은 원본 orderformupdate.php 처럼 포인트 내역 합계(get_point_sum)로 본다 — mb_point 열은 insert_point() 가
+            // 내역 합계로 덮어쓰는 사본이라, 포인트가 동시에 쌓이면 실제 잔액과 어긋날 수 있다.
+            if ((int) get_point_sum($mbId) < $point) {
                 throw new RuntimeException('보유 포인트가 부족합니다.');
             }
 

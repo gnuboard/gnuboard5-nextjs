@@ -243,6 +243,16 @@ if (function_exists('api_image_memory_fits') && !api_image_memory_fits($imageWid
     Response::error('Image dimensions are too large.', 400);
 }
 
+// 회원별 업로드 한도 — 올린 그림은 data/editor/ 에 계속 남고(운영에 정리 크론이 없다) 한 장이 최대 20MB 다.
+// 앱은 사진을 한 장씩 골라 올리고(글쓰기 · 리뷰 최대 5장) 디데이 앱은 동기화 때 사진 있는 디데이마다 차례로 한 장씩
+// 올리므로 분당 30 · 시간당 300 은 정상 사용이 닿지 않는다. 검사를 통과해 실제로 저장할 요청만 센다.
+// 셀 표(login_attempt)가 없는 설치본은 막지 않는다 — 쪽지(memos.php)처럼 비용이 드는 부수 효과가 없는 글쓰기 기능이라
+// 표 하나 때문에 편집기 사진 올리기 전체가 멈추면 안 된다.
+$uploadQuotaMsg = Throttle::checkMemberQuota('editorupload', (string) $member['mb_id'], 30, 300);
+if ($uploadQuotaMsg !== null) {
+    Response::error($uploadQuotaMsg, 429);
+}
+
 // ---------------------------------------------------------------------------
 // Save file (그누보드5 표준: /data/editor/YYMM/)
 // ---------------------------------------------------------------------------
@@ -254,8 +264,15 @@ if (!is_dir($uploadDir)) {
     @file_put_contents($uploadDir . '/index.html', '');
 }
 
-// Generate unique filename: timestamp + random + original extension
-$newFilename = date('YmdHis') . '_' . sprintf('%06d', mt_rand(0, 999999)) . '.' . $ext;
+// 파일 이름: 시각 + 16자 난수(random_int, 영숫자 62자) + 확장자. 그림은 인증 없이 열리므로(/v1/editor-images) 이름을
+// 맞혀 남의 그림을 찾을 수 없어야 한다 — 예전 6자리 mt_rand 는 올린 시각만 알면 훑을 수 있었다(post-files.php 와 같은 방식).
+// 예전 이름도 같은 문자 규칙이라 api_editor_image_ref() · 앱의 주소 규칙에 그대로 맞는다.
+$nameChars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+$nameRand = '';
+for ($k = 0; $k < 16; $k++) {
+    $nameRand .= $nameChars[random_int(0, strlen($nameChars) - 1)];
+}
+$newFilename = date('YmdHis') . '_' . $nameRand . '.' . $ext;
 $destPath = $uploadDir . '/' . $newFilename;
 
 if (!move_uploaded_file($file['tmp_name'], $destPath)) {

@@ -459,7 +459,8 @@ if ($apiMethod === 'PATCH' && $ct_id !== '') {
     $patchMbId = !empty($member['mb_id']) ? (string) $member['mb_id'] : '';
 
     $newCtOption = isset($input['ct_option']) ? trim((string) $input['ct_option']) : null;
-    $isChangingOption = $newCtOption !== null && $newCtOption !== ($cartItem['ct_option'] ?? '');
+    // 입력 ct_option 은 io_id 다 — 저장된 ct_option(표시 글자)이 아니라 io_id 와 비교한다.
+    $isChangingOption = $newCtOption !== null && $newCtOption !== (string) ($cartItem['io_id'] ?? '');
     $isDirectCart = (int) ($cartItem['ct_direct'] ?? 0) === 1;
 
     if (!$isChangingOption && (int) ($cartItem['io_type'] ?? 0) === 0) {
@@ -569,17 +570,18 @@ if ($apiMethod === 'PATCH' && $ct_id !== '') {
 
             // 옵션만 갱신 — ct_price 는 새 io_type 에 따라 재계산.
             $itemPrice = DB::fetch(
-                "SELECT it_price FROM " . DB::table('g5_shop_item_table') . " WHERE it_id = ? LIMIT 1",
+                "SELECT it_price, it_name, it_option_subject FROM " . DB::table('g5_shop_item_table') . " WHERE it_id = ? LIMIT 1",
                 [$cartItem['it_id']]
             );
             $basePrice = (int) ($itemPrice['it_price'] ?? 0);
             $newCtPrice = $basePrice;
+            $newOptionText = shop_api_cart_option_text($itemPrice ?: [], $newCtOption, $newIoType);
 
             DB::execute(
                 "UPDATE " . DB::table('g5_shop_cart_table') . "
                  SET ct_qty = ?, ct_option = ?, io_id = ?, io_type = ?, io_price = ?, ct_price = ?
                  WHERE ct_id = ? AND od_id = ?",
-                [$newQty, $newCtOption, $newCtOption, $newIoType, $newIoPrice, $newCtPrice, $ct_id, $cart_id]
+                [$newQty, $newOptionText, $newCtOption, $newIoType, $newIoPrice, $newCtPrice, $ct_id, $cart_id]
             );
             shop_api_reevaluate_line_coupon((int) $ct_id, $patchMbId);
             $updated = DB::fetch(

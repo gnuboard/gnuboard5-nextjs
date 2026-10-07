@@ -33,21 +33,16 @@ export function ProductPurchasePanel({
   canPurchaseProduct,
   optionSubjects,
   optionSelections,
-  onOptionSelectionsChange,
+  onSelectOptionValue,
   getAvailableValues,
-  supplyOptions,
-  supplyLabel,
-  supplySelection,
-  onSupplySelectionChange,
-  onAddSupplyOption,
+  supplyGroups,
+  onSelectSupplyOption,
   quantity,
   onQuantityChange,
   quantityMinQty,
   minBuyQty,
   maxBuyQty,
-  selectedOption,
   selectedCartOptions,
-  onAddSelectedOption,
   onUpdateSelectedOptionQty,
   onRemoveSelectedOption,
   displayTotal,
@@ -241,21 +236,16 @@ export function ProductPurchasePanel({
         canPurchaseProduct={canPurchaseProduct}
         optionSubjects={optionSubjects}
         optionSelections={optionSelections}
-        onOptionSelectionsChange={onOptionSelectionsChange}
+        onSelectOptionValue={onSelectOptionValue}
         getAvailableValues={getAvailableValues}
-        supplyOptions={supplyOptions}
-        supplyLabel={supplyLabel}
-        supplySelection={supplySelection}
-        onSupplySelectionChange={onSupplySelectionChange}
-        onAddSupplyOption={onAddSupplyOption}
+        supplyGroups={supplyGroups}
+        onSelectSupplyOption={onSelectSupplyOption}
         quantity={quantity}
         onQuantityChange={onQuantityChange}
         quantityMinQty={quantityMinQty}
         minBuyQty={minBuyQty}
         maxBuyQty={maxBuyQty}
-        selectedOption={selectedOption}
         selectedCartOptions={selectedCartOptions}
-        onAddSelectedOption={onAddSelectedOption}
         onUpdateSelectedOptionQty={onUpdateSelectedOptionQty}
         onRemoveSelectedOption={onRemoveSelectedOption}
         displayTotal={displayTotal}

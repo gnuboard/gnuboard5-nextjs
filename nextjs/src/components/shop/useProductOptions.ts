@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ShopProduct } from "@/lib/api";
 import { toastError } from "@/lib/toast";
 import {
+  OPTION_SEPARATOR,
+  baseOptionLabel,
   baseOptionQty,
   buyQtyLimitMessage,
   clampBuyQuantity,
@@ -12,7 +14,10 @@ import {
   productMaxBuyQty,
   productMinBuyQty,
   shopOptionStockQty,
+  supplyOptionGroups,
+  supplyOptionLabel,
   type SelectedCartOption,
+  type SupplyOptionGroup,
 } from "./productDetailHelpers";
 
 type UseProductOptionsOptions = {
@@ -20,13 +25,22 @@ type UseProductOptionsOptions = {
   resetKey?: string;
 };
 
+/** 추가옵션 항목 하나 + 그 select 에 보일 값(목록에 남은 그 항목의 마지막 줄). */
+export type SupplyOptionGroupView = SupplyOptionGroup & { selectedIoId: string };
+
+/**
+ * 상품 옵션 고르기 상태 — 영카트 js/shop.js · item.form.skin.php 와 같게 움직인다.
+ * - 마지막 선택옵션을 고르면 그 조합이 "고른 옵션" 목록에 수량 1 로 바로 붙는다(추가 단추 없음). 고른 값은 select 에 남는다.
+ * - 추가옵션은 항목마다 select 가 따로 있고, 고르면 바로 붙는다.
+ * - 같은 옵션을 다시 고르면 "이미 추가하신 옵션상품입니다". 추가옵션이 있으면 선택옵션 줄은 하나 이상 남아야 한다.
+ * - 옵션 없는 상품은 본품 한 줄(quantity, 최소 구매수량부터)이 목록 맨 위에 있고 지울 수 없다.
+ */
 export function useProductOptions({
   product,
   resetKey,
 }: UseProductOptionsOptions) {
   const [quantity, setQuantity] = useState(1);
   const [optionSelections, setOptionSelections] = useState<string[]>([]);
-  const [supplySelection, setSupplySelection] = useState("");
   const [selectedCartOptions, setSelectedCartOptions] = useState<
     SelectedCartOption[]
   >([]);
@@ -43,7 +57,6 @@ export function useProductOptions({
   useEffect(() => {
     setQuantity(1);
     setOptionSelections([]);
-    setSupplySelection("");
     setSelectedCartOptions([]);
   }, [resetKey]);
 
@@ -68,14 +81,23 @@ export function useProductOptions({
       ),
     [product?.options]
   );
-  const supplyLabel =
-    (product?.it_supply_subject || "").split(",").filter(Boolean).join(" / ") ||
-    "추가옵션";
+  const supplyGroupList = useMemo(
+    () => supplyOptionGroups(product?.it_supply_subject, supplyOptions),
+    [product?.it_supply_subject, supplyOptions]
+  );
+  const supplyGroups: SupplyOptionGroupView[] = supplyGroupList.map((group) => ({
+    ...group,
+    selectedIoId:
+      [...selectedCartOptions]
+        .reverse()
+        .find((item) => item.ioType === 1 && item.io_id.startsWith(group.subject + OPTION_SEPARATOR))
+        ?.io_id ?? "",
+  }));
   const parsedOptions = useMemo(
     () =>
       baseOptions.map((option) => ({
         ...option,
-        levels: (option.io_id || "").split("\x1e"),
+        levels: (option.io_id || "").split(OPTION_SEPARATOR),
       })),
     [baseOptions]
   );
@@ -116,112 +138,92 @@ export function useProductOptions({
     [optionSelections, optionSubjects.length, parsedOptions]
   );
 
-  const getSelectedIoId = useCallback(() => {
-    return optionSelections.filter(Boolean).join("\x1e");
-  }, [optionSelections]);
-
-  const getSelectedOption = useCallback(() => {
-    if (!product?.options) return null;
-    const ioId = getSelectedIoId();
-    if (!ioId) return null;
-    return (
-      product.options.find(
-        (option) =>
-          Number(option.io_type) === 0 &&
-          option.io_id === ioId &&
-          isShopOptionPurchasable(option)
-      ) ?? null
-    );
-  }, [product?.options, getSelectedIoId]);
-
-  const selectedOption = getSelectedOption();
-  const optionPrice = selectedOption?.io_price ?? 0;
-
-  const handleAddSelectedOption = useCallback(() => {
-    const option = getSelectedOption();
-    if (!option) {
-      toastError("옵션을 선택해주세요.");
-      return;
-    }
-
-    if (product) {
-      const message = buyQtyLimitMessage(
-        product,
-        baseOptionQty(selectedCartOptions) + quantity
+  /** 같은 줄이 이미 있으면 알리고 true — 영카트 same_option_check(). */
+  const isAlreadyAdded = useCallback(
+    (ioId: string, ioType: number, label: string) => {
+      const exists = selectedCartOptions.some(
+        (item) => item.ioType === ioType && item.io_id === ioId
       );
-      if (message) {
-        toastError(message);
+      if (exists) toastError(`${label} 은(는) 이미 추가하신 옵션상품입니다.`);
+      return exists;
+    },
+    [selectedCartOptions]
+  );
+
+  /** select 하나를 고른다. 아래 단계는 비우고, 마지막 단계면 그 조합을 목록에 붙인다(영카트 sel_option_process). */
+  const selectOptionValue = useCallback(
+    (levelIndex: number, value: string) => {
+      const next = optionSubjects.map((_, index) =>
+        index < levelIndex ? optionSelections[index] ?? "" : index === levelIndex ? value : ""
+      );
+      setOptionSelections(next);
+      if (!product || !value || levelIndex !== optionSubjects.length - 1) return;
+
+      const ioId = next.join(OPTION_SEPARATOR);
+      const option = baseOptions.find((item) => item.io_id === ioId);
+      if (!option || !isShopOptionPurchasable(option)) {
+        toastError("선택하신 선택옵션상품은 재고가 부족하여 구매할 수 없습니다.");
         return;
       }
-    }
-
-    setSelectedCartOptions((previousOptions) => {
-      const exists = previousOptions.find(
-        (item) => item.io_id === option.io_id
-      );
-      if (exists) {
-        return previousOptions.map((item) =>
-          item.io_id === option.io_id
-            ? { ...item, qty: item.qty + quantity }
-            : item
-        );
+      if ((product.it_price ?? 0) + option.io_price < 0) {
+        toastError("구매금액이 음수인 상품은 구매할 수 없습니다.");
+        return;
+      }
+      const label = baseOptionLabel(optionSubjects, ioId);
+      if (isAlreadyAdded(ioId, 0, label)) return;
+      if (maxBuyQty > 0 && baseOptionQty(selectedCartOptions) + 1 > maxBuyQty) {
+        toastError(`이 상품은 최대 ${maxBuyQty}개까지 구매할 수 있습니다.`);
+        return;
       }
 
-      return [
-        ...previousOptions,
-        {
-          io_id: option.io_id,
-          label: option.io_id.replace(/\x1e/g, " / "),
-          qty: quantity,
-          price: option.io_price,
-          stockQty: shopOptionStockQty(option),
-          ioType: 0,
-        },
-      ];
-    });
-    setOptionSelections([]);
-    setQuantity(1);
-  }, [getSelectedOption, product, quantity, selectedCartOptions]);
+      const line: SelectedCartOption = {
+        io_id: ioId,
+        label,
+        qty: 1,
+        price: option.io_price,
+        stockQty: shopOptionStockQty(option),
+        ioType: 0,
+      };
+      // 선택옵션 줄은 추가옵션 줄보다 앞에(영카트 add_sel_option).
+      setSelectedCartOptions((previous) => [
+        ...previous.filter((item) => item.ioType === 0),
+        line,
+        ...previous.filter((item) => item.ioType !== 0),
+      ]);
+    },
+    [baseOptions, isAlreadyAdded, maxBuyQty, optionSelections, optionSubjects, product, selectedCartOptions]
+  );
 
-  const handleAddSupplyOption = useCallback(() => {
-    if (!product?.options) return;
-    const option = product.options.find(
-      (item) =>
-        Number(item.io_type) === 1 &&
-        item.io_id === supplySelection &&
-        isShopOptionPurchasable(item)
-    );
-    if (!option) {
-      toastError("추가옵션을 선택해주세요.");
-      return;
-    }
-
-    setSelectedCartOptions((previousOptions) => {
-      const exists = previousOptions.find(
-        (item) => item.io_id === option.io_id && item.ioType === 1
-      );
-      if (exists) {
-        return previousOptions.map((item) =>
-          item.io_id === option.io_id && item.ioType === 1
-            ? { ...item, qty: item.qty + 1 }
-            : item
-        );
+  /** 추가옵션 select 에서 고르면 바로 목록에 붙인다(영카트 sel_supply_process). */
+  const selectSupplyOption = useCallback(
+    (ioId: string) => {
+      if (!ioId) return;
+      const option = supplyOptions.find((item) => item.io_id === ioId);
+      const label = supplyOptionLabel(ioId);
+      if (!option || !isShopOptionPurchasable(option)) {
+        toastError(`${label.split(":").slice(1).join(":")}은(는) 재고가 부족하여 구매할 수 없습니다.`);
+        return;
       }
+      if (option.io_price < 0) {
+        toastError("구매금액이 음수인 상품은 구매할 수 없습니다.");
+        return;
+      }
+      if (isAlreadyAdded(ioId, 1, label)) return;
 
-      return [
-        ...previousOptions,
+      setSelectedCartOptions((previous) => [
+        ...previous,
         {
-          io_id: option.io_id,
-          label: option.io_value || option.io_id,
+          io_id: ioId,
+          label,
           qty: 1,
           price: option.io_price,
           stockQty: shopOptionStockQty(option),
           ioType: 1,
         },
-      ];
-    });
-    setSupplySelection("");
-  }, [product?.options, supplySelection]);
+      ]);
+    },
+    [isAlreadyAdded, supplyOptions]
+  );
 
   const updateSelectedOptionQty = useCallback(
     (ioId: string, qty: number) => {
@@ -265,47 +267,36 @@ export function useProductOptions({
     [maxBuyQty]
   );
 
-  const removeSelectedOption = useCallback((ioId: string) => {
-    setSelectedCartOptions((previousOptions) =>
-      previousOptions.filter((item) => item.io_id !== ioId)
-    );
+  const removeSelectedOption = useCallback(
+    (ioId: string) => {
+      const target = selectedCartOptions.find((item) => item.io_id === ioId);
+      if (!target) return;
+      const baseCount = selectedCartOptions.filter((item) => item.ioType === 0).length;
+      const hasSupply = selectedCartOptions.some((item) => item.ioType === 1);
+      if (target.ioType === 0 && hasSupply && baseCount <= 1) {
+        toastError("선택옵션은 하나이상이어야 합니다.");
+        return;
+      }
+      setSelectedCartOptions((previous) => previous.filter((item) => item.io_id !== ioId));
+      // 지운 줄이 select 에 고른 그 조합이면 마지막 단계를 비워 같은 값을 다시 고를 수 있게 한다.
+      if (target.ioType === 0 && optionSelections.join(OPTION_SEPARATOR) === ioId) {
+        setOptionSelections((previous) => previous.map((value, index) => (index === previous.length - 1 ? "" : value)));
+      }
+    },
+    [optionSelections, selectedCartOptions]
+  );
+
+  /** 담은 뒤 처음 모습으로 — 고른 줄과 select 를 비운다. */
+  const clearSelectedOptions = useCallback(() => {
+    setSelectedCartOptions([]);
+    setOptionSelections([]);
   }, []);
 
-  const buildSelectedCartOptions = useCallback(() => {
-    const option = getSelectedOption();
-    if (selectedCartOptions.length > 0) {
-      const hasBaseOption = selectedCartOptions.some(
-        (item) => item.ioType === 0
-      );
-      if (!hasBaseOption && option) {
-        return [
-          {
-            io_id: option.io_id,
-            label: option.io_id.replace(/\x1e/g, " / "),
-            qty: quantity,
-            price: option.io_price,
-            stockQty: shopOptionStockQty(option),
-            ioType: 0,
-          },
-          ...selectedCartOptions,
-        ];
-      }
-      return selectedCartOptions;
-    }
-
-    if (!option) return [];
-
-    return [
-      {
-        io_id: option.io_id,
-        label: option.io_id.replace(/\x1e/g, " / "),
-        qty: quantity,
-        price: option.io_price,
-        stockQty: shopOptionStockQty(option),
-        ioType: 0,
-      },
-    ];
-  }, [getSelectedOption, quantity, selectedCartOptions]);
+  /** 담을 줄 — 목록 그대로. 옵션 없는 상품의 본품 줄은 quantity 로 따로 담는다(addProductToCart). */
+  const buildSelectedCartOptions = useCallback(
+    () => selectedCartOptions,
+    [selectedCartOptions]
+  );
 
   const validateBuyQtyBeforeSubmit = useCallback(
     (cartOptions: SelectedCartOption[]) => {
@@ -327,53 +318,29 @@ export function useProductOptions({
     [optionSubjects.length, product, quantity]
   );
 
-  const selectedOptionsTotal = selectedCartOptions.reduce(
+  const itemPrice = product?.it_price ?? 0;
+  const linesTotal = selectedCartOptions.reduce(
     (sum, option) =>
-      sum +
-      (option.ioType === 1
-        ? option.price
-        : (product?.it_price ?? 0) + option.price) *
-        option.qty,
+      sum + (option.ioType === 1 ? option.price : itemPrice + option.price) * option.qty,
     0
   );
-  const hasQueuedBaseOption = selectedCartOptions.some(
-    (option) => option.ioType === 0
-  );
-  const pendingBaseTotal =
-    selectedCartOptions.length > 0 && !hasQueuedBaseOption
-      ? selectedOption
-        ? ((product?.it_price ?? 0) + optionPrice) * quantity
-        : optionSubjects.length === 0
-          ? (product?.it_price ?? 0) * quantity
-          : 0
-      : 0;
-  const displayTotal =
-    selectedCartOptions.length > 0
-      ? selectedOptionsTotal + pendingBaseTotal
-      : ((product?.it_price ?? 0) + optionPrice) * quantity;
+  const displayTotal = linesTotal + (optionSubjects.length === 0 ? itemPrice * quantity : 0);
 
   return {
     quantity,
     setQuantity,
     optionSelections,
-    setOptionSelections,
-    supplySelection,
-    setSupplySelection,
+    selectOptionValue,
+    selectSupplyOption,
+    supplyGroups,
     selectedCartOptions,
     setSelectedCartOptions,
+    clearSelectedOptions,
     optionSubjects,
     minBuyQty,
     maxBuyQty,
     quantityMinQty,
-    baseOptions,
-    supplyOptions,
-    supplyLabel,
     getAvailableValues,
-    getSelectedOption,
-    selectedOption,
-    optionPrice,
-    handleAddSelectedOption,
-    handleAddSupplyOption,
     updateSelectedOptionQty,
     removeSelectedOption,
     buildSelectedCartOptions,

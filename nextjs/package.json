@@ -150,7 +150,7 @@
     "check:local-point-actions": "node scripts/check-local-point-actions.mjs",
     "check:local-poll-actions": "node scripts/check-local-poll-actions.mjs",
     "check:local-post-reaction-actions": "node scripts/check-local-post-reaction-actions.mjs",
-    "test:sanitize": "playwright test tests/sanitize.spec.ts tests/menu.spec.ts tests/notification-prefs.spec.ts tests/build-workspace-normalizer.spec.ts tests/register-helpers.spec.ts tests/next-runtime.spec.ts tests/shared-helpers.spec.ts tests/safe-storage.spec.ts tests/qa-html.spec.ts tests/editor-content.spec.ts tests/maintenance-beacon.spec.ts tests/cart-groups.spec.ts",
+    "test:sanitize": "playwright test tests/sanitize.spec.ts tests/menu.spec.ts tests/notification-prefs.spec.ts tests/build-workspace-normalizer.spec.ts tests/register-helpers.spec.ts tests/next-runtime.spec.ts tests/shared-helpers.spec.ts tests/safe-storage.spec.ts tests/qa-html.spec.ts tests/editor-content.spec.ts tests/maintenance-beacon.spec.ts tests/cart-groups.spec.ts tests/product-options.spec.ts",
     "test:payment": "playwright test tests/payment-shared.spec.ts tests/payment-kcp.spec.ts tests/payment-nicepay.spec.ts tests/payment-return.spec.ts tests/payment-inicis.spec.ts tests/payment-toss.spec.ts",
     "test:payment:kcp": "playwright test tests/payment-kcp.spec.ts",
     "test:payment:nicepay": "playwright test tests/payment-nicepay.spec.ts",

@@ -3,6 +3,8 @@ if (!defined('_GNUBOARD_')) {
     exit;
 }
 
+require_once __DIR__ . '/cart_option_text.php';
+
 function shop_api_cart_option_inputs($input, $defaultQty) {
     if (empty($input['options']) || !is_array($input['options'])) {
         return [];
@@ -342,7 +344,7 @@ function shop_api_cart_add_row($cart_id, $mb_id, $item, $it_id, $ioId, $qty, $di
             $ctPrice,
             $ctPoint,
             $qty,
-            $ioId,
+            shop_api_cart_option_text_for($item, (string) $it_id, (string) $ioId, $ioType), // ct_option — 영카트 io_value 글자
             (int) ($item['it_notax'] ?? 0),
             $ioId,
             $ioType,

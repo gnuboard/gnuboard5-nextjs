@@ -611,6 +611,55 @@ if ($apiMethod === 'PATCH' && $od_id !== '') {
         }
     }
 
+    // 주문 상태 + 취소 금액 + 히스토리 — 재고 · 포인트 · 쿠폰을 되돌리기 전에 "주문 → 취소"를 먼저 차지한다.
+    // 원본 shop/orderinquirycancel.php · 관리자 화면은 위 주문 잠금을 잡지 않는다. 원본 취소처럼 od_cancel_price = 0 가드 +
+    // 영향 행 확인으로, 그사이 다른 쪽이 먼저 취소했거나(그쪽이 포인트를 돌려줬다) 상태를 바꿨으면 덮어쓰지도 되돌리지도 않는다
+    // — 끝에서 덮어쓰면 포인트가 두 번 돌아가거나, 입금 확인된 주문에 할인만 돌려준 꼴이 된다.
+    $cancelledAt = defined('G5_TIME_YMDHIS') ? G5_TIME_YMDHIS : date('Y-m-d H:i:s');
+    $memoReason = preg_replace('/\s+/', ' ', trim(strip_tags($reason)));
+    $existingHistory = (string) ($order['od_mod_history'] ?? '');
+    $existingShopMemo = (string) ($order['od_shop_memo'] ?? '');
+    $newHistory = trim($existingHistory . "\n[" . $cancelledAt . "] 취소 — " . $memoReason
+        . ($refundNote ? ' / ' . $refundNote : ''));
+    $newShopMemo = trim(
+        $existingShopMemo . "\n주문자 본인 직접 취소 - " . $cancelledAt . " (취소이유 : " . $memoReason . ")"
+    );
+    // 포인트 기록의 주문번호는 요청 값이 아니라 DB 의 주문번호로 — od_id 는 숫자 열이라 앞에 0 을 붙인 값도 같은 주문을 찾는데
+    // po_rel_id 는 문자열이라 달라져, 원본 취소가 남긴 기록과 같은 건으로 보지 못한다.
+    $od_id = (string) $order['od_id'];
+    $orderClaimed = DB::execute(
+        "UPDATE " . DB::table('g5_shop_order_table') . "
+         SET od_send_cost = 0,
+             od_send_cost2 = 0,
+             od_receipt_price = 0,
+             od_receipt_point = 0,
+             od_misu = 0,
+             od_cancel_price = od_cart_price,
+             od_cart_coupon = 0,
+             od_coupon = 0,
+             od_send_coupon = 0,
+             od_status = '취소',
+             od_refund_price = CASE WHEN ? > 0 THEN ? ELSE od_refund_price END,
+             od_mod_history = ?,
+             od_shop_memo = ?
+         WHERE od_id = ? AND mb_id = ? AND od_status = ? AND od_cancel_price = 0",
+        [$refundedPgAmount, $refundedPgAmount, $newHistory, $newShopMemo, $od_id, $orderMbId, (string) $order['od_status']]
+    );
+    if ($orderClaimed !== 1) {
+        if ($hadPgPayment) {
+            // PG 는 이미 취소됐는데 주문은 다른 쪽이 바꿨다 — 관리자가 맞춰 볼 수 있게 기록만 남긴다.
+            $pgLine = '[' . $cancelledAt . '] 결제(PG)는 취소됐지만 그사이 주문 상태가 바뀌어 앱 취소를 반영하지 못함 — 확인 필요'
+                . ($refundNote ? ' / ' . $refundNote : '');
+            DB::execute(
+                "UPDATE " . DB::table('g5_shop_order_table') . "
+                 SET od_mod_history = CASE WHEN od_mod_history = '' THEN ? ELSE CONCAT(od_mod_history, '\n', ?) END
+                 WHERE od_id = ?",
+                [$pgLine, $pgLine, $od_id]
+            );
+        }
+        Response::error('주문 상태가 바뀌어 취소하지 못했습니다. 주문 내역을 다시 확인해 주세요.', 409, ['code' => 'order_status_changed']);
+    }
+
     // 1+2) 카트 행 + 재고 복구.
     $cartRestore = DB::fetchAll(
         "SELECT ct_id, it_id, ct_qty, ct_option, io_id, io_type, ct_stock_use FROM " . DB::table('g5_shop_cart_table') . "
@@ -705,35 +754,6 @@ if ($apiMethod === 'PATCH' && $od_id !== '') {
         "DELETE FROM " . DB::table('g5_shop_coupon_log_table') . "
          WHERE od_id = ? AND mb_id = ?",
         [$od_id, $orderMbId]
-    );
-
-    // 6) 주문 상태 + 취소 금액 + 히스토리.
-    $cancelledAt = defined('G5_TIME_YMDHIS') ? G5_TIME_YMDHIS : date('Y-m-d H:i:s');
-    $memoReason = preg_replace('/\s+/', ' ', trim(strip_tags($reason)));
-    $existingHistory = (string) ($order['od_mod_history'] ?? '');
-    $existingShopMemo = (string) ($order['od_shop_memo'] ?? '');
-    $newHistory = trim($existingHistory . "\n[" . $cancelledAt . "] 취소 — " . $memoReason
-        . ($refundNote ? ' / ' . $refundNote : ''));
-    $newShopMemo = trim(
-        $existingShopMemo . "\n주문자 본인 직접 취소 - " . $cancelledAt . " (취소이유 : " . $memoReason . ")"
-    );
-    DB::execute(
-        "UPDATE " . DB::table('g5_shop_order_table') . "
-         SET od_send_cost = 0,
-             od_send_cost2 = 0,
-             od_receipt_price = 0,
-             od_receipt_point = 0,
-             od_misu = 0,
-             od_cancel_price = od_cart_price,
-             od_cart_coupon = 0,
-             od_coupon = 0,
-             od_send_coupon = 0,
-             od_status = '취소',
-             od_refund_price = CASE WHEN ? > 0 THEN ? ELSE od_refund_price END,
-             od_mod_history = ?,
-             od_shop_memo = ?
-         WHERE od_id = ? AND mb_id = ?",
-        [$refundedPgAmount, $refundedPgAmount, $newHistory, $newShopMemo, $od_id, $orderMbId]
     );
 
     $updated = DB::fetch(

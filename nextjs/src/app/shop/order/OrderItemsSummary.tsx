@@ -32,9 +32,9 @@ export function OrderItemsSummary({ items }: { items: ShopCartItem[] }) {
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium">{item.it_name}</p>
-              {item.ct_option && (
+              {formatCartOption(item.ct_option, item.it_name) && (
                 <p className="text-xs text-muted-foreground">
-                  {formatCartOption(item.ct_option)}
+                  {formatCartOption(item.ct_option, item.it_name)}
                 </p>
               )}
               <p className="text-xs text-muted-foreground">

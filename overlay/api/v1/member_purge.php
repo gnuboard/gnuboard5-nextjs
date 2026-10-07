@@ -15,7 +15,7 @@
  *     차단 목록, 스크랩, 쪽지, 포인트, 접속 기록, 소셜 티켓, 본인인증 이력, 글 임시저장,
  *     정기결제 카드, 웹 입장권)은 삭제. 기기 기록은 남기되 이 회원과의 연결 · IP · 브라우저를 지운다.
  *   - 신고 기록은 운영 목적으로 남기되 신고자 식별자만 비운다.
- *   - 파일(회원 아이콘·프로필 이미지·디데이 사진)은 DB 커밋 뒤에 지운다.
+ *   - 파일(회원 아이콘·프로필 이미지·디데이 사진)은 DB 커밋 뒤에 지운다. 디데이 사진은 이 회원이 올린 에디터 그림만.
  *
  * 소셜 연결을 지우므로 같은 소셜 계정으로 바로 재가입할 수 있다.
  */
@@ -185,7 +185,7 @@ if (!function_exists('api_member_purge_now')) {
         $deletedFiles = 0;
         $deletedFiles += api_member_purge_unlink_member_images($mb_id);
         foreach ($imageUris as $uri) {
-            $deletedFiles += api_member_purge_unlink_data_file($uri);
+            $deletedFiles += api_member_purge_unlink_data_file($uri, $mb_id);
         }
 
         return [
@@ -388,12 +388,14 @@ if (!function_exists('api_member_purge_unlink_member_images')) {
 
 if (!function_exists('api_member_purge_unlink_data_file')) {
     /**
-     * dday_image_uri 가 이 서버의 data/ 아래 파일을 가리킬 때만 지운다.
+     * dday_image_uri 가 이 회원이 POST /v1/upload 로 올린 에디터 그림(data/editor/<yymm>/<파일>)일 때만 지운다.
+     * dday_image_uri 는 회원이 직접 쓰는 값이라(…/data/dbconfig.php 같은 주소도 저장할 수 있다) data/ 안이라는 것만으로는
+     * 지우지 않는다 — 에디터 그림 이름 규칙에 맞고, 그림 옆 정보 파일의 owner_hash 가 이 회원일 때만(upload.php 삭제와 같은 확인).
      * 기기 로컬 URI(file://, content://)나 외부 URL 은 건드릴 수 없으니 무시한다.
      */
-    function api_member_purge_unlink_data_file(string $uri): int
+    function api_member_purge_unlink_data_file(string $uri, string $mb_id): int
     {
-        if (!defined('G5_DATA_PATH') || !defined('G5_DATA_URL')) {
+        if (!defined('G5_DATA_PATH') || !defined('G5_DATA_URL') || $mb_id === '') {
             return 0;
         }
         $uri = trim($uri);
@@ -403,19 +405,60 @@ if (!function_exists('api_member_purge_unlink_data_file')) {
         $relative = substr($uri, strlen(G5_DATA_URL));
         $relative = strtok($relative, '?#');
         $relative = rawurldecode((string) $relative);
-        if ($relative === '' || strpos($relative, "\0") !== false || strpos($relative, '..') !== false) {
+        // 에디터 그림 이름 규칙(upload.php api_upload_editor_file_path_from_url 과 같다)만. 그 밖의 data/ 파일은 지우지 않는다.
+        if (!preg_match('#^/?editor/([0-9]{4})/([A-Za-z0-9][A-Za-z0-9_.-]*\.(?:gif|jpe?g|png|webp|bmp))$#i', (string) $relative, $m)) {
             return 0;
         }
 
-        $dataRoot = realpath(G5_DATA_PATH);
-        $target = realpath(G5_DATA_PATH . '/' . ltrim($relative, '/'));
-        if ($dataRoot === false || $target === false) {
+        $editorRoot = realpath(G5_DATA_PATH . '/editor');
+        $target = realpath(G5_DATA_PATH . '/editor/' . $m[1] . '/' . $m[2]);
+        if ($editorRoot === false || $target === false || !is_file($target)) {
             return 0;
         }
-        // data/ 밖으로 나가는 경로는 절대 지우지 않는다.
-        if (strpos($target, $dataRoot . DIRECTORY_SEPARATOR) !== 0) {
+        // data/editor/ 밖으로 나가는 경로(링크 등)는 절대 지우지 않는다.
+        if (strpos($target, $editorRoot . DIRECTORY_SEPARATOR) !== 0) {
             return 0;
         }
-        return is_file($target) && @unlink($target) ? 1 : 0;
+        if (!api_member_purge_owns_editor_file($target, $mb_id) || !@unlink($target)) {
+            return 0;
+        }
+        @unlink($target . '.meta.php');
+        @unlink($target . '.meta.json');
+        return 1;
+    }
+}
+
+if (!function_exists('api_member_purge_owns_editor_file')) {
+    /**
+     * 에디터 그림 옆 정보 파일(.meta.php, 예전 .meta.json)의 owner_hash 가 이 회원인가.
+     * 해시 식은 api/v1/upload.php api_upload_owner_hash() 와 같다(그 파일은 라우트라 여기서 불러 쓸 수 없다).
+     * 정보 파일이 없거나 읽지 못하면 이 회원 것이라고 볼 수 없으니 지우지 않는다.
+     */
+    function api_member_purge_owns_editor_file(string $filePath, string $mb_id): bool
+    {
+        if (!defined('JWT_SECRET') && is_file(__DIR__ . '/../lib/JWT.php')) {
+            require_once __DIR__ . '/../lib/JWT.php'; // 크론(purge_withdrawn_members.php)은 JWT 를 불러오지 않는다
+        }
+        $guard = defined('API_UPLOAD_META_GUARD') ? API_UPLOAD_META_GUARD : "<?php exit; ?>\n";
+        foreach (array($filePath . '.meta.php', $filePath . '.meta.json') as $metaPath) {
+            if (!is_file($metaPath)) {
+                continue;
+            }
+            $raw = @file_get_contents($metaPath);
+            if (!is_string($raw) || $raw === '') {
+                return false;
+            }
+            if (strpos($raw, $guard) === 0) {
+                $raw = substr($raw, strlen($guard));
+            }
+            $meta = json_decode($raw, true);
+            $ownerHash = is_array($meta) && isset($meta['owner_hash']) ? (string) $meta['owner_hash'] : '';
+            if ($ownerHash === '') {
+                return false;
+            }
+            $secret = defined('JWT_SECRET') ? JWT_SECRET : (defined('G5_TOKEN_ENCRYPTION_KEY') ? G5_TOKEN_ENCRYPTION_KEY : '');
+            return hash_equals($ownerHash, hash_hmac('sha256', $mb_id, (string) $secret));
+        }
+        return false;
     }
 }

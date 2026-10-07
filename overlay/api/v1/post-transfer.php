@@ -274,12 +274,17 @@ function api_post_transfer_copy_files(string $src_table, string $dst_table, int 
             $file = api_run_replace('bbs_move_update_file', $file, array($copy_name, $src_table, $dst_table, $insert_id), $member);
         }
 
+        // 보이는 이름은 원본 write_update.php 처럼 get_safe_filename() 을 거친 값으로 — 원본 스킨이 escape 없이 찍는다.
+        // 예전 API 가 정리 없이 저장한 행도 옮기면서 정리된다(이미 정리된 이름은 그대로).
+        $source = function_exists('get_safe_filename') ? get_safe_filename((string) $file['bf_source']) : (string) $file['bf_source'];
+        $source = (string) preg_replace('/[\x00-\x1f\x7f]/', '', $source);
+
         DB::execute(
             "INSERT INTO {$fileTable} SET bo_table = ?, wr_id = ?, bf_no = ?, bf_source = ?, bf_file = ?, bf_download = ?,
                 bf_content = ?, bf_fileurl = ?, bf_thumburl = ?, bf_storage = ?, bf_filesize = ?, bf_width = ?, bf_height = ?,
                 bf_type = ?, bf_datetime = ?",
             [
-                $dst_table, $insert_id, $file['bf_no'], $file['bf_source'], $copy_name, $file['bf_download'],
+                $dst_table, $insert_id, $file['bf_no'], $source, $copy_name, $file['bf_download'],
                 $file['bf_content'], $file['bf_fileurl'] ?? '', $file['bf_thumburl'] ?? '', $file['bf_storage'] ?? '',
                 $file['bf_filesize'], $file['bf_width'], $file['bf_height'], $file['bf_type'], $file['bf_datetime'],
             ]

@@ -7,7 +7,6 @@ import type {
   ShopNaverPayConfig,
   ShopPolicy,
   ShopProduct,
-  ShopProductOption,
   ShopQA,
   ShopReview,
   ShopReviewSummary,
@@ -19,6 +18,7 @@ import {
   productPointLabel,
   type SelectedCartOption,
 } from "@/components/shop/productDetailHelpers";
+import type { SupplyOptionGroupView } from "@/components/shop/useProductOptions";
 import { ProductDetailHeadHtml, ProductDetailTailHtml } from "./ProductDetailHtmlBlocks";
 import {
   ProductDetailEmpty,
@@ -87,21 +87,16 @@ interface ProductDetailViewProps {
   onCtSendCostSelectionChange: Dispatch<SetStateAction<number>>;
   optionSubjects: string[];
   optionSelections: string[];
-  onOptionSelectionsChange: Dispatch<SetStateAction<string[]>>;
+  onSelectOptionValue: (levelIndex: number, value: string) => void;
   getAvailableValues: (levelIndex: number) => AvailableOptionValue[];
-  supplyOptions: ShopProductOption[];
-  supplyLabel: string;
-  supplySelection: string;
-  onSupplySelectionChange: Dispatch<SetStateAction<string>>;
-  onAddSupplyOption: () => void;
+  supplyGroups: SupplyOptionGroupView[];
+  onSelectSupplyOption: (ioId: string) => void;
   quantity: number;
   onQuantityChange: Dispatch<SetStateAction<number>>;
   quantityMinQty: number;
   minBuyQty: number;
   maxBuyQty: number;
-  selectedOption?: ShopProductOption | null;
   selectedCartOptions: SelectedCartOption[];
-  onAddSelectedOption: () => void;
   onUpdateSelectedOptionQty: (ioId: string, qty: number) => void;
   onRemoveSelectedOption: (ioId: string) => void;
   displayTotal: number;
@@ -173,21 +168,16 @@ export function ProductDetailView({
   onCtSendCostSelectionChange,
   optionSubjects,
   optionSelections,
-  onOptionSelectionsChange,
+  onSelectOptionValue,
   getAvailableValues,
-  supplyOptions,
-  supplyLabel,
-  supplySelection,
-  onSupplySelectionChange,
-  onAddSupplyOption,
+  supplyGroups,
+  onSelectSupplyOption,
   quantity,
   onQuantityChange,
   quantityMinQty,
   minBuyQty,
   maxBuyQty,
-  selectedOption,
   selectedCartOptions,
-  onAddSelectedOption,
   onUpdateSelectedOptionQty,
   onRemoveSelectedOption,
   displayTotal,
@@ -303,21 +293,16 @@ export function ProductDetailView({
     canPurchaseProduct,
     optionSubjects,
     optionSelections,
-    onOptionSelectionsChange,
+    onSelectOptionValue,
     getAvailableValues,
-    supplyOptions,
-    supplyLabel,
-    supplySelection,
-    onSupplySelectionChange,
-    onAddSupplyOption,
+    supplyGroups,
+    onSelectSupplyOption,
     quantity,
     onQuantityChange,
     quantityMinQty,
     minBuyQty,
     maxBuyQty,
-    selectedOption,
     selectedCartOptions,
-    onAddSelectedOption,
     onUpdateSelectedOptionQty,
     onRemoveSelectedOption,
     displayTotal,

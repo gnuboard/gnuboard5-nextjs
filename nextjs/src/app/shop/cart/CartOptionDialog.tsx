@@ -8,9 +8,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ProductOptionPicker } from "@/components/shop/ProductOptionPicker";
 import { useProductOptions } from "@/components/shop/useProductOptions";
 import {
+  baseOptionLabel,
   isProductDetailSoldOut,
   isShopOptionPurchasable,
   shopOptionStockQty,
+  supplyOptionLabel,
   type SelectedCartOption,
 } from "@/components/shop/productDetailHelpers";
 import type { ShopCartItem, ShopProduct } from "@/lib/api";
@@ -57,9 +59,14 @@ function toSelectedOption(line: ShopCartItem, product: ShopProduct): SelectedCar
   const option = product.options?.find(
     (candidate) => candidate.io_id === ioId && Number(candidate.io_type) === ioType
   );
+  // 상품 상세에서 고른 줄과 같은 이름("색상:실버 / 크기:L", "항목:값"). 옵션이 없어진 줄은 담긴 글자 그대로.
+  const subjects = (product.it_option_subject || "").split(",").filter(Boolean);
+  const label = option
+    ? ioType === 1 ? supplyOptionLabel(ioId) : baseOptionLabel(subjects, ioId)
+    : formatCartOption(line.ct_option) || line.it_name;
   return {
     io_id: ioId,
-    label: formatCartOption(line.ct_option) || line.it_name,
+    label,
     qty: line.ct_qty,
     price: Number(line.io_price ?? 0),
     stockQty: isShopOptionPurchasable(option) ? shopOptionStockQty(option) : line.ct_qty,
@@ -127,28 +134,6 @@ export function CartOptionDialog({ group, onClose, onChanged }: CartOptionDialog
         ? "품절된 상품입니다."
         : "";
 
-  /** 고른 옵션 목록 + 골라 놓고 "선택 옵션 추가"를 누르지 않은 옵션(확인하면 함께 담는다 — 조용히 버리지 않는다). */
-  const finalSelectedOptions = (): SelectedCartOption[] => {
-    const pending = options.selectedOption;
-    const listed = options.selectedCartOptions;
-    if (!pending) return listed;
-    const isPending = (option: SelectedCartOption) => option.ioType === 0 && option.io_id === pending.io_id;
-    if (listed.some(isPending)) {
-      return listed.map((option) => (isPending(option) ? { ...option, qty: option.qty + options.quantity } : option));
-    }
-    return [
-      ...listed,
-      {
-        io_id: pending.io_id,
-        label: pending.io_id.replace(/\x1e/g, " / "),
-        qty: options.quantity,
-        price: pending.io_price,
-        stockQty: shopOptionStockQty(pending),
-        ioType: 0,
-      },
-    ];
-  };
-
   const desiredOptions = (selected: SelectedCartOption[]): DesiredCartOption[] => {
     const picked = selected.map((option) => ({
       io_id: option.io_id,
@@ -167,7 +152,7 @@ export function CartOptionDialog({ group, onClose, onChanged }: CartOptionDialog
 
   const handleConfirm = async () => {
     if (!detail || unavailableReason || saving) return;
-    const selected = finalSelectedOptions();
+    const selected = options.selectedCartOptions;
     if (!options.validateBuyQtyBeforeSubmit(selected)) return;
 
     const desired = desiredOptions(selected);
@@ -223,23 +208,19 @@ export function CartOptionDialog({ group, onClose, onChanged }: CartOptionDialog
             </p>
           ) : (
             <ProductOptionPicker
+              productName={detail?.it_name ?? group.item.it_name}
               optionSubjects={options.optionSubjects}
               optionSelections={options.optionSelections}
-              onOptionSelectionsChange={options.setOptionSelections}
+              onSelectOptionValue={options.selectOptionValue}
               getAvailableValues={options.getAvailableValues}
-              supplyOptions={options.supplyOptions}
-              supplyLabel={options.supplyLabel}
-              supplySelection={options.supplySelection}
-              onSupplySelectionChange={options.setSupplySelection}
-              onAddSupplyOption={options.handleAddSupplyOption}
+              supplyGroups={options.supplyGroups}
+              onSelectSupplyOption={options.selectSupplyOption}
               quantity={options.quantity}
               onQuantityChange={options.setQuantity}
               quantityMinQty={options.quantityMinQty}
               minBuyQty={options.minBuyQty}
               maxBuyQty={options.maxBuyQty}
-              selectedOption={options.selectedOption}
               selectedCartOptions={options.selectedCartOptions}
-              onAddSelectedOption={options.handleAddSelectedOption}
               onUpdateSelectedOptionQty={options.updateSelectedOptionQty}
               onRemoveSelectedOption={options.removeSelectedOption}
               displayTotal={options.displayTotal}

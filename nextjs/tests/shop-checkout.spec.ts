@@ -160,10 +160,12 @@ test.describe('쇼핑몰 결제 종단 흐름', () => {
     const row = ((cart.data?.items || []) as ShopSmokeCartItem[]).find(
       (item) =>
         String(item.it_id) === String(OPTION_PRODUCT_ID) &&
-        String(item.ct_option) === String(option?.ioId)
+        String(item.io_id) === String(option?.ioId)
     );
     expect(row, 'option cart row persisted').toBeTruthy();
     if (!row) throw new Error('option cart row persisted assertion did not narrow the row');
+    // ct_option 은 영카트 io_value 와 같은 표시 글자("색상:실버 / 크기:L") — io_id 원문의 구분 문자가 들어가면 안 된다.
+    expect(String(row.ct_option), 'ct_option is the YoungCart display text').not.toContain('\x1e');
     expect(Number(row.ct_qty), 'option cart quantity').toBe(qty);
 
     await clearCart(req, api, headers);

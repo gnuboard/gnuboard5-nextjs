@@ -160,7 +160,7 @@ export function createLocalShopCartChecks(context) {
       const cartRow = cartRows.find(
         (row) =>
           String(row.it_id) === product.it_id &&
-          (!option || String(row.ct_option) === option.ioId)
+          (!option || String(row.io_id) === option.ioId)
       );
       if (!cartRow || Number(cartRow.ct_send_cost) !== 1) {
         fail('cart add did not persist selected collect-on-delivery shipping payment', {
@@ -234,7 +234,7 @@ export function createLocalShopCartChecks(context) {
     let cartRow = cartRows.find(
       (row) =>
         String(row.it_id) === product.it_id &&
-        (!option || String(row.ct_option) === option.ioId)
+        (!option || String(row.io_id) === option.ioId)
     );
     if (!cartRow || Number(cartRow.ct_qty) !== expectedQty) {
       fail('cart add did not persist through the API', { cartRows, option });

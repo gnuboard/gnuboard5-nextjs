@@ -20,8 +20,6 @@ type ValidateOrderSubmissionInput = {
   depositName: string;
   guestPassword: string;
   isMemberOrder: boolean;
-  agreeTerms: boolean;
-  agreePrivacy: boolean;
 };
 
 export type OrderSubmitValidationResult =
@@ -76,8 +74,6 @@ export function validateOrderSubmission({
   depositName,
   guestPassword,
   isMemberOrder,
-  agreeTerms,
-  agreePrivacy,
 }: ValidateOrderSubmissionInput): OrderSubmitValidationResult {
   if (!hasRequiredAddressFields(orderer)) {
     return { ok: false, message: "주문자 정보를 모두 입력해주세요." };
@@ -126,10 +122,6 @@ export function validateOrderSubmission({
       message:
         "비회원 주문조회에 사용할 비밀번호를 영문/숫자 3자리 이상 입력해주세요.",
     };
-  }
-
-  if (!agreeTerms || !agreePrivacy) {
-    return { ok: false, message: "필수 약관에 동의해주세요." };
   }
 
   return { ok: true, methodDef, recipient: resolvedRecipient };

@@ -71,8 +71,9 @@ if (!function_exists('api_apple_provider_enabled')) {
     function api_apple_signup_profile(array $claims, array $input): array
     {
         $email = trim((string) ($claims['email'] ?? ''));
-        $emailVerified = $claims['email_verified'] ?? true;
-        if ($emailVerified === false || $emailVerified === 'false') {
+        // email_verified 가 없으면 확인되지 않은 주소로 본다(Apple 은 email 을 줄 때 이 칸도 함께 준다).
+        $emailVerified = $claims['email_verified'] ?? false;
+        if ($emailVerified !== true && $emailVerified !== 'true') {
             $email = '';
         }
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {

@@ -88,7 +88,6 @@ export function buildOrderPageControllerResult({
       pointWarn: discounts.pointWarn,
       couponPoint: formState.couponPoint,
     }),
-    agreements: formState.agreements,
     summary: buildSummaryProps({
       subtotal: discounts.subtotal,
       cartCoupon: discounts.cartCoupon,

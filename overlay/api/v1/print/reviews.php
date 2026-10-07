@@ -99,7 +99,7 @@ if (!$id && $apiMethod === 'POST') {
 
     // 새 리뷰는 회원마다 1분 3건 · 1시간 20건까지(게시판 글쓰기와 같은 수) — 같은 요청의 재시도는 위에서 돌려주므로 세지 않는다.
     if (Auth::adminRole($me) !== 'super') {
-        $reviewQuotaMsg = Throttle::checkMemberQuota('printreview', (string) $me['mb_id'], 3, 20);
+        $reviewQuotaMsg = Throttle::checkMemberQuota('printreview', (string) $me['mb_id'], 3, 20, true, true);
         if ($reviewQuotaMsg !== null) {
             Response::error($reviewQuotaMsg, 429);
         }

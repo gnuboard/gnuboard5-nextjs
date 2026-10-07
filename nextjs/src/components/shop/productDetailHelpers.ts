@@ -49,6 +49,48 @@ export function clampBuyQuantity(value: number, minQty: number, maxQty: number) 
   return nextQty;
 }
 
+/** 옵션 io_id 의 단계 구분자(영카트 chr(30)) — 선택옵션 "값1␞값2", 추가옵션 "항목␞값". */
+export const OPTION_SEPARATOR = "\x1e";
+
+export interface SupplyOptionGroup {
+  subject: string;
+  options: ShopProductOption[];
+}
+
+/**
+ * 추가옵션을 항목(it_supply_subject)마다 묶는다 — 영카트 get_item_supply()(lib/shop.lib.php)처럼 항목마다
+ * select 하나. 추가옵션 io_id 는 "항목␞값"이고, 항목 이름에 없는 io_id 는 영카트처럼 보이지 않는다.
+ */
+export function supplyOptionGroups(subjectText: string | undefined, supplyOptions: ShopProductOption[]): SupplyOptionGroup[] {
+  return (subjectText || "")
+    .split(",")
+    .filter(Boolean)
+    .map((subject) => ({
+      subject,
+      options: supplyOptions.filter((option) => {
+        const [prefix, value] = String(option.io_id || "").split(OPTION_SEPARATOR);
+        return prefix === subject && Boolean(value);
+      }),
+    }))
+    .filter((group) => group.options.length > 0);
+}
+
+/** 영카트 옵션 글자의 값 뒤 금액 — "  + 5,900원" · 음수는 "  -1,000원" (get_item_options · get_item_supply). */
+export function optionPriceSuffix(price: number) {
+  return price >= 0 ? `  + ${formatPrice(price)}` : `  ${formatPrice(price)}`;
+}
+
+/** 고른 옵션 줄의 이름 — 영카트 io_value 와 같다. 선택옵션 "색상:실버 / 크기:L", 추가옵션 "항목:값". */
+export function baseOptionLabel(subjects: string[], ioId: string) {
+  const values = ioId.split(OPTION_SEPARATOR);
+  return subjects.map((subject, index) => `${subject}:${values[index] ?? ""}`).join(" / ");
+}
+
+export function supplyOptionLabel(ioId: string) {
+  const [subject, value = ""] = ioId.split(OPTION_SEPARATOR);
+  return `${subject}:${value}`;
+}
+
 export function baseOptionQty(options: SelectedCartOption[]) {
   return options.reduce((sum, option) => sum + (option.ioType === 0 ? option.qty : 0), 0);
 }

@@ -313,6 +313,7 @@ if ($apiMethod === 'POST' && $action === 'prepare') {
             od_coupon        = ?,
             od_receipt_point = ?,
             od_receipt_price = ?,
+            od_misu          = ?,
             od_settle_case   = ?,
             od_pg            = ?,
             od_test          = ?,
@@ -344,7 +345,9 @@ if ($apiMethod === 'POST' && $action === 'prepare') {
             ($appliedCoupon ? shop_api_coupon_marker_line($appliedCoupon['cp_id']) : '') .
             ($appliedSendCoupon ? shop_api_coupon_marker_line($appliedSendCoupon['cp_id'], 'send') : ''),
             $totalPrice, $totalQty, $od_send_cost, $od_send_cost2, $od_send_coupon,
-            $od_cart_coupon, $od_coupon, $od_receipt_point, $od_receipt_price,
+            // 아직 결제 전이다 — 입금액 0 · 미수금 = 결제할 금액으로 둔다. 상태 '준비'는 원본 관리자 목록에서 "상품준비중"이라
+            // 입금액을 채워 두면 돈을 낸 주문처럼 보였다(앱에서 결제를 그만두면 24시간 동안 남는다). 결제 확인이 금액을 채운다.
+            $od_cart_coupon, $od_coupon, $od_receipt_point, 0, $od_receipt_price,
             // od_test: 웹 주문(shop/orderformupdate.php)처럼 관리자 '결제 테스트' 값을 남겨 관리자 주문 목록에서 테스트 주문을 구분한다.
             $settleCase, $order_pg_service, (int) ($cfg['de_card_test'] ?? 0), '준비', $od_hope_date, $od_mobile, $od_tax_flag,
             (int) $taxAmounts['od_tax_mny'], (int) $taxAmounts['od_vat_mny'], (int) $taxAmounts['od_free_mny'],

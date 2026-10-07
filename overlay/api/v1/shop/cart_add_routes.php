@@ -35,7 +35,7 @@ if ($apiMethod === 'POST' && $ct_id === '') {
     // Check product exists and is available — it_point_type 도 함께 가져와야
     // get_item_point() 가 정률/정액 정확히 계산.
     $item = DB::fetch(
-        "SELECT it_id, it_name, it_price, it_stock_qty, it_soldout, it_use, it_tel_inq,
+        "SELECT it_id, it_name, it_option_subject, it_price, it_stock_qty, it_soldout, it_use, it_tel_inq,
                 it_sc_type, it_sc_method, it_sc_price, it_sc_minimum, it_sc_qty,
                 it_point, it_point_type, it_supply_point, it_notax, it_buy_min_qty, it_buy_max_qty
          FROM " . DB::table('g5_shop_item_table') . "
@@ -176,12 +176,12 @@ if ($apiMethod === 'POST' && $ct_id === '') {
     $existingBaseQty = shop_api_cart_active_base_qty($cart_id, $it_id, $sw_direct);
     shop_api_cart_validate_buy_qty($item, $ct_qty, $existingBaseQty);
 
-    // Check if same item + option already in cart
+    // 같은 줄이 있으면 수량을 더한다 — 영카트처럼 io_id · io_type 으로 찾는다(ct_option 은 표시 글자).
     $existing = DB::fetch(
         "SELECT ct_id, ct_qty FROM " . DB::table('g5_shop_cart_table') . "
          WHERE od_id = ?
            AND it_id = ?
-           AND ct_option = ?
+           AND io_id = ? AND io_type = 0
            AND ct_direct = ?
            AND " . shop_api_cart_active_status_sql() . "
          LIMIT 1",
@@ -275,7 +275,7 @@ if ($apiMethod === 'POST' && $ct_id === '') {
                         ? max(0, (int) get_item_point($item, $ct_option))
                         : max(0, (int) ($item['it_point'] ?? 0))),
                 $ct_qty,
-                $ct_option,
+                shop_api_cart_option_text($item, (string) $io_id, (int) $io_type), // ct_option — 영카트 io_value 글자
                 (int) ($item['it_notax'] ?? 0),
                 $io_id,
                 $io_type,

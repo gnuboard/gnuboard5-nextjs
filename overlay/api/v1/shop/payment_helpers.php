@@ -123,6 +123,16 @@ function pg_mark_vbank_deposited(string $provider, string $orderId, string $tno,
     return $result;
 }
 
+/**
+ * 가상계좌 안내 문구(은행명 · 계좌 · 예금주) 정리 — 관리자 주문서(그누보드 원본)가 od_bank_account 를 그대로 출력하고
+ * 주문 메일도 HTML 이라 태그 · 따옴표 · 제어문자를 지우고 길이를 자른다(결제 확인의 $vbankText 와 같은 규칙).
+ */
+function pg_vbank_text(string $value, int $limit): string {
+    $value = function_exists('shop_api_plain_text') ? shop_api_plain_text($value) : strip_tags($value);
+    $value = (string) preg_replace('/[<>"\'\x00-\x1F\x7F]/u', '', $value);
+    return trim(function_exists('mb_substr') ? mb_substr($value, 0, $limit, 'UTF-8') : substr($value, 0, $limit));
+}
+
 /** pg_mark_vbank_deposited() 가 주문 잠금을 잡은 뒤에만 부른다. */
 function pg_mark_vbank_deposited_locked(string $provider, string $orderId, string $tno, int $amount, string $paidAt, string $depositName = '', string $bankAccount = '', array $cashReceipt = []): array {
     if (trim($paidAt) === '') {
@@ -178,11 +188,11 @@ function pg_mark_vbank_deposited_locked(string $provider, string $orderId, strin
             $amount > 0 ? $amount : $expectedAmount,
             0,
             $paidAt,
-            $depositName,
+            pg_vbank_text($depositName, 20), // 통보에 실려 온 값 — 관리자 주문서가 그대로 출력한다
             $tno !== '' ? $tno : (string) ($order['od_tno'] ?? ''),
             // 발급 때 저장한 계좌 안내(은행명·계좌·예금주·입금기한)를 지킨다 — 통보의 계좌값은 은행 코드(BK04 등)만
             // 오기도 해서 덮으면 안내가 망가진다. 영카트 settle_*_common.php 도 입금통보에서 od_bank_account 를 건드리지 않는다.
-            (string) ($order['od_bank_account'] ?? '') !== '' ? (string) $order['od_bank_account'] : $bankAccount,
+            (string) ($order['od_bank_account'] ?? '') !== '' ? (string) $order['od_bank_account'] : pg_vbank_text($bankAccount, 160),
         ];
 
         if (!empty($cashReceipt)) {

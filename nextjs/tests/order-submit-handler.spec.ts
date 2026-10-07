@@ -67,8 +67,6 @@ function submitOptions(
     paymentConfig: paymentConfig(),
     bankAccount: "Bank 123",
     depositName: "Buyer",
-    agreeTerms: true,
-    agreePrivacy: true,
     selectedCouponId: "coupon-order",
     selectedSendCouponId: "coupon-send",
     pointUse: 1200,

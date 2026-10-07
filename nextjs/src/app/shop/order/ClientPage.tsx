@@ -4,7 +4,6 @@ import { useState } from "react";
 import Script from "next/script";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { AddressBookModal } from "./AddressBookModal";
-import { OrderAgreementsSection } from "./OrderAgreementsSection";
 import { OrderCouponPointSection } from "./OrderCouponPointSection";
 import { OrderItemsSummary } from "./OrderItemsSummary";
 import { OrderPaymentMethodSection } from "./OrderPaymentMethodSection";
@@ -26,7 +25,6 @@ export default function OrderPage() {
     recipientInfo,
     paymentMethodSection,
     couponPointSection,
-    agreements,
     summary,
     addressModal,
   } = useOrderPageController();
@@ -92,7 +90,6 @@ export default function OrderPage() {
                 {...couponPointSection}
               />
             )}
-            <OrderAgreementsSection {...agreements} />
           </div>
 
           {/* 결제수단은 결제 금액 바로 위 — 레퍼런스 주문서(shop/orderform.sub.php)도

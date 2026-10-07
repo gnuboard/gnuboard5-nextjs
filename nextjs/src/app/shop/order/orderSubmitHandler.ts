@@ -43,8 +43,6 @@ export type UseOrderSubmitOptions = {
   paymentConfig: PaymentConfig | null;
   bankAccount: string;
   depositName: string;
-  agreeTerms: boolean;
-  agreePrivacy: boolean;
   selectedCouponId: string;
   selectedSendCouponId: string;
   pointUse: number;
@@ -106,8 +104,6 @@ export async function submitOrder({
   paymentConfig,
   bankAccount,
   depositName,
-  agreeTerms,
-  agreePrivacy,
   selectedCouponId,
   selectedSendCouponId,
   pointUse,
@@ -132,8 +128,6 @@ export async function submitOrder({
     depositName,
     guestPassword,
     isMemberOrder,
-    agreeTerms,
-    agreePrivacy,
   });
 
   if (!validation.ok) {

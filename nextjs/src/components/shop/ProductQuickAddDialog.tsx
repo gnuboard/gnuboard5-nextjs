@@ -163,23 +163,19 @@ export function ProductQuickAddDialog({ product, href, open, onOpenChange }: Pro
           ) : (
             <>
               <ProductOptionPicker
+                productName={product.it_name}
                 optionSubjects={options.optionSubjects}
                 optionSelections={options.optionSelections}
-                onOptionSelectionsChange={options.setOptionSelections}
+                onSelectOptionValue={options.selectOptionValue}
                 getAvailableValues={options.getAvailableValues}
-                supplyOptions={options.supplyOptions}
-                supplyLabel={options.supplyLabel}
-                supplySelection={options.supplySelection}
-                onSupplySelectionChange={options.setSupplySelection}
-                onAddSupplyOption={options.handleAddSupplyOption}
+                supplyGroups={options.supplyGroups}
+                onSelectSupplyOption={options.selectSupplyOption}
                 quantity={options.quantity}
                 onQuantityChange={options.setQuantity}
                 quantityMinQty={options.quantityMinQty}
                 minBuyQty={options.minBuyQty}
                 maxBuyQty={options.maxBuyQty}
-                selectedOption={options.selectedOption}
                 selectedCartOptions={options.selectedCartOptions}
-                onAddSelectedOption={options.handleAddSelectedOption}
                 onUpdateSelectedOptionQty={options.updateSelectedOptionQty}
                 onRemoveSelectedOption={options.removeSelectedOption}
                 displayTotal={options.displayTotal}

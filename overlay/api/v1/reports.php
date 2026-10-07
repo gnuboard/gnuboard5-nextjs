@@ -58,7 +58,8 @@ function api_report_image_in_post(string $bo_table, int $wr_id, string $path): b
         [$wr_id]
     );
     $content = (string) ($row['wr_content'] ?? '');
-    return $content !== '' && (strpos($content, $name) !== false || strpos($content, rawurlencode($name)) !== false);
+    // 주소 속 파일 이름으로 찾는다 — "/이름" 꼴이라 photo.jpg 가 myphoto.jpg 에 걸리지 않는다.
+    return $content !== '' && (strpos($content, '/' . $name) !== false || strpos($content, '/' . rawurlencode($name)) !== false);
 }
 
 /** 관리자 화면에 띄울 신고 이미지 주소 — 이 사이트의 이미지만(바깥 이미지는 추적 우려로 띄우지 않는다). */
@@ -98,6 +99,11 @@ function api_report_legacy_image_path(string $key): ?string
 function api_report_notify_admin(string $type, string $reason, int $openCount, bool $autoHidden, ?string $reporterMb): void
 {
     if ($openCount !== 1 && !$autoHidden) {
+        return;
+    }
+    // 서로 다른 대상을 잔뜩 신고해 관리자 잠금화면을 알림으로 덮지 못하게 — 첫 신고 알림은 사이트 전체에서 1분 10건 ·
+    // 1시간 30건까지(신고는 그대로 받고 신고 관리에서 보인다). 자동 가림 알림은 줄이지 않는다.
+    if (!$autoHidden && Throttle::checkMemberQuota('reportpush', 'admin', 10, 30) !== null) {
         return;
     }
     register_shutdown_function(static function () use ($type, $reason, $autoHidden, $reporterMb) {

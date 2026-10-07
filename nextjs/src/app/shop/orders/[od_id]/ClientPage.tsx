@@ -433,9 +433,9 @@ export default function OrderDetailPage() {
                   >
                     {item.it_name}
                   </a>
-                  {item.ct_option && (
+                  {formatCartOption(item.ct_option, item.it_name) && (
                     <p className="text-xs text-muted-foreground">
-                      옵션: {formatCartOption(item.ct_option)}
+                      옵션: {formatCartOption(item.ct_option, item.it_name)}
                     </p>
                   )}
                   <p className="text-xs text-muted-foreground">

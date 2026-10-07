@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import { Minus, Plus } from "lucide-react";
+import { Minus, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { ShopProductOption } from "@/lib/api";
 import { formatPrice } from "@/lib/utils";
 import {
   clampBuyQuantity,
   isShopOptionPurchasable,
+  optionPriceSuffix,
+  OPTION_SEPARATOR,
   type SelectedCartOption,
 } from "./productDetailHelpers";
+import type { SupplyOptionGroupView } from "./useProductOptions";
 
 type AvailableOptionValue = {
   value: string;
@@ -18,78 +20,64 @@ type AvailableOptionValue = {
 };
 
 export type ProductOptionPickerProps = {
+  /** 옵션 없는 상품의 본품 줄 이름 */
+  productName: string;
   optionSubjects: string[];
   optionSelections: string[];
-  onOptionSelectionsChange: Dispatch<SetStateAction<string[]>>;
+  onSelectOptionValue: (levelIndex: number, value: string) => void;
   getAvailableValues: (levelIndex: number) => AvailableOptionValue[];
-  supplyOptions: ShopProductOption[];
-  supplyLabel: string;
-  supplySelection: string;
-  onSupplySelectionChange: (value: string) => void;
-  onAddSupplyOption: () => void;
+  supplyGroups: SupplyOptionGroupView[];
+  onSelectSupplyOption: (ioId: string) => void;
   quantity: number;
   onQuantityChange: Dispatch<SetStateAction<number>>;
   quantityMinQty: number;
   minBuyQty: number;
   maxBuyQty: number;
-  selectedOption?: ShopProductOption | null;
   selectedCartOptions: SelectedCartOption[];
-  onAddSelectedOption: () => void;
   onUpdateSelectedOptionQty: (ioId: string, qty: number) => void;
   onRemoveSelectedOption: (ioId: string) => void;
   displayTotal: number;
 };
 
+const SELECT_CLASS =
+  "w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-50";
+
+function signedPrice(price: number) {
+  return `${price >= 0 ? "+" : ""}${formatPrice(price)}`;
+}
+
 /**
- * 선택옵션 → 추가옵션 → 수량 → 고른 옵션 목록 → 합계. 상품 상세의 구매 상자(ProductPurchaseControls)와
- * 상품 카드의 빠른 담기 창(ProductQuickAdd)이 같은 것을 쓴다. 상태는 부르는 쪽의 useProductOptions 가 갖는다.
+ * 선택옵션 → 추가옵션 → 선택된 옵션 → 총 금액 — 영카트 상품 상세(item.form.skin.php)와 같은 모양 · 순서.
+ * select 를 고르면 바로 아래 목록에 한 줄이 붙고(추가 단추 없음), 줄마다 수량 −/+ · 삭제가 있다.
+ * 상품 상세의 구매 상자 · 상품 카드의 빠른 담기 창 · 장바구니 선택사항수정 창이 같은 것을 쓴다(상태: useProductOptions).
  */
 export function ProductOptionPicker({
+  productName,
   optionSubjects,
   optionSelections,
-  onOptionSelectionsChange,
+  onSelectOptionValue,
   getAvailableValues,
-  supplyOptions,
-  supplyLabel,
-  supplySelection,
-  onSupplySelectionChange,
-  onAddSupplyOption,
+  supplyGroups,
+  onSelectSupplyOption,
   quantity,
   onQuantityChange,
   quantityMinQty,
   minBuyQty,
   maxBuyQty,
-  selectedOption,
   selectedCartOptions,
-  onAddSelectedOption,
   onUpdateSelectedOptionQty,
   onRemoveSelectedOption,
   displayTotal,
 }: ProductOptionPickerProps) {
-  const [quantityInput, setQuantityInput] = useState(String(quantity));
-
-  useEffect(() => {
-    setQuantityInput(String(quantity));
-  }, [quantity]);
-
-  const commitQuantityInput = () => {
-    const parsed = Number(quantityInput);
-    if (!Number.isFinite(parsed)) {
-      setQuantityInput(String(quantity));
-      return;
-    }
-    const nextQuantity = clampBuyQuantity(parsed, quantityMinQty, maxBuyQty);
-    onQuantityChange(nextQuantity);
-    setQuantityInput(String(nextQuantity));
-  };
+  const hasOptionSubjects = optionSubjects.length > 0;
+  const quantityMaxQty = maxBuyQty > 0 ? Math.max(quantityMinQty, maxBuyQty) : 0;
 
   return (
     <>
-      {optionSubjects.length > 0 && (
+      {hasOptionSubjects && (
         <div className="product-options space-y-3">
           {optionSubjects.map((subject, levelIndex) => {
-            const available = getAvailableValues(levelIndex);
-            const isDisabled = levelIndex > 0 && !optionSelections[levelIndex - 1];
+            const isLastLevel = levelIndex === optionSubjects.length - 1;
             return (
               <div key={levelIndex}>
                 <label className="mb-1 block text-sm font-medium">{subject}</label>
@@ -97,29 +85,16 @@ export function ProductOptionPicker({
                   aria-label={subject}
                   data-shop-option-select="1"
                   value={optionSelections[levelIndex] || ""}
-                  disabled={isDisabled}
-                  onChange={(event) => {
-                    onOptionSelectionsChange((previous) => {
-                      const next = [...previous];
-                      next[levelIndex] = event.target.value;
-                      for (let i = levelIndex + 1; i < optionSubjects.length; i++) {
-                        next[i] = "";
-                      }
-                      return next;
-                    });
-                  }}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                  disabled={levelIndex > 0 && !optionSelections[levelIndex - 1]}
+                  onChange={(event) => onSelectOptionValue(levelIndex, event.target.value)}
+                  className={SELECT_CLASS}
                 >
-                  <option value="">선택해주세요</option>
-                  {available.map((item) => (
+                  <option value="">{subject}</option>
+                  {getAvailableValues(levelIndex).map((item) => (
                     <option key={item.value} value={item.value} disabled={item.soldOut}>
                       {item.value}
-                      {item.price && item.price > 0
-                        ? ` (+${formatPrice(item.price)})`
-                        : item.price && item.price < 0
-                          ? ` (${formatPrice(item.price)})`
-                          : ""}
-                      {item.soldOut ? " [품절]" : ""}
+                      {isLastLevel ? optionPriceSuffix(item.price ?? 0) : ""}
+                      {item.soldOut ? "  [품절]" : ""}
                     </option>
                   ))}
                 </select>
@@ -129,186 +104,156 @@ export function ProductOptionPicker({
         </div>
       )}
 
-      {supplyOptions.length > 0 && (
-        <div className="space-y-2">
-          <label className="mb-1 block text-sm font-medium">{supplyLabel}</label>
-          <div className="flex gap-2">
-            <select
-              aria-label={supplyLabel}
-              value={supplySelection}
-              onChange={(event) => onSupplySelectionChange(event.target.value)}
-              className="min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="">추가옵션을 선택해주세요</option>
-              {supplyOptions.map((option) => (
-                <option
-                  key={option.io_id}
-                  value={option.io_id}
-                  disabled={!isShopOptionPurchasable(option)}
-                >
-                  {option.io_value || option.io_id}
-                  {option.io_price > 0
-                    ? ` (+${formatPrice(option.io_price)})`
-                    : option.io_price < 0
-                      ? ` (${formatPrice(option.io_price)})`
-                      : ""}
-                  {!isShopOptionPurchasable(option) ? " [품절]" : ""}
-                </option>
-              ))}
-            </select>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onAddSupplyOption}
-              disabled={!supplySelection}
-            >
-              추가
-            </Button>
-          </div>
+      {supplyGroups.length > 0 && (
+        <div className="product-supply-options space-y-3">
+          {supplyGroups.map((group) => (
+            <div key={group.subject}>
+              <label className="mb-1 block text-sm font-medium">{group.subject}</label>
+              <select
+                aria-label={group.subject}
+                value={group.selectedIoId}
+                onChange={(event) => onSelectSupplyOption(event.target.value)}
+                className={SELECT_CLASS}
+              >
+                <option value="">{group.subject}</option>
+                {group.options.map((option) => {
+                  const purchasable = isShopOptionPurchasable(option);
+                  return (
+                    <option key={option.io_id} value={option.io_id} disabled={!purchasable}>
+                      {option.io_id.split(OPTION_SEPARATOR)[1]}
+                      {optionPriceSuffix(option.io_price)}
+                      {purchasable ? "" : "  [품절]"}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          ))}
         </div>
       )}
 
-      <div className="product-quantity">
-        <label className="mb-1 block text-sm font-medium">수량</label>
-        <div className="product-quantity-controls flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="수량 감소"
-            onClick={() =>
-              onQuantityChange((quantity) =>
-                clampBuyQuantity(quantity - 1, quantityMinQty, maxBuyQty)
-              )
-            }
-            disabled={quantity <= quantityMinQty}
-          >
-            <Minus className="h-4 w-4" />
-          </Button>
-          <input
-            type="number"
-            min={quantityMinQty}
-            max={maxBuyQty > 0 ? Math.max(quantityMinQty, maxBuyQty) : undefined}
-            aria-label="구매 수량"
-            value={quantityInput}
-            onChange={(event) => setQuantityInput(event.target.value)}
-            onBlur={commitQuantityInput}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.currentTarget.blur();
-              }
-            }}
-            className="h-9 w-16 rounded-md border bg-background text-center text-sm outline-none"
+      <div className="product-selected space-y-2" aria-label="선택된 옵션">
+        {!hasOptionSubjects && (
+          <SelectedOptionLine
+            label={productName}
+            priceText={signedPrice(0)}
+            qty={quantity}
+            minQty={quantityMinQty}
+            maxQty={quantityMaxQty}
+            onQtyChange={(next) => onQuantityChange(clampBuyQuantity(next, quantityMinQty, maxBuyQty))}
           />
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="수량 증가"
-            onClick={() =>
-              onQuantityChange((quantity) =>
-                clampBuyQuantity(quantity + 1, quantityMinQty, maxBuyQty)
-              )
-            }
-            disabled={maxBuyQty > 0 && quantity >= Math.max(quantityMinQty, maxBuyQty)}
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
+        )}
+        {selectedCartOptions.map((option) => (
+          <SelectedOptionLine
+            key={`${option.ioType}-${option.io_id}`}
+            label={option.label}
+            priceText={signedPrice(option.price)}
+            qty={option.qty}
+            minQty={1}
+            maxQty={option.stockQty}
+            onQtyChange={(next) => onUpdateSelectedOptionQty(option.io_id, next)}
+            onRemove={() => onRemoveSelectedOption(option.io_id)}
+          />
+        ))}
         {(minBuyQty > 0 || maxBuyQty > 0) && (
-          <p className="mt-1 text-xs text-muted-foreground">
-            {[
-              minBuyQty > 0 ? `최소 ${minBuyQty}개` : "",
-              maxBuyQty > 0 ? `최대 ${maxBuyQty}개` : "",
-            ]
+          <p className="text-xs text-muted-foreground">
+            {[minBuyQty > 0 ? `최소 ${minBuyQty}개` : "", maxBuyQty > 0 ? `최대 ${maxBuyQty}개` : ""]
               .filter(Boolean)
               .join(" / ")}
           </p>
         )}
       </div>
 
-      {(optionSubjects.length > 0 || supplyOptions.length > 0) && (
-        <div className="product-selected space-y-3">
-          {optionSubjects.length > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={onAddSelectedOption}
-              disabled={!selectedOption}
-            >
-              선택 옵션 추가
-            </Button>
-          )}
-
-          {selectedCartOptions.length > 0 && (
-            <div className="space-y-2 rounded-lg border p-3">
-              {selectedCartOptions.map((option) => (
-                <div
-                  key={option.io_id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/40 p-2"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{option.label}</p>
-                    {option.price !== 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {option.price > 0 ? "+" : ""}
-                        {formatPrice(option.price)}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      aria-label={`${option.label} 수량 감소`}
-                      onClick={() => onUpdateSelectedOptionQty(option.io_id, option.qty - 1)}
-                      disabled={option.qty <= 1}
-                    >
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                    <input
-                      type="number"
-                      min={1}
-                      max={option.stockQty > 0 ? option.stockQty : undefined}
-                      aria-label={`${option.label} 수량`}
-                      value={option.qty}
-                      onChange={(event) =>
-                        onUpdateSelectedOptionQty(option.io_id, Number(event.target.value))
-                      }
-                      className="h-9 w-16 rounded-md border bg-background text-center text-sm outline-none"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      aria-label={`${option.label} 수량 증가`}
-                      onClick={() => onUpdateSelectedOptionQty(option.io_id, option.qty + 1)}
-                      disabled={option.stockQty > 0 && option.qty >= option.stockQty}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onRemoveSelectedOption(option.io_id)}
-                    >
-                      삭제
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       <div className="product-total rounded-lg border bg-muted/50 p-4">
         <div className="flex items-center justify-between">
-          <span className="product-total-label font-medium">총 상품 금액</span>
+          <span className="product-total-label font-medium">총 금액</span>
           <span className="product-total-value text-xl font-bold text-primary">{formatPrice(displayTotal)}</span>
         </div>
       </div>
     </>
+  );
+}
+
+type SelectedOptionLineProps = {
+  label: string;
+  priceText: string;
+  qty: number;
+  minQty: number;
+  /** 0 이면 위 한도 없음 */
+  maxQty: number;
+  onQtyChange: (qty: number) => void;
+  /** 없으면 삭제 단추를 그리지 않는다(옵션 없는 상품의 본품 줄). */
+  onRemove?: () => void;
+};
+
+/** 선택된 옵션 한 줄 — 영카트 #sit_opt_added li: 이름, [−][수량][+], 옵션 금액, 삭제(×). */
+function SelectedOptionLine({ label, priceText, qty, minQty, maxQty, onQtyChange, onRemove }: SelectedOptionLineProps) {
+  const [input, setInput] = useState(String(qty));
+
+  useEffect(() => {
+    setInput(String(qty));
+  }, [qty]);
+
+  const commitInput = () => {
+    const parsed = Number(input);
+    if (!Number.isFinite(parsed) || input.trim() === "") {
+      setInput(String(qty));
+      return;
+    }
+    onQtyChange(parsed);
+  };
+
+  return (
+    <div className="product-selected-line relative rounded-lg border bg-background p-3">
+      <p className="pr-8 text-sm font-medium break-words">{label}</p>
+      {onRemove && (
+        <button
+          type="button"
+          aria-label={`${label} 삭제`}
+          onClick={onRemove}
+          className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
+      <div className="mt-2 flex items-center justify-between gap-3">
+        <div className="product-quantity-controls flex items-center gap-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label={`${label} 수량 감소`}
+            onClick={() => onQtyChange(qty - 1)}
+            disabled={qty <= minQty}
+          >
+            <Minus className="h-4 w-4" />
+          </Button>
+          <input
+            type="number"
+            min={minQty}
+            max={maxQty > 0 ? maxQty : undefined}
+            aria-label={`${label} 수량`}
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onBlur={commitInput}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.currentTarget.blur();
+            }}
+            className="h-9 w-14 rounded-md border bg-background text-center text-sm outline-none"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label={`${label} 수량 증가`}
+            onClick={() => onQtyChange(qty + 1)}
+            disabled={maxQty > 0 && qty >= maxQty}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+        <span className="product-selected-price text-sm font-semibold">{priceText}</span>
+      </div>
+    </div>
   );
 }

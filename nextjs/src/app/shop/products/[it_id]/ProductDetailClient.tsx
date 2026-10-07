@@ -108,21 +108,16 @@ export default function ProductDetailClient({
     quantity,
     setQuantity,
     optionSelections,
-    setOptionSelections,
-    supplySelection,
-    setSupplySelection,
+    selectOptionValue,
+    selectSupplyOption,
+    supplyGroups,
     selectedCartOptions,
-    setSelectedCartOptions,
+    clearSelectedOptions,
     optionSubjects,
     minBuyQty,
     maxBuyQty,
     quantityMinQty,
-    supplyOptions,
-    supplyLabel,
     getAvailableValues,
-    selectedOption,
-    handleAddSelectedOption,
-    handleAddSupplyOption,
     updateSelectedOptionQty,
     removeSelectedOption,
     buildSelectedCartOptions,
@@ -403,7 +398,7 @@ export default function ProductDetailClient({
         ctSendCost: shippingPayment.ctSendCost,
       });
       if (cartOptions.length > 0) {
-        setSelectedCartOptions([]);
+        clearSelectedOptions();
       }
       toastAddedToCart(router);
     } catch (err: unknown) {
@@ -421,7 +416,7 @@ export default function ProductDetailClient({
     validateBuyQtyBeforeSubmit,
     shippingPayment.ctSendCost,
     optionSubjects.length,
-    setSelectedCartOptions,
+    clearSelectedOptions,
     router,
   ]);
 
@@ -465,7 +460,7 @@ export default function ProductDetailClient({
           }
         );
         directCartIds.push(...cartIdsFromAddResponse(response));
-        setSelectedCartOptions([]);
+        clearSelectedOptions();
       } else {
         const response = await addCartItemDirect(product.it_id, quantity, "", {
           ctSendCost: shippingPayment.ctSendCost,
@@ -490,7 +485,7 @@ export default function ProductDetailClient({
     validateBuyQtyBeforeSubmit,
     shippingPayment.ctSendCost,
     optionSubjects.length,
-    setSelectedCartOptions,
+    clearSelectedOptions,
     router,
   ]);
 
@@ -653,21 +648,16 @@ export default function ProductDetailClient({
       onCtSendCostSelectionChange={setCtSendCostSelection}
       optionSubjects={optionSubjects}
       optionSelections={optionSelections}
-      onOptionSelectionsChange={setOptionSelections}
+      onSelectOptionValue={selectOptionValue}
       getAvailableValues={getAvailableValues}
-      supplyOptions={supplyOptions}
-      supplyLabel={supplyLabel}
-      supplySelection={supplySelection}
-      onSupplySelectionChange={setSupplySelection}
-      onAddSupplyOption={handleAddSupplyOption}
+      supplyGroups={supplyGroups}
+      onSelectSupplyOption={selectSupplyOption}
       quantity={quantity}
       onQuantityChange={setQuantity}
       quantityMinQty={quantityMinQty}
       minBuyQty={minBuyQty}
       maxBuyQty={maxBuyQty}
-      selectedOption={selectedOption}
       selectedCartOptions={selectedCartOptions}
-      onAddSelectedOption={handleAddSelectedOption}
       onUpdateSelectedOptionQty={updateSelectedOptionQty}
       onRemoveSelectedOption={removeSelectedOption}
       displayTotal={displayTotal}

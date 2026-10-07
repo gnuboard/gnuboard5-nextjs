@@ -415,8 +415,9 @@ if ($apiMethod === 'POST' && $action === 'download') {
         Response::error('다운로드 시작 전입니다.', 400);
     }
 
-    // 영카트 원본 ajax.coupondownload.php 처럼 동시 다운로드를 MySQL lock으로 막는다.
-    $lockKey = 'g5_coupon_dl_' . $cz_id . '_' . $mb_id;
+    // 영카트 원본 ajax.coupondownload.php 처럼 동시 다운로드를 MySQL lock으로 막는다 — 이름도 원본과 같이 회원 단위.
+    // 쿠폰존마다 이름을 다르게 두면 웹 다운로드와 앱 다운로드가 서로를 보지 못해 같은 쿠폰존 쿠폰이 두 장 발급된다.
+    $lockKey = 'g5_coupon_dl_' . $mb_id;
     $lockRow = DB::fetch('SELECT GET_LOCK(?, 5) AS lk', [$lockKey]);
     if (empty($lockRow['lk'])) {
         Response::error('잠시 후 다시 시도해 주십시오.', 409);
@@ -434,13 +435,13 @@ if ($apiMethod === 'POST' && $action === 'download') {
     }
 
     $pointCost = !empty($zone['cz_type']) ? (int) $zone['cz_point'] : 0;
-    // 포인트로 사는 쿠폰은 회원 포인트 잠금(주문의 포인트 차감과 같은 이름)도 잡는다 — 위 잠금은 쿠폰존마다라
-    // 서로 다른 쿠폰을 동시에 받으면 둘 다 같은 잔액을 보고 포인트가 마이너스가 된다.
-    // 이름 잠금을 하나만 드는 옛 DB 에서는 둘째 잠금이 위 쿠폰존 잠금을 풀어 버리므로(중복 다운로드가 열린다) 잡지 않는다.
+    // 포인트로 사는 쿠폰은 회원 포인트 잠금(주문의 포인트 차감 · 원본 orderformupdate.php 와 같은 이름)도 잡는다 —
+    // 위 잠금은 쿠폰 다운로드끼리만 줄을 세우므로, 주문의 포인트 사용과 동시에 받으면 둘 다 같은 잔액을 보고 포인트가 마이너스가 된다.
+    // 이름 잠금을 하나만 드는 옛 DB 에서는 둘째 잠금이 위 다운로드 잠금을 풀어 버리므로(중복 다운로드가 열린다) 잡지 않는다.
     $pointLockKey = '';
     if ($pointCost > 0) {
         if (DB::supportsMultipleNamedLocks()) {
-            $pointLockKey = 'g5_shop_point_member_' . md5($mb_id);
+            $pointLockKey = shop_api_member_point_lock_name((string) $mb_id);
             $pointLock = DB::fetch('SELECT GET_LOCK(?, 5) AS lk', [$pointLockKey]);
             if (empty($pointLock['lk'])) {
                 shop_api_coupon_download_release_lock($lockKey);
@@ -448,12 +449,8 @@ if ($apiMethod === 'POST' && $action === 'download') {
             }
         }
 
-        $pointRow = DB::fetch(
-            "SELECT mb_point FROM " . DB::table('member_table') . "
-             WHERE mb_id = ? LIMIT 1",
-            [$mb_id]
-        );
-        $memberPoint = $pointRow ? (int) $pointRow['mb_point'] : (int) ($member['mb_point'] ?? 0);
+        // 잔액은 주문의 포인트 차감처럼 포인트 내역 합계(get_point_sum)로 본다 — mb_point 열은 어긋날 수 있는 사본이다.
+        $memberPoint = function_exists('get_point_sum') ? (int) get_point_sum($mb_id) : (int) ($member['mb_point'] ?? 0);
         if (($memberPoint - $pointCost) < 0) {
             shop_api_coupon_download_release_lock($pointLockKey);
             shop_api_coupon_download_release_lock($lockKey);

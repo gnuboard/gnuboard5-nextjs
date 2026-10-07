@@ -138,7 +138,7 @@ if (!function_exists('shop_api_send_order_mail')) {
         );
         $itemLines = [];
         foreach ($items as $it) {
-            $opt = str_replace("\x1e", ' / ', (string) $it['ct_option']);
+            $opt = (string) $it['ct_option'] === (string) $it['it_name'] ? '' : str_replace("\x1e", ' / ', (string) $it['ct_option']); // 옵션 없는 줄은 상품명이 들어 있다
             $itemLines[] = sprintf(
                 '- %s%s × %d개  %s원',
                 $it['it_name'],

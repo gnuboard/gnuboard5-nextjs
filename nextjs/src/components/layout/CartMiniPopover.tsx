@@ -98,9 +98,9 @@ export function CartMiniPopover() {
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-medium">{it.it_name}</p>
-                      {it.ct_option && (
+                      {formatCartOption(it.ct_option, it.it_name) && (
                         <p className="truncate text-[10px] text-muted-foreground">
-                          {formatCartOption(it.ct_option)}
+                          {formatCartOption(it.ct_option, it.it_name)}
                         </p>
                       )}
                       <p className="text-[10px] text-muted-foreground">

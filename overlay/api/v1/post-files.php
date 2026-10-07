@@ -387,7 +387,7 @@ function post_files_save_disk(array $u, $boardDir)
     return [
         'path' => $dest,
         'meta' => [
-            'bf_source'   => $orig,
+            'bf_source'   => post_files_display_name($orig),
             'bf_file'     => $stored,
             'bf_download' => 0,
             'bf_filesize' => $u['size'],
@@ -396,6 +396,19 @@ function post_files_save_disk(array $u, $boardDir)
             'bf_type'     => $imgInfo ? (int) $imgInfo[2] : 0,
         ],
     ];
+}
+
+/**
+ * 첨부의 보이는 이름(bf_source). 원본 bbs/write_update.php 는 get_safe_filename() 을 거친 이름을 저장하고, 원본 스킨은
+ * 그 정리를 믿고 이 값을 escape 없이 찍는다(lib/common.lib.php get_file() 은 addslashes 뿐) — API 로 들어온 이름도
+ * 같은 정리를 거친다(" ' < > = # & ! % \ ( ) * + ? 제거). 제어문자도 뺀다. 한글은 그대로. 디스크 이름(bf_file)은 따로 만든다.
+ */
+function post_files_display_name($name)
+{
+    $name = function_exists('get_safe_filename')
+        ? get_safe_filename((string) $name)
+        : preg_replace('/["\'<>=#&!%\\\\(\)\*\+\?]/', '', (string) $name);
+    return (string) preg_replace('/[\x00-\x1f\x7f]/', '', (string) $name);
 }
 
 /**

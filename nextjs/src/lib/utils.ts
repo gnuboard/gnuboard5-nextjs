@@ -72,8 +72,14 @@ export function truncate(str: string, length: number) {
  * 로 join 한 형태라 사용자에겐 'S / 블루' 처럼 슬래시로 변환해서 보여준다.
  * 빈 값/undefined 면 빈 문자열.
  */
-export function formatCartOption(ctOption?: string | null): string {
+/**
+ * 장바구니 · 주문 줄의 옵션 글자. 영카트처럼 옵션 없는 줄의 ct_option 에는 상품명이 들어 있으므로(cartupdate.php
+ * io_value), itName 을 주면 그때는 빈 글자 — 상품명 아래에 같은 이름이 한 번 더 붙지 않게.
+ * 예전 줄은 io_id 원문("값1␞값2")이라 구분자를 " / " 로 바꿔 보여 준다.
+ */
+export function formatCartOption(ctOption?: string | null, itName?: string | null): string {
   if (!ctOption) return '';
+  if (itName && ctOption.trim() === itName.trim()) return '';
   return ctOption.split('\x1e').join(' / ');
 }
 

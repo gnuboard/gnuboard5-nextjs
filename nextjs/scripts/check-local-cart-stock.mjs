@@ -100,7 +100,7 @@ async function main() {
   }
 
   // 담은 뒤 재고가 줄면: 줄이기는 허용, 늘리기는 거부(남은 초과분은 주문 때 막힌다).
-  const optionRow = (await api('/shop/cart')).data?.items?.find((row) => String(row.ct_option) === String(option.io_id) && Number(row.io_type) === 0);
+  const optionRow = (await api('/shop/cart')).data?.items?.find((row) => String(row.io_id) === String(option.io_id) && Number(row.io_type) === 0);
   if (!optionRow) throw new Error('option cart row not found');
   await api(`/shop/cart/${optionRow.ct_id}`, { method: 'PATCH', body: { ct_qty: 5 } });
   const shrink = seedStock([`--product-id=${optionItem.it_id}`, `--io-id-b64=${ioIdB64}`, '--io-type=0', '--stock=2']);

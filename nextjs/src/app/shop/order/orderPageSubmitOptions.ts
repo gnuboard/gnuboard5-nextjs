@@ -41,8 +41,6 @@ export function buildOrderSubmitOptions({
     paymentConfig: orderData.paymentConfig,
     bankAccount: orderData.bankAccount,
     depositName: orderData.depositName,
-    agreeTerms: formState.agreements.agreeTerms,
-    agreePrivacy: formState.agreements.agreePrivacy,
     selectedCouponId: formState.couponPoint.selectedCouponId,
     selectedSendCouponId: formState.couponPoint.selectedSendCouponId,
     pointUse: discounts.pointUse,

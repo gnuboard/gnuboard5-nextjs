@@ -336,7 +336,8 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
         : $order['od_settle_case'];
     $bankAccount = '';
     $depositName = '';
-    $confirmedAmount = (int) ($order['od_receipt_price'] ?? 0);
+    // 결제할 금액 = 입금액 + 미수금 — 초안은 미수금에 담는다(예전에 만든 초안은 입금액에 있어 합이 같다).
+    $confirmedAmount = (int) ($order['od_receipt_price'] ?? 0) + (int) ($order['od_misu'] ?? 0);
     $finalReceiptPrice = $confirmedAmount;
     $finalMisu = 0;
     $finalReceiptTime = date('Y-m-d H:i:s');

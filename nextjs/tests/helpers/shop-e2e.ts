@@ -15,7 +15,9 @@ export interface ShopSmokeProduct {
 
 export interface ShopSmokeCartItem {
   it_id?: string | number;
+  /** 표시 글자(영카트 io_value — "색상:실버") — 줄을 찾을 때는 io_id 를 쓴다. */
   ct_option?: string | number;
+  io_id?: string | number;
   ct_qty?: string | number;
 }
 
