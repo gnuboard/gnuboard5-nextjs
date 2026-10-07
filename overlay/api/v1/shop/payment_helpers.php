@@ -267,11 +267,6 @@ function pg_notify_ip_allowed(string $provider): bool {
     $allowed = pg_notify_allowed_ips($provider);
 
     if ($allowed === [] || !in_array($remote, $allowed, true)) {
-        error_log(sprintf(
-            '[shop-pg] %s 입금통보를 허용 목록에 없는 주소에서 받아 거절했다: %s',
-            $provider,
-            $remote !== '' ? $remote : '(주소 없음)'
-        ));
         return false;
     }
 
@@ -430,15 +425,6 @@ function pg_file_status(string $path): array {
         'path'     => $path,
         'exists'   => $exists,
         'readable' => $exists && is_readable($path),
-    ];
-}
-
-function pg_dir_status(string $path): array {
-    $exists = $path !== '' && is_dir($path);
-    return [
-        'path'     => $path,
-        'exists'   => $exists,
-        'writable' => $exists && is_writable($path),
     ];
 }
 

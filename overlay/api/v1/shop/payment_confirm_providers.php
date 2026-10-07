@@ -246,7 +246,6 @@ function shop_payment_confirm_verify_pg(string $pg_service, array &$input, array
             $requestSiteCd = 'SR' . $requestSiteCd;
         }
         if ($site_cd === '' || ($requestSiteCd !== '' && !hash_equals($site_cd, $requestSiteCd))) {
-            error_log('[shop/payment/confirm] KCP site_cd mismatch for order ' . $order_id);
             Response::error('결제 정보가 쇼핑몰 설정과 맞지 않습니다.', 400, ['code' => 'kcp_site_mismatch']);
         }
         $tno      = pg_mobile_request_value($input, ['tno', 'TNO', 'tid', 'TID']);

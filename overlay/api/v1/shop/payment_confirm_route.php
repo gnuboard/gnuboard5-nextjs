@@ -472,7 +472,6 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
             }
         }
 
-        error_log('[api/shop/payment] Order finalization failed: ' . $e->getMessage());
         $internalMessage = '결제 확정 DB 처리 실패: ' . $e->getMessage();
         // 다른 주문이 이미 쓴 쿠폰 — 위 사전 검사에 걸렸거나, 그 뒤 끼어든 주문 때문에 사용 기록 INSERT 가 unique 에 걸렸다.
         $couponConflict = $e->getMessage() === 'Coupon already used by another order.'

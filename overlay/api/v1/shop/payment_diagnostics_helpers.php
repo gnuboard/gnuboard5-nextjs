@@ -76,7 +76,6 @@ function pg_payment_diagnostics(array $cfg): array {
         : '';
     $kcpMobileLib = defined('G5_MSHOP_PATH') ? G5_MSHOP_PATH . '/kcp/KCPComLibrary.php' : '';
     $kcpPpCliLib = defined('G5_SHOP_PATH') ? G5_SHOP_PATH . '/kcp/pp_ax_hub_lib.php' : '';
-    $kcpLogDir = getenv('SHOP_KCP_LOG_DIR') ?: (defined('G5_DATA_PATH') ? G5_DATA_PATH . '/log/kcp' : sys_get_temp_dir());
     $kcp = [
         'ready' => $kcpSiteCd !== ''
             && pg_kcp_site_key($cfg, $kcpSiteCd) !== ''
@@ -89,7 +88,6 @@ function pg_payment_diagnostics(array $cfg): array {
         'mobile_library' => pg_file_status($kcpMobileLib),
         'approval_wsdl' => pg_file_status($kcpWsdl),
         'pp_cli_library' => pg_file_status($kcpPpCliLib),
-        'log_dir' => pg_dir_status($kcpLogDir),
     ];
 
     $nicepayTestMode = pg_detect_test_mode($cfg, 'nicepay');
@@ -138,13 +136,6 @@ function pg_payment_diagnostics(array $cfg): array {
             'severity' => 'error',
             'code'     => 'KCP_SOAP_MISSING',
             'message'  => 'KCP 모바일 거래등록에는 PHP SOAP 확장이 필요합니다.',
-        ];
-    }
-    if ($pgService === 'kcp' && !$kcp['log_dir']['writable']) {
-        $issues[] = [
-            'severity' => 'warning',
-            'code'     => 'KCP_LOG_DIR_NOT_WRITABLE',
-            'message'  => 'KCP 승인 로그 디렉터리에 쓰기 권한이 없습니다.',
         ];
     }
     if ($pgService === 'nicepay' && empty($nicepay['ready'])) {
