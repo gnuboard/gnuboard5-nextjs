@@ -7,7 +7,6 @@ export function checkRuntimeOriginGuards({
   phpCertCommonSource,
   phpShopCommonSource,
   phpShopSessionHelpersSource,
-  phpShopNaverpaySource,
   phpShopPaymentHelpersSource,
   phpGreenhubRuntimeCoreCheckSource,
   phpGreenhubAppShellCheckSource,
@@ -50,13 +49,5 @@ export function checkRuntimeOriginGuards({
 
   if (!phpShopSessionHelpersSource.includes('api_public_request_origin(false)')) {
     fail('api/v1/shop/common_session_helpers.php must derive current origin through api_public_request_origin(false)');
-  }
-
-  if (phpShopNaverpaySource.includes("$_SERVER['HTTP_HOST']")) {
-    fail('api/v1/shop/naverpay.php must not trust HTTP_HOST as a Naver Pay back_url allowlist source');
-  }
-
-  if (!phpShopNaverpaySource.includes('api_public_request_origin(false)')) {
-    fail('api/v1/shop/naverpay.php must use api_public_request_origin(false) for request-origin back_url allowlisting');
   }
 }

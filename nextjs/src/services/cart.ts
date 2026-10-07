@@ -97,6 +97,15 @@ export function replaceCartItemOptions(itId: string, options: CartOptionLineInpu
   return apiClient.post("/shop/cart/options", { it_id: itId, options });
 }
 
+/**
+ * 장바구니의 "주문하기" 앞 재고 검사 — 영카트 cart.php 가 주문하기를 누를 때 부르는 ajax.orderstock.php 와 같다
+ * (POST /shop/cart/order-stock). 품절 · 판매중지 · 재고 부족 · 구매수량 한도에 걸리면 서버의 안내 문구로 던진다.
+ * 고른 줄의 선택 시각도 이때 갱신한다.
+ */
+export function checkCartOrderStock(ctIds: string[]) {
+  return apiClient.post("/shop/cart/order-stock", { ct_ids: ctIds });
+}
+
 export function updateCartItemQuantity(ctId: string, qty: number) {
   return apiClient.patch(`/shop/cart/${ctId}`, { ct_qty: qty });
 }

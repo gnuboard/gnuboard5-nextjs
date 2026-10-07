@@ -20,7 +20,6 @@ const ORIGINAL_PHP_ROOTS = new Set([
   "kcp",
   "lg",
   "mail",
-  "naverpay",
   "nicepay",
   "price",
   "samsungpay",

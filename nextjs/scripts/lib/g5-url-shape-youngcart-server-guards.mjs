@@ -65,9 +65,6 @@ const serverRuntimeOnlyRouteHandlers = [
   'kakaopay/[...path]',
   'lg/[...path]',
   'nicepay/[...path]',
-  'naverpay/naverpay_item.php',
-  'naverpay/naverpay_order.php',
-  'naverpay/naverpay_wish.php',
   'orderaddress.php',
   'orderaddressupdate.php',
   'ordercoupon.php',
@@ -105,7 +102,6 @@ const internalRootShopFiles = new Set([
   'settle_kcp_common.php',
   'settle_lg.inc.php',
   'settle_lg_common.php',
-  'settle_naverpay.inc.php',
   'settle_nicepay.inc.php',
   'settle_nicepay_common.php',
   'settle_toss.inc.php',
@@ -122,15 +118,19 @@ if (!hasOriginalShopRoot && !isPublicPackage) {
   fail(`original YoungCart shop directory is missing: ${originalShopRoot}`);
 }
 
+// 원본에 남아 있지만 이제 쓰지 않는 아주 오래된 코드(네이버페이 주문형, shop/naverpay · settle_naverpay.inc.php) —
+// 우리 앱(api · nextjs)은 이 기능을 넣지 않으므로 라우트나 예약 이름을 요구하지 않는다.
+const obsoleteOriginalShopNames = new Set(['naverpay', 'settle_naverpay.inc.php']);
+
 const rootShopPhpFiles = hasOriginalShopRoot
   ? readdirSync(originalShopRoot, { withFileTypes: true })
-      .filter((entry) => entry.isFile() && entry.name.endsWith('.php'))
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.php') && !obsoleteOriginalShopNames.has(entry.name))
       .map((entry) => entry.name)
       .sort()
   : [];
 const rootShopPhpDirs = hasOriginalShopRoot
   ? readdirSync(originalShopRoot, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
+      .filter((entry) => entry.isDirectory() && !obsoleteOriginalShopNames.has(entry.name))
       .filter((entry) => {
         try {
           return readdirSync(join(originalShopRoot, entry.name), { withFileTypes: true }).some(
@@ -274,24 +274,6 @@ for (const route of serverRuntimeOnlyRouteHandlers) {
   if (route === 'taxsave.php') {
     if (!routeSource.includes('legacyYoungcartPhpRedirect') || !routeSource.includes('/shop/taxsave.php')) {
       fail('shop/taxsave.php/route.ts must pass cash receipt issue requests to original YoungCart PHP');
-    }
-    continue;
-  }
-  if (route === 'naverpay/naverpay_item.php') {
-    if (!routeSource.includes('legacyYoungcartPhpRedirect') || !routeSource.includes('/shop/naverpay/naverpay_item.php')) {
-      fail('shop/naverpay/naverpay_item.php/route.ts must pass Naver Pay item XML requests to original YoungCart PHP');
-    }
-    continue;
-  }
-  if (route === 'naverpay/naverpay_order.php') {
-    if (!routeSource.includes('legacyNaverPayOrder')) {
-      fail('shop/naverpay/naverpay_order.php/route.ts must bridge original Naver Pay order JSON shape');
-    }
-    continue;
-  }
-  if (route === 'naverpay/naverpay_wish.php') {
-    if (!routeSource.includes('legacyNaverPayWish')) {
-      fail('shop/naverpay/naverpay_wish.php/route.ts must bridge original Naver Pay wishlist popup flow');
     }
     continue;
   }

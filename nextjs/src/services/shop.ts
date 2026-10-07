@@ -12,9 +12,6 @@ import {
   shopCategoryProductPageSchema,
   shopCategorySchema,
   shopBannerListSchema,
-  shopNaverPayConfigSchema,
-  shopNaverPayOrderResponseSchema,
-  shopNaverPayWishResponseSchema,
   shopPolicySchema,
   shopPopupListSchema,
   shopQaSchema,
@@ -30,10 +27,6 @@ import {
 import type {
   ShopCategory,
   ShopBanner,
-  ShopNaverPayConfig,
-  ShopNaverPayOrderRequest,
-  ShopNaverPayOrderResponse,
-  ShopNaverPayWishResponse,
   ShopPolicy,
   ShopPopup,
   ShopProduct,
@@ -298,49 +291,6 @@ export function getShopPolicy(revalidate = 300): Promise<ShopPolicy | null> {
     },
     (policy) => policy === null
   );
-}
-
-export function getShopNaverPayConfig(): Promise<ShopNaverPayConfig | null> {
-  return requestShare.get(
-    "shop/naverpay",
-    SHARED_DETAIL_TTL_MS,
-    async () => {
-      try {
-        const response = await apiClient.get<unknown>("/shop/naverpay");
-        const parsed = shopNaverPayConfigSchema.safeParse(response.data);
-        return parsed.success ? parsed.data : null;
-      } catch {
-        return null;
-      }
-    },
-    (config) => config === null
-  );
-}
-
-export async function registerShopNaverPayOrder(
-  payload: ShopNaverPayOrderRequest
-): Promise<ShopNaverPayOrderResponse> {
-  const response = await apiClient.post<unknown>("/shop/naverpay/order", payload);
-  const parsed = shopNaverPayOrderResponseSchema.safeParse(response.data);
-
-  if (!parsed.success) {
-    throw new Error("네이버페이 주문 등록 응답 형식이 올바르지 않습니다.");
-  }
-
-  return parsed.data;
-}
-
-export async function registerShopNaverPayWish(
-  payload: { it_id?: string; it_ids?: string[] }
-): Promise<ShopNaverPayWishResponse> {
-  const response = await apiClient.post<unknown>("/shop/naverpay/wish", payload);
-  const parsed = shopNaverPayWishResponseSchema.safeParse(response.data);
-
-  if (!parsed.success) {
-    throw new Error("네이버페이 찜 등록 응답 형식이 올바르지 않습니다.");
-  }
-
-  return parsed.data;
 }
 
 export async function getShopShippingQuote(params: {

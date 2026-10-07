@@ -18,7 +18,7 @@ const {
   phpAuthSocialRoutesPath, phpAuthLibPath, phpPaymentPath, phpStatusPath, phpSocialBridgePath,
   phpSocialStartPath, phpSocialPopupPath, phpSocialFinishPath, phpThemeCommonPath,
   phpNextjsRuntimeExtendPath, phpApiHelpersPath, phpCertCommonPath, phpKcpStartPath,
-  phpShopCommonPath, phpShopSessionHelpersPath, phpShopNaverpayPath, phpShopPaymentHelpersPath,
+  phpShopCommonPath, phpShopSessionHelpersPath, phpShopPaymentHelpersPath,
   phpGreenhubRuntimeCorePath, phpGreenhubMetadataRewritePath, phpGreenhubAppShellPath,
   phpNextjs25AppShellPath, phpNextjs25AssetResponsesPath, phpNextjs25LegacyRouteResolversPath,
   phpNextjs25LegacyRoutesPath, phpNextjs25MetadataPath, phpNextjs25RenderPath,
@@ -93,7 +93,6 @@ const phpCertCommonSource = readText(phpCertCommonPath);
 const phpKcpStartSource = readText(phpKcpStartPath);
 const phpShopCommonSource = readText(phpShopCommonPath);
 const phpShopSessionHelpersSource = readText(phpShopSessionHelpersPath);
-const phpShopNaverpaySource = readText(phpShopNaverpayPath);
 const phpShopPaymentHelpersSource = readText(phpShopPaymentHelpersPath);
 const phpGreenhubRuntimeCoreSource = readText(phpGreenhubRuntimeCorePath);
 const phpGreenhubMetadataRewriteSource = readText(phpGreenhubMetadataRewritePath);
@@ -433,7 +432,6 @@ checkRuntimeOriginGuards({
   phpCertCommonSource,
   phpShopCommonSource,
   phpShopSessionHelpersSource,
-  phpShopNaverpaySource,
   phpShopPaymentHelpersSource,
   phpGreenhubRuntimeCoreCheckSource,
   phpGreenhubAppShellCheckSource,

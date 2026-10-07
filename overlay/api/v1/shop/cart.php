@@ -36,7 +36,7 @@ if (($apiMethod === 'GET' || $apiMethod === 'POST') && $ct_id === 'order-stock')
     $cartParams = [$cart_id];
 
     if ($hasCtIdFilter && empty($filterCtIds)) {
-        Response::error('Invalid cart item ids.', 422);
+        Response::error('올바르지 않은 장바구니 상품입니다.', 422);
     }
 
     if (!empty($filterCtIds)) {
@@ -45,6 +45,19 @@ if (($apiMethod === 'GET' || $apiMethod === 'POST') && $ct_id === 'order-stock')
     } elseif (isset($input['direct']) || isset($input['sw_direct'])) {
         $filterSql = ' AND ct_direct = ?';
         $cartParams[] = $directFilter ? 1 : 0;
+    }
+
+    // 앱 장바구니의 "주문하기" — 고른 줄의 선택 시각을 지금으로 갱신한 뒤 검사한다(영카트 cartupdate.php act=buy 가
+    // ct_select_time 을 갱신한 다음 ajax.orderstock.php 가 보는 것과 같다). 갱신하지 않으면 담은 지 몇 시간 된 장바구니는
+    // 아래의 "선택한 지 너무 오래됨" 검사에 잘못 걸린다. 검사만 하는 GET 은 아무것도 바꾸지 않는다.
+    if ($apiMethod === 'POST' && !empty($filterCtIds)) {
+        DB::execute(
+            "UPDATE " . DB::table('g5_shop_cart_table') . "
+             SET ct_select_time = NOW()
+             WHERE od_id = ? AND ct_select = 1 AND ct_id IN (" . implode(',', array_fill(0, count($filterCtIds), '?')) . ")
+               AND " . shop_api_cart_active_status_sql(),
+            array_merge([$cart_id], $filterCtIds, shop_api_cart_active_statuses())
+        );
     }
 
     $cartItems = DB::fetchAll(
@@ -58,7 +71,7 @@ if (($apiMethod === 'GET' || $apiMethod === 'POST') && $ct_id === 'order-stock')
     );
 
     if (empty($cartItems)) {
-        Response::error('Cart is empty. Add items before placing an order.', 400);
+        Response::error('장바구니가 비어 있습니다. 이미 주문하셨거나 장바구니에 담긴 상품이 없는 경우입니다.', 400);
     }
 
     $shopDefault = shop_api_shop_default_config();
@@ -84,14 +97,14 @@ if (($apiMethod === 'GET' || $apiMethod === 'POST') && $ct_id === 'order-stock')
         }
 
         if (!$recentSelect) {
-            Response::error('Order items were selected too long ago. Please review the cart and order again.', 400, [
+            Response::error('주문 요청 때까지 ' . $cartStockLimit . '시간 이상 경과되어 주문 상품이 초기화 됐습니다. 장바구니에서 주문하실 상품을 다시 확인해 주십시오.', 400, [
                 'cart_stock_limit_hours' => $cartStockLimit,
             ]);
         }
     }
 
     if (function_exists('before_check_cart_price') && !before_check_cart_price($cart_id)) {
-        Response::error('Cart amount has changed. Please review the cart again.', 400);
+        Response::error('장바구니 금액에 변동사항이 있습니다. 장바구니를 다시 확인해 주세요.', 400);
     }
 
     shop_api_validate_order_stock($cartItems);

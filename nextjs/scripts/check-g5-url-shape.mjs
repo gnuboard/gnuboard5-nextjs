@@ -317,7 +317,7 @@ for (const route of ['search', 'largeimage']) {
   }
 }
 
-for (const route of ['bannerhit', 'naverpay', 'orderform', 'price', 'taxsave']) {
+for (const route of ['bannerhit', 'orderform', 'price', 'taxsave']) {
   if (!new RegExp(`LEGACY_SHOP_ROOTS[\\s\\S]*"${route}"[\\s\\S]*\\]\\)`).test(shortUrlRulesSource)) {
     fail(`g5-short-url-rules.ts must reserve /shop/${route} for the original YoungCart route`);
   }

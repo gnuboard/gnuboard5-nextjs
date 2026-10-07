@@ -309,7 +309,6 @@ const cases = [
   ['/shop/products/cart', '/shop/products/cart'],
   ['/shop/products/largeimage', '/shop/products/largeimage'],
   ['/shop/products/bannerhit.php?bn_id=1', '/shop/products/bannerhit.php?bn_id=1'],
-  ['/shop/products/naverpay', '/shop/products/naverpay'],
   ['/shop/products/orderform', '/shop/products/orderform'],
   ['/shop/products/price', '/shop/products/price'],
   ['/shop/products/qas', '/shop/products/qas'],

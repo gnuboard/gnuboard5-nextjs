@@ -4,9 +4,6 @@ import type {
   ShopCartResponse,
   ShopBanner,
   ShopCategory,
-  ShopNaverPayConfig,
-  ShopNaverPayOrderResponse,
-  ShopNaverPayWishResponse,
   ShopOrder,
   ShopPolicy,
   ShopPopup,
@@ -204,39 +201,6 @@ export const shopCartResponseSchema = z
     shipping_cost: numberValue.optional(),
   })
   .passthrough() as unknown as z.ZodType<ShopCartResponse>;
-
-export const shopNaverPayConfigSchema = z
-  .object({
-    enabled: z.boolean().default(false),
-    reason: stringValue,
-    test: z.boolean().default(false),
-    mobile: z.boolean().default(false),
-    shop_id: stringValue,
-    button_key: stringValue,
-    button_count_item: numberValue,
-    button_count_cart: numberValue,
-    script_url: stringValue,
-    order_url: stringValue,
-    wish_url: stringValue,
-  })
-  .passthrough() as unknown as z.ZodType<ShopNaverPayConfig>;
-
-export const shopNaverPayOrderResponseSchema = z
-  .object({
-    order_id: stringValue,
-    shop_id: stringValue,
-    total_price: numberValue,
-    redirect_url: stringValue,
-  })
-  .passthrough() as unknown as z.ZodType<ShopNaverPayOrderResponse>;
-
-export const shopNaverPayWishResponseSchema = z
-  .object({
-    shop_id: stringValue,
-    item_ids: z.array(stringValue).default([]),
-    redirect_url: stringValue,
-  })
-  .passthrough() as unknown as z.ZodType<ShopNaverPayWishResponse>;
 
 export const shopShippingRuleSchema = z
   .object({

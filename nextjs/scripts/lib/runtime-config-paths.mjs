@@ -71,7 +71,6 @@ export function runtimeConfigPaths(repoRoot) {
     phpKcpStartPath: apiFile('cert/kcp_start.php'),
     phpShopCommonPath: apiFile('v1/shop/common.php'),
     phpShopSessionHelpersPath: apiFile('v1/shop/common_session_helpers.php'),
-    phpShopNaverpayPath: apiFile('v1/shop/naverpay.php'),
     phpShopPaymentHelpersPath: apiFile('v1/shop/payment_helpers.php'),
     phpGreenhubRuntimeCorePath: greenhubRuntimeFile('runtime-core.php'),
     phpGreenhubMetadataRewritePath: greenhubRuntimeFile('metadata-rewrite.php'),

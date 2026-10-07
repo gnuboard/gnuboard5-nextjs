@@ -35,7 +35,6 @@ $shopHandlers = [
     'events'     => __DIR__ . '/events.php',
     'images'     => __DIR__ . '/images.php',
     'personalpay' => __DIR__ . '/personalpay.php',
-    'naverpay'   => __DIR__ . '/naverpay.php',
     'receipts'   => __DIR__ . '/receipts.php',
 ];
 

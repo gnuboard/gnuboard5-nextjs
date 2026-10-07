@@ -29,11 +29,6 @@
     "targetLines": 650,
     "nextStep": "Extract package assembly, SSH upload, and remote verification into smaller scripts."
   },
-  "src/app/shop/products/[it_id]/ProductDetailClient.tsx": {
-    "priority": "medium",
-    "targetLines": 650,
-    "nextStep": "Extract option selection, cart actions, metadata, and tab content into focused components/hooks."
-  },
   "scripts/lib/local-order-scope-checks.mjs": {
     "priority": "medium",
     "targetLines": 650,
@@ -44,11 +39,6 @@
     "targetLines": 650,
     "nextStep": "Move runtime origin, auth, image, and theme checks into reusable guard modules."
   },
-  "../overlay/api/v1/shop/naverpay.php": {
-    "priority": "medium",
-    "targetLines": 650,
-    "nextStep": "Separate NaverPay request parsing, origin checks, and order payload assembly."
-  },
   "../overlay/api/v1/auth_account_routes.php": {
     "priority": "medium",
     "targetLines": 650,
@@ -58,6 +48,11 @@
     "priority": "medium",
     "targetLines": 650,
     "nextStep": "Separate order list, detail, cancellation, and guest lookup handlers."
+  },
+  "../overlay/api/v1/qas.php": {
+    "priority": "low",
+    "targetLines": 650,
+    "nextStep": "Move the new-question rate limits and the mail/SMS notification into a qa_create_limits.php helper next to the other qa helpers."
   },
   "../overlay/api/v1/posts.php": {
     "priority": "medium",

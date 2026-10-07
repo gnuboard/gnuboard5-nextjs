@@ -245,10 +245,6 @@ const EXACT: Record<string, string> = {
   "Answered product Q&A cannot be changed": "답변이 달린 상품 문의는 바꿀 수 없습니다.",
   "Coupon ID Error": "쿠폰을 찾을 수 없습니다.",
   "Banner not found": "배너를 찾을 수 없습니다.",
-  "This product is not orderable by Naver Pay": "네이버페이로 주문할 수 없는 상품입니다.",
-  "No orderable Naver Pay items were selected": "네이버페이로 주문할 수 있는 상품이 없습니다.",
-  "No Naver Pay items were selected": "네이버페이로 주문할 상품을 선택해 주세요.",
-  "No wishable Naver Pay items were selected": "네이버페이 찜에 담을 수 있는 상품이 없습니다.",
   "KAKAOPAY is not enabled": "카카오페이를 사용할 수 없습니다.",
   "Cash receipt issue link has expired": "현금영수증 발급 링크가 만료되었습니다.",
 };

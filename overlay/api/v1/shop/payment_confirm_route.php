@@ -519,9 +519,8 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
             );
         }
         $pgCancelled = $pgCancel === null ? null : !empty($pgCancel['ok']);
-        // 대사에 필요한 내용(실패 이유 · PG 취소 결과 · 트랜잭션 여부)은 주문 기록과 서버 로그에 — 응답에는 싣지 않는다.
+        // 대사에 필요한 내용(실패 이유 · PG 취소 결과 · 트랜잭션 여부)은 주문 기록에만 — 응답에도, 서버 로그에도 싣지 않는다.
         $cancelSummary = shop_payment_cancel_result_summary($pgCancel);
-        error_log('[api/shop/payment] PG cancel after local failure od_id=' . $order_id . ' pg=' . $pg_service . ': ' . $cancelSummary);
         try {
             pg_append_order_history(
                 (string) $order_id,

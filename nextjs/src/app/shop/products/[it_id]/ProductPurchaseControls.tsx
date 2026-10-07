@@ -3,12 +3,11 @@
 import {
   Bell,
   BellOff,
-  CreditCard,
   Heart,
   ShoppingCart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { ShopNaverPayConfig, ShopProduct } from "@/lib/api";
+import type { ShopProduct } from "@/lib/api";
 import { ProductOptionPicker, type ProductOptionPickerProps } from "@/components/shop/ProductOptionPicker";
 import { isProductDetailSoldOut } from "@/components/shop/productDetailHelpers";
 
@@ -22,11 +21,6 @@ export type ProductPurchaseControlsProps = Omit<ProductOptionPickerProps, "produ
   onAddToCart: () => void;
   onBuyNow: () => void;
   onWishlist: () => void;
-  naverPayConfig: ShopNaverPayConfig | null;
-  naverPaySubmitting: boolean;
-  onNaverPayOrder: () => void;
-  naverPayWishSubmitting: boolean;
-  onNaverPayWish: () => void;
   isTelInquiry: boolean;
 };
 
@@ -61,11 +55,6 @@ export function ProductPurchaseControls({
   onAddToCart,
   onBuyNow,
   onWishlist,
-  naverPayConfig,
-  naverPaySubmitting,
-  onNaverPayOrder,
-  naverPayWishSubmitting,
-  onNaverPayWish,
   isTelInquiry,
 }: ProductPurchaseControlsProps) {
   return (
@@ -135,32 +124,6 @@ export function ProductPurchaseControls({
           <Heart className="h-4 w-4" />
         </Button>
       </div>
-
-      {naverPayConfig?.enabled && canPurchaseProduct && (
-        <div className="product-naverpay rounded-md border border-[#0c8040]/30 bg-[#0c8040]/5 p-3">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Button
-              type="button"
-              className="bg-[#0c8040] text-white hover:bg-[#08783a]"
-              onClick={onNaverPayOrder}
-              disabled={naverPaySubmitting}
-            >
-              <CreditCard className="mr-2 h-4 w-4" />
-              {naverPaySubmitting ? "네이버페이 등록 중..." : "N Pay 구매"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="border-[#0c8040]/50 text-[#0c8040] hover:bg-[#0c8040]/10"
-              onClick={onNaverPayWish}
-              disabled={naverPayWishSubmitting}
-            >
-              <Heart className="mr-2 h-4 w-4" />
-              {naverPayWishSubmitting ? "찜 등록 중..." : "N Pay 찜"}
-            </Button>
-          </div>
-        </div>
-      )}
     </>
   );
 }

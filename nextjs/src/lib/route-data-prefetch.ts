@@ -2,7 +2,7 @@
 
 import { routeDataPrefetchTarget } from "@/lib/route-data-prefetch-target";
 import { getBoard } from "@/services/boards";
-import { getShopCategoryProductPage, getShopNaverPayConfig, getShopPolicy, getShopProductResult } from "@/services/shop";
+import { getShopCategoryProductPage, getShopPolicy, getShopProductResult } from "@/services/shop";
 
 /** 마우스가 링크 위에 이만큼 머물면 미리 부른다. 스쳐 지나가는 링크까지 부르지 않도록. */
 const HOVER_INTENT_DELAY_MS = 65;
@@ -29,7 +29,6 @@ export function prefetchRouteData(clientPath: string): void {
     case "product":
       void getShopProductResult(target.itId);
       void getShopPolicy().catch(() => null);
-      void getShopNaverPayConfig();
       return;
     case "category":
       void getShopCategoryProductPage(target.caId, target.params).catch(() => null);

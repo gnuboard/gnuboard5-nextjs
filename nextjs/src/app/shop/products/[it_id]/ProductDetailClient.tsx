@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ShopProduct, ShopReview, ShopReviewSummary, ShopQA } from "@/lib/api";
-import type { ShopNaverPayOrderOption } from "@/lib/api";
 import { toastSuccess, toastError } from "@/lib/toast";
 import {
   currentPathForRuntime,
@@ -31,8 +30,6 @@ import {
   getShopProductQaPage,
   getShopProductReviews,
   getShopProductReviewPage,
-  registerShopNaverPayOrder,
-  registerShopNaverPayWish,
 } from "@/services/shop";
 import { getClientPublicSettings } from "@/services/settings";
 import {
@@ -85,7 +82,7 @@ export default function ProductDetailClient({
   const [reviews, setReviews] = useState<ShopReview[]>([]);
   const [reviewSummary, setReviewSummary] = useState<ShopReviewSummary | null>(null);
   const [qas, setQas] = useState<ShopQA[]>([]);
-  const { shippingPolicy, naverPayConfig } = useShopProductPageConfig();
+  const { shippingPolicy } = useShopProductPageConfig();
   const [reviewPage, setReviewPage] = useState(1);
   // 사용후기 쪽 — 서버가 실제로 연 쪽(찾아간 후기가 있으면 그 쪽)과 마지막 쪽.
   const [reviewShownPage, setReviewShownPage] = useState(1);
@@ -98,8 +95,6 @@ export default function ProductDetailClient({
   const [qaLastPage, setQaLastPage] = useState(1);
   const [pendingFocusIqId, setPendingFocusIqId] = useState(0);
   const [addingToCart, setAddingToCart] = useState(false);
-  const [naverPaySubmitting, setNaverPaySubmitting] = useState(false);
-  const [naverPayWishSubmitting, setNaverPayWishSubmitting] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [productRewriteMode, setProductRewriteMode] = useState<BbsRewriteMode>(0);
   const addRecentProduct = useRecentProductsStore((s) => s.addProduct);
@@ -501,116 +496,6 @@ export default function ProductDetailClient({
     }
   }, [product, requireLogin, handleMemberActionError]);
 
-  const buildNaverPayOptions = useCallback((): ShopNaverPayOrderOption[] => {
-    if (!product) return [];
-
-    const cartOptions = buildSelectedCartOptions();
-    if (cartOptions.length === 0) {
-      return [
-        {
-          io_id: "",
-          io_type: 0,
-          io_value: "",
-          ct_qty: quantity,
-        },
-      ];
-    }
-
-    return cartOptions.map((option) => ({
-      io_id: option.io_id,
-      io_type: option.ioType,
-      io_value: option.label,
-      ct_qty: option.qty,
-    }));
-  }, [buildSelectedCartOptions, product, quantity]);
-
-  const validateNaverPaySelection = useCallback(() => {
-    if (!product) return false;
-    if (telInquiry) {
-      toastError("전화문의 상품은 네이버페이로 주문할 수 없습니다.");
-      return false;
-    }
-    if (product.it_soldout === "1") {
-      toastError("품절 상품은 네이버페이로 주문할 수 없습니다.");
-      return false;
-    }
-
-    const cartOptions = buildSelectedCartOptions();
-    const hasBaseOption = cartOptions.some((option) => option.ioType === 0);
-    if (optionSubjects.length > 0 && !hasBaseOption) {
-      toastError("옵션을 선택해주세요.");
-      return false;
-    }
-
-    return validateBuyQtyBeforeSubmit(cartOptions);
-  }, [
-    buildSelectedCartOptions,
-    telInquiry,
-    optionSubjects.length,
-    product,
-    validateBuyQtyBeforeSubmit,
-  ]);
-
-  const handleNaverPayOrder = useCallback(async () => {
-    if (!product || !naverPayConfig?.enabled || !validateNaverPaySelection()) return;
-
-    setNaverPaySubmitting(true);
-    try {
-      const response = await registerShopNaverPayOrder({
-        source: "item",
-        it_id: product.it_id,
-        quantity,
-        options: buildNaverPayOptions(),
-        back_url: window.location.href,
-      });
-      if (!response.redirect_url) {
-        throw new Error("네이버페이 이동 URL이 없습니다.");
-      }
-      window.location.href = response.redirect_url;
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "네이버페이 주문 등록에 실패했습니다.";
-      toastError(message);
-    } finally {
-      setNaverPaySubmitting(false);
-    }
-  }, [
-    buildNaverPayOptions,
-    naverPayConfig?.enabled,
-    product,
-    quantity,
-    validateNaverPaySelection,
-  ]);
-
-  const handleNaverPayWish = useCallback(async () => {
-    if (!product || !naverPayConfig?.enabled) return;
-
-    const popup = window.open(
-      "about:blank",
-      "win_naverpay_wishlist",
-      "scrollbars=yes,width=400,height=267"
-    );
-    setNaverPayWishSubmitting(true);
-    try {
-      const response = await registerShopNaverPayWish({ it_id: product.it_id });
-      if (!response.redirect_url) {
-        throw new Error("네이버페이 찜 URL이 없습니다.");
-      }
-      if (popup) {
-        popup.location.href = response.redirect_url;
-      } else {
-        window.open(response.redirect_url, "_blank", "noopener,noreferrer");
-      }
-    } catch (err: unknown) {
-      if (popup) popup.close();
-      const message =
-        err instanceof Error ? err.message : "네이버페이 찜 등록에 실패했습니다.";
-      toastError(message);
-    } finally {
-      setNaverPayWishSubmitting(false);
-    }
-  }, [naverPayConfig?.enabled, product]);
-
   const handleReviewSubmitted = useCallback(() => {
     if (!product) return;
     getShopProductReviews(product.it_id, 1).then(setReviews).catch(() => undefined);
@@ -668,11 +553,6 @@ export default function ProductDetailClient({
       onAddToCart={handleAddToCart}
       onBuyNow={handleBuyNow}
       onWishlist={handleWishlist}
-      naverPayConfig={naverPayConfig}
-      naverPaySubmitting={naverPaySubmitting}
-      onNaverPayOrder={handleNaverPayOrder}
-      naverPayWishSubmitting={naverPayWishSubmitting}
-      onNaverPayWish={handleNaverPayWish}
       activeTab={activeTab}
       onActiveTabChange={setActiveTab}
       canWriteReview={Boolean(user)}

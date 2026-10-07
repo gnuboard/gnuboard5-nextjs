@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { G5Link as Link } from "@/components/ui/g5-link";
-import type { ShopCartItem, ShopNaverPayConfig, ShopPolicy } from "@/lib/api";
+import type { ShopCartItem, ShopPolicy } from "@/lib/api";
 import type { BbsRewriteMode } from "@/lib/board-url";
 import { applyClientPageMetadata } from "@/lib/client-metadata";
 import { formatPrice } from "@/lib/utils";
@@ -17,19 +17,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { CreditCard, ShoppingBag } from "lucide-react";
+import { ShoppingBag } from "lucide-react";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { toastError } from "@/lib/toast";
 import { notifyCartChanged } from "@/lib/cart-events";
-import { clearCart, getCart, removeCartItems } from "@/services/cart";
-import {
-  estimateShopShippingCost,
-  getShopNaverPayConfig,
-  getShopPolicy,
-  registerShopNaverPayOrder,
-} from "@/services/shop";
+import { checkCartOrderStock, clearCart, getCart, removeCartItems } from "@/services/cart";
+import { useRouter } from "next/navigation";
+import { runtimeRouterPush } from "@/lib/runtime-router";
+import { estimateShopShippingCost, getShopPolicy } from "@/services/shop";
 import { getClientPublicSettings } from "@/services/settings";
-import { isTelInquiry } from "@/lib/shop-product-state";
 import { useAuthStore } from "@/store/auth";
 import { cartOrderHref, groupCartItems, selectedGroupCtIds, type CartGroup } from "./cartGroups";
 import { CartTable } from "./CartTable";
@@ -38,28 +34,6 @@ import { CartCouponDialog } from "./CartCouponDialog";
 
 const NOTHING_TO_ORDER = "주문하실 상품을 하나이상 선택해 주십시오.";
 const NOTHING_TO_DELETE = "삭제하실 상품을 하나이상 선택해 주십시오.";
-
-function naverPayCartBlockReason(item: ShopCartItem): string {
-  const itemName = item.it_name || "상품";
-
-  if (item.it_use !== undefined && String(item.it_use) !== "1") {
-    return `${itemName}은(는) 판매중지 상품이라 네이버페이로 구매할 수 없습니다.`;
-  }
-  if (String(item.it_soldout ?? "0") === "1") {
-    return `${itemName}은(는) 품절 상품이라 네이버페이로 구매할 수 없습니다.`;
-  }
-  if (isTelInquiry(item)) {
-    return `${itemName}은(는) 전화문의 상품이라 네이버페이로 구매할 수 없습니다.`;
-  }
-  if (Number(item.io_type ?? 0) === 1 && Number(item.io_price ?? 0) < 0) {
-    return `${itemName}의 차감 추가옵션은 네이버페이로 구매할 수 없습니다.`;
-  }
-  if (Number(item.io_type ?? 0) !== 1 && item.it_basic_price + Number(item.io_price ?? 0) <= 0) {
-    return `${itemName}은(는) 결제 금액이 없어 네이버페이로 구매할 수 없습니다.`;
-  }
-
-  return "";
-}
 
 type DeleteKind = "selected" | "all";
 
@@ -97,8 +71,8 @@ export default function CartPage() {
   const [cartShippingCost, setCartShippingCost] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [naverPayConfig, setNaverPayConfig] = useState<ShopNaverPayConfig | null>(null);
-  const [naverPaySubmitting, setNaverPaySubmitting] = useState(false);
+  const [ordering, setOrdering] = useState(false);
+  const router = useRouter();
   const [productRewriteMode, setProductRewriteMode] = useState<BbsRewriteMode>(0);
   // 영카트처럼 처음에는 모두 고른 상태 — 해제한 상품만 기억한다(다시 불러와 새로 생긴 상품도 골라진 채로 보인다).
   const [deselected, setDeselected] = useState<ReadonlySet<string>>(() => new Set());
@@ -118,13 +92,6 @@ export default function CartPage() {
       })
       .catch(() => {
         if (alive) setProductRewriteMode(0);
-      });
-    getShopNaverPayConfig()
-      .then((config) => {
-        if (alive) setNaverPayConfig(config);
-      })
-      .catch(() => {
-        if (alive) setNaverPayConfig(null);
       });
     return () => {
       alive = false;
@@ -185,6 +152,27 @@ export default function CartPage() {
   const selectedCtIds = selectedGroupCtIds(groups, selected);
   const orderHref = cartOrderHref(groups, selected);
 
+  /**
+   * 주문하기 — 영카트 cart.php 처럼 주문서로 가기 전에 재고를 본다(ajax.orderstock.php). 품절 · 재고 부족이면 서버의
+   * 안내 문구를 알리고 장바구니에 남는다. 통과하면 주문서로 간다(주문을 만들 때 서버가 한 번 더 본다).
+   */
+  const handleOrder = async () => {
+    if (!orderHref || ordering) return;
+    setOrdering(true);
+    try {
+      await checkCartOrderStock(selectedCtIds);
+    } catch (err: unknown) {
+      toastError(err instanceof Error && err.message ? err.message : "재고를 확인하지 못했습니다. 잠시 뒤 다시 시도해 주세요.");
+      setOrdering(false);
+      // 서버가 알려 준 대로 장바구니를 다시 불러 수량 · 상태를 맞춘다.
+      await reloadAfterChange();
+      return;
+    }
+    runtimeRouterPush(router, orderHref);
+    // 주문서에서 뒤로 돌아왔을 때 단추가 잠긴 채 남지 않게 이동을 시작한 뒤 바로 푼다.
+    setOrdering(false);
+  };
+
   const toggleGroup = useCallback((itId: string, checked: boolean) => {
     setDeselected((previous) => {
       const next = new Set(previous);
@@ -223,39 +211,6 @@ export default function CartPage() {
       setDeleting(false);
     }
   };
-
-  const selectedItems = items.filter((item) => selected.has(item.it_id));
-  const naverPayBlockReason = selectedItems.map(naverPayCartBlockReason).find(Boolean) || "";
-  const canUseNaverPay = !!naverPayConfig?.enabled && selectedItems.length > 0 && naverPayBlockReason === "";
-
-  const handleNaverPayOrder = useCallback(async () => {
-    if (!naverPayConfig?.enabled) return;
-    if (selectedCtIds.length === 0) {
-      toastError(NOTHING_TO_ORDER);
-      return;
-    }
-    if (naverPayBlockReason) {
-      toastError(naverPayBlockReason);
-      return;
-    }
-
-    setNaverPaySubmitting(true);
-    try {
-      const response = await registerShopNaverPayOrder({
-        source: "cart",
-        ct_ids: selectedCtIds,
-        back_url: window.location.href,
-      });
-      if (!response.redirect_url) {
-        throw new Error("네이버페이 이동 URL이 없습니다.");
-      }
-      window.location.href = response.redirect_url;
-    } catch (err: unknown) {
-      toastError(err instanceof Error ? err.message : "네이버페이 주문 등록에 실패했습니다.");
-    } finally {
-      setNaverPaySubmitting(false);
-    }
-  }, [naverPayBlockReason, naverPayConfig?.enabled, selectedCtIds]);
 
   // 합계는 영카트처럼 장바구니 전체 — 배송비는 서버 계산값, 없으면 정책으로 어림한다.
   const subtotal = groups.reduce((sum, group) => sum + group.subtotal, 0);
@@ -332,8 +287,8 @@ export default function CartPage() {
         </Button>
         {groups.length > 0 &&
           (orderHref ? (
-            <Button size="lg" className="cart-order flex-1" asChild>
-              <Link href={orderHref}>주문하기</Link>
+            <Button size="lg" className="cart-order flex-1" onClick={handleOrder} disabled={ordering} aria-busy={ordering || undefined}>
+              주문하기
             </Button>
           ) : (
             <Button size="lg" className="cart-order flex-1" onClick={() => toastError(NOTHING_TO_ORDER)}>
@@ -341,24 +296,6 @@ export default function CartPage() {
             </Button>
           ))}
       </div>
-      {naverPayConfig?.enabled && groups.length > 0 && (
-        <div className="mx-auto mt-2 max-w-sm">
-          <Button
-            type="button"
-            className="w-full bg-[#0c8040] text-white hover:bg-[#08783a] disabled:bg-[#0c8040]/50 disabled:text-white"
-            size="lg"
-            onClick={handleNaverPayOrder}
-            disabled={naverPaySubmitting || !canUseNaverPay}
-          >
-            <CreditCard className="mr-2 h-4 w-4" />
-            {naverPaySubmitting ? "네이버페이 등록 중..." : "N Pay 구매"}
-          </Button>
-          {naverPayBlockReason && (
-            <p className="mt-2 text-xs text-muted-foreground">{naverPayBlockReason}</p>
-          )}
-        </div>
-      )}
-
       {optionGroup && (
         <CartOptionDialog group={optionGroup} onClose={() => setOptionItId("")} onChanged={reloadAfterChange} />
       )}

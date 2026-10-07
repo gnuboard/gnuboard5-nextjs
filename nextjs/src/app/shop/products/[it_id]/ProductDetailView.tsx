@@ -4,7 +4,6 @@ import dynamic from "next/dynamic";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import type {
-  ShopNaverPayConfig,
   ShopPolicy,
   ShopProduct,
   ShopQA,
@@ -107,11 +106,6 @@ interface ProductDetailViewProps {
   onAddToCart: () => void;
   onBuyNow: () => void;
   onWishlist: () => void;
-  naverPayConfig: ShopNaverPayConfig | null;
-  naverPaySubmitting: boolean;
-  onNaverPayOrder: () => void;
-  naverPayWishSubmitting: boolean;
-  onNaverPayWish: () => void;
   activeTab: string;
   onActiveTabChange: Dispatch<SetStateAction<string>>;
   canWriteReview: boolean;
@@ -188,11 +182,6 @@ export function ProductDetailView({
   onAddToCart,
   onBuyNow,
   onWishlist,
-  naverPayConfig,
-  naverPaySubmitting,
-  onNaverPayOrder,
-  naverPayWishSubmitting,
-  onNaverPayWish,
   activeTab,
   onActiveTabChange,
   canWriteReview,
@@ -313,11 +302,6 @@ export function ProductDetailView({
     onAddToCart,
     onBuyNow,
     onWishlist,
-    naverPayConfig,
-    naverPaySubmitting,
-    onNaverPayOrder,
-    naverPayWishSubmitting,
-    onNaverPayWish,
   };
 
   return (

@@ -84,6 +84,10 @@ async function main() {
   const ctId = collectCtIds(added.data)[0];
   check('수량 바꾸기도 재고를 넘으면 막는다', await api(`/shop/cart/${ctId}`, { method: 'PATCH', body: { ct_qty: stock + 1 } }), { status: 400, message: 'exceeds available stock' });
 
+  // 주문하기 앞 재고 검사(영카트 ajax.orderstock.php) — 장바구니의 "주문하기" 단추가 부른다.
+  check('주문하기 앞 검사: 재고가 있으면 통과한다', await api('/shop/cart/order-stock', { method: 'POST', body: { ct_ids: [ctId] } }), { status: 200 });
+  check('주문하기 앞 검사: 올바르지 않은 줄 번호는 한국어로 거절한다', await api('/shop/cart/order-stock', { method: 'POST', body: { ct_ids: ['abc'] } }), { status: 422, message: '올바르지 않은 장바구니 상품입니다' });
+
   check('옵션 상품을 옵션 없이 담으면 옵션 선택을 요구한다(품절이 아니다)', await api('/shop/cart', { method: 'POST', body: { it_id: optionItem.it_id, ct_qty: 1 } }), { status: 400, message: '옵션을 선택해주세요' });
 
   const optStock = Number(option.io_stock_qty);
@@ -107,6 +111,8 @@ async function main() {
   try {
     check('재고가 줄어든 뒤에도 수량 줄이기는 된다', await api(`/shop/cart/${optionRow.ct_id}`, { method: 'PATCH', body: { ct_qty: 3 } }), { status: 200 });
     check('재고가 줄어든 뒤 수량 늘리기는 막는다', await api(`/shop/cart/${optionRow.ct_id}`, { method: 'PATCH', body: { ct_qty: 4 } }), { status: 400, message: 'exceeds available' });
+    // 남은 초과분(재고 2, 담긴 수량 3)은 주문하기 앞 검사가 영카트 문구로 막는다.
+    check('주문하기 앞 검사: 재고가 모자라면 영카트 문구로 막는다', await api('/shop/cart/order-stock', { method: 'POST', body: { ct_ids: [optionRow.ct_id] } }), { status: 400, message: '재고수량이 부족합니다' });
   } finally {
     seedStock([`--product-id=${optionItem.it_id}`, `--io-id-b64=${ioIdB64}`, '--io-type=0', `--stock=${shrink.previous_stock}`]);
   }

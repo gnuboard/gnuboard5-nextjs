@@ -11,7 +11,7 @@ export const DEFAULT_PUBLIC_METADATA_PATHS =
   '/,/boards,/faq,/recent,/polls,/search,/shop,/free/6,/shop/1446772772,/shop/list-2010101010,/shop/reviews,/shop/qas,/shop/content/company';
 
 export const DEFAULT_LEGACY_SHOP_PASSTHROUGH_PATHS =
-  '/shop/bannerhit.php?bn_id=1,/shop/taxsave.php,/shop/naverpay/naverpay_order.php,/shop/price/naver.php,/shop/kcp/pp_ax_hub.php,/mobile/shop/toss/returnurl.php?orderId=demo,/mobile/shop/samsungpay/orderform.1.php';
+  '/shop/bannerhit.php?bn_id=1,/shop/taxsave.php,/shop/price/naver.php,/shop/kcp/pp_ax_hub.php,/mobile/shop/toss/returnurl.php?orderId=demo,/mobile/shop/samsungpay/orderform.1.php';
 
 export const DEFAULT_LEGACY_SHOP_REDIRECTS = [
   '/mobile=>/',

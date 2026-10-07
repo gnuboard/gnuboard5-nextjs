@@ -118,7 +118,6 @@ const originalPhpPassthroughs = parseCsv(
       '/shop/nicepay/nicepay_result.php',
       '/shop/toss/returnurl.php?orderId=demo',
       '/shop/price/naver.php',
-      '/shop/naverpay/naverpay_item.php?it_id=1446772772',
       '/mobile/shop/toss/returnurl.php?orderId=demo',
       '/mobile/shop/samsungpay/orderform.1.php',
     ].join(',')

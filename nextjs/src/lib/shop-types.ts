@@ -124,49 +124,6 @@ export interface ShopPopup {
   nw_content_html: number;
 }
 
-export interface ShopNaverPayConfig {
-  enabled: boolean;
-  reason: string;
-  test: boolean;
-  mobile: boolean;
-  shop_id: string;
-  button_key: string;
-  button_count_item: number;
-  button_count_cart: number;
-  script_url: string;
-  order_url: string;
-  wish_url: string;
-}
-
-export interface ShopNaverPayOrderOption {
-  io_id: string;
-  io_type: number;
-  io_value: string;
-  ct_qty: number;
-}
-
-export interface ShopNaverPayOrderRequest {
-  source: "item" | "cart";
-  it_id?: string;
-  quantity?: number;
-  options?: ShopNaverPayOrderOption[];
-  ct_ids?: string[] | string;
-  back_url?: string;
-}
-
-export interface ShopNaverPayOrderResponse {
-  order_id: string;
-  shop_id: string;
-  total_price: number;
-  redirect_url: string;
-}
-
-export interface ShopNaverPayWishResponse {
-  shop_id: string;
-  item_ids: string[];
-  redirect_url: string;
-}
-
 export interface ShopCartItem {
   ct_id: string;
   it_id: string;

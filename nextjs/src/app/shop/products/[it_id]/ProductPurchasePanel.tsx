@@ -53,11 +53,6 @@ export function ProductPurchasePanel({
   onAddToCart,
   onBuyNow,
   onWishlist,
-  naverPayConfig,
-  naverPaySubmitting,
-  onNaverPayOrder,
-  naverPayWishSubmitting,
-  onNaverPayWish,
 }: ProductPurchaseControlsProps & {
   productRewriteMode: BbsRewriteMode;
   hasDiscount: boolean;
@@ -256,11 +251,6 @@ export function ProductPurchasePanel({
         onAddToCart={onAddToCart}
         onBuyNow={onBuyNow}
         onWishlist={onWishlist}
-        naverPayConfig={naverPayConfig}
-        naverPaySubmitting={naverPaySubmitting}
-        onNaverPayOrder={onNaverPayOrder}
-        naverPayWishSubmitting={naverPayWishSubmitting}
-        onNaverPayWish={onNaverPayWish}
         isTelInquiry={isTelInquiry}
       />
     </div>
