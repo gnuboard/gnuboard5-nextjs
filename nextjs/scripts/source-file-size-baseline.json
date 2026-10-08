@@ -10,7 +10,7 @@
   "../overlay/api/v1/shop/orders.php": 785,
   "../overlay/theme/nextjs_default/bridge/metadata.php": 718,
   "../overlay/theme/nextjs_default/bridge/seo.php": 872,
-  "scripts/check-local-browser.mjs": 748,
+  "scripts/check-local-browser.mjs": 750,
   "scripts/check-runtime-config.mjs": 706,
   "scripts/lib/g5-url-shape-live-guards.mjs": 724,
   "scripts/lib/local-order-scope-checks.mjs": 718,

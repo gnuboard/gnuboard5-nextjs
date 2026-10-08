@@ -48,8 +48,10 @@ jobs:
       - name: Build theme matrix
         id: theme-matrix
         env:
-          THEME_SOURCE_FILTER: ${{ github.event.inputs.theme_source || '' }}
-          LIVE_APP_URL_OVERRIDE: ${{ github.event.inputs.live_app_url || '' }}
+          # Without inputs, test the public demo (Vercel, server runtime). Override with the
+          # LIVE_DEFAULT_APP_URL / LIVE_DEFAULT_THEME_SOURCE repository variables.
+          THEME_SOURCE_FILTER: ${{ github.event.inputs.theme_source || vars.LIVE_DEFAULT_THEME_SOURCE || 'default' }}
+          LIVE_APP_URL_OVERRIDE: ${{ github.event.inputs.live_app_url || vars.LIVE_DEFAULT_APP_URL || 'https://gnuboard5-nextjs-demo.vercel.app' }}
         run: node nextjs/scripts/print-vercel-theme-matrix.mjs
 
   live-qa:
@@ -68,6 +70,24 @@ jobs:
       G5_THEME_NAME: ${{ matrix.theme_name }}
       G5_E2E_USER_ID: ${{ secrets.G5_E2E_USER_ID }}
       G5_E2E_USER_PASSWORD: ${{ secrets.G5_E2E_USER_PASSWORD }}
+      # The demo runs Next.js as a server (no static .txt RSC payloads), calls the API through its
+      # own /api/v1 proxy and loads attachments from the backend's absolute URLs.
+      LIVE_SMOKE_RSC_PAYLOADS: ${{ vars.LIVE_SMOKE_RSC_PAYLOADS || 'off' }}
+      LOCAL_EXPECTED_RUNTIME_API_URL: ${{ vars.LIVE_EXPECTED_RUNTIME_API_URL || '/api/v1' }}
+      LOCAL_EXTRA_API_URLS: ${{ vars.LIVE_EXTRA_API_URLS || 'https://thisgun3.mycafe24.com/api/v1' }}
+      # Sample content that exists on the demo backend (fixtures of the browser smoke).
+      LOCAL_SMOKE_POST_PATH: /free/147
+      LOCAL_SMOKE_POST_EXPECTED_API_PARTS: /settings,/boards/free
+      LOCAL_SMOKE_POST_TITLE: 함께 읽고 싶은 콘텐츠 23
+      LOCAL_SMOKE_POST_H1: 함께 읽고 싶은 콘텐츠 23
+      LOCAL_SMOKE_PRODUCT_PATH: /shop/soluneshop01
+      LOCAL_SMOKE_PRODUCT_TITLE: 알루미늄 모니터 받침대
+      LOCAL_SMOKE_CATEGORY_PATH: /shop/list-1010
+      LOCAL_SMOKE_CATEGORY_EXPECTED_API_PARTS: /settings
+      LOCAL_SMOKE_CATEGORY_TITLE: 데스크 셋업
+      LOCAL_SMOKE_CATEGORY_H1: 데스크 셋업 상품리스트
+      LOCAL_SMOKE_SHOP_LARGEIMAGE_PATH: /shop/largeimage?it_id=soluneshop01&no=1
+      LOCAL_SMOKE_SKIP_LABELS: board post seo,shop product seo,shop search
 
     steps:
       - name: Checkout

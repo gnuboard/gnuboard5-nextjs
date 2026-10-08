@@ -72,6 +72,12 @@ export function createLocalBrowserSmokeRuntime({
   const expectedRuntimeApiUrl = trimTrailingSlash(
     env.LOCAL_EXPECTED_RUNTIME_API_URL || env.NEXT_PUBLIC_API_URL || expectedApiUrl
   );
+  // 화면이 프록시(/api/v1)로 API 를 부르고 첨부는 백엔드가 준 절대 주소로 받는 배포(Vercel 데모 등)는 API 주소가 둘이다.
+  // 쉼표로 더 허용할 API 주소를 받는다(예: https://backend.example.com/api/v1).
+  const extraApiUrls = String(env.LOCAL_EXTRA_API_URLS || '')
+    .split(',')
+    .map((item) => trimTrailingSlash(item.trim()))
+    .filter(Boolean);
   const mobileViewport = argv.includes('--mobile') || env.LOCAL_SMOKE_MOBILE === '1';
   const activeViewport = mobileViewport
     ? { name: 'mobile', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }
@@ -97,12 +103,23 @@ export function createLocalBrowserSmokeRuntime({
       env.LOCAL_SMOKE_POST_SEO_CANONICAL_PATH || env.LOCAL_SMOKE_POST_CANONICAL_PATH,
   });
 
+  // 상품 · 분류 검사도 다른 데이터(예: 공개 데모)에 맞출 수 있게 — 경로는 LOCAL_SMOKE_PRODUCT_PATH · LOCAL_SMOKE_CATEGORY_PATH.
+  overrideSmokePath(smokePaths, 'shop product', {
+    expectedTitleIncludes: env.LOCAL_SMOKE_PRODUCT_TITLE,
+    expectedH1: env.LOCAL_SMOKE_PRODUCT_H1 || env.LOCAL_SMOKE_PRODUCT_TITLE,
+  });
+  overrideSmokePath(smokePaths, 'shop category', {
+    expectedTitleIncludes: env.LOCAL_SMOKE_CATEGORY_TITLE,
+    expectedH1: env.LOCAL_SMOKE_CATEGORY_H1 || env.LOCAL_SMOKE_CATEGORY_TITLE,
+  });
+
   const skippedSmokeLabels = skippedSmokeLabelSet(env);
 
   return {
     appUrl,
     expectedApiUrl,
     expectedRuntimeApiUrl,
+    extraApiUrls,
     authId: env.LOCAL_SMOKE_LOGIN_ID || '',
     authPassword: env.LOCAL_SMOKE_LOGIN_PASSWORD || '',
     requireAuth: argv.includes('--require-auth') || env.LOCAL_SMOKE_REQUIRE_AUTH === '1',

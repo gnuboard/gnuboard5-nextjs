@@ -1,5 +1,11 @@
 import { liveAppUrl } from './lib/live-env.mjs';
 
+// 서버 실행 방식(Vercel 등)에는 정적 빌드가 만드는 .txt RSC 페이로드가 없다 — off 면 건너뛴다.
+if (String(process.env.LIVE_SMOKE_RSC_PAYLOADS || '').trim().toLowerCase() === 'off') {
+  console.log('[check-live-rsc-payloads] skipped (LIVE_SMOKE_RSC_PAYLOADS=off — server runtime deployment)');
+  process.exit(0);
+}
+
 const appUrl = liveAppUrl('check-live-rsc-payloads');
 const rscPayloads = parseRedirects(
   process.env.LIVE_SMOKE_RSC_PAYLOADS ||

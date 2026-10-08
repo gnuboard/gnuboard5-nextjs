@@ -11,6 +11,7 @@ const {
   appUrl,
   expectedApiUrl,
   expectedRuntimeApiUrl,
+  extraApiUrls,
   requireAuth,
   seedAuth,
   activeViewport,
@@ -546,9 +547,10 @@ function assertPage(result) {
     fail(`${check.label} runtime apiBaseUrl is ${runtimeApi || '(empty)'}`, result);
   }
 
-  const unexpectedApiUrls = apiUrls.filter((url) => !url.startsWith(`${expectedApiUrl}/`));
+  const allowedApiUrls = [expectedApiUrl, ...extraApiUrls];
+  const unexpectedApiUrls = apiUrls.filter((url) => !allowedApiUrls.some((base) => url.startsWith(`${base}/`)));
   if (unexpectedApiUrls.length > 0) {
-    fail(`${check.label} used unexpected API origin`, { unexpectedApiUrls, expectedApiUrl });
+    fail(`${check.label} used unexpected API origin`, { unexpectedApiUrls, allowedApiUrls });
   }
 
   for (const part of check.expectedApiParts || []) {

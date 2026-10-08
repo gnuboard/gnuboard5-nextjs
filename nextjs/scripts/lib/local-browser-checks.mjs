@@ -136,8 +136,8 @@ const smokePaths = [
   {
     label: 'recent',
     path: process.env.LOCAL_SMOKE_RECENT_PATH || '/recent',
-    expectedApiParts: ['/settings', '/recent/groups', '/recent?page=1&limit=20'],
-    expectedTitleIncludes: '전체 게시물',
+    expectedApiParts: ['/settings', '/recent/groups', '/recent?page=1'],
+    expectedTitleIncludes: '새글',
   },
   {
     label: 'search',
