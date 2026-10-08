@@ -546,7 +546,8 @@ if (!function_exists('shop_api_order_uid')) {
             return get_shop_uid('order', $odId, $odTime, $odIp);
         }
 
-        return md5($odId . $odTime . $odIp);
+        // get_shop_uid() 가 없는 옛 코어 — 주문번호 · 시각 · IP 만으로 만들 수 있는 md5 대신 서버 비밀 HMAC.
+        return hash_hmac('sha256', 'order|' . $odId . '|' . $odTime . '|' . $odIp, defined('JWT_SECRET') ? (string) JWT_SECRET : '');
     }
 }
 

@@ -545,11 +545,11 @@ if ($apiMethod === 'PATCH' && $od_id !== '') {
     // PG 결제 취소는 로컬 재고/포인트를 되돌리기 전에 먼저 확정한다.
     $refundNote = '';
     $refundedPgAmount = 0;
-    $hadPgPayment = !empty($order['od_pg']) && (int) ($order['od_receipt_price'] ?? 0) > 0;
+    $hadPgPayment = shop_orders_had_pg_payment($order);
     if ($hadPgPayment) {
         $orderPg = strtolower((string) ($order['od_pg'] ?? ''));
         if ($orderPg === 'toss') {
-            $tossCancel = shop_orders_toss_cancel_payment($order, $reason, $input);
+            $tossCancel = shop_orders_toss_cancel_payment($order, $reason);
             if (empty($tossCancel['ok'])) {
                 Response::error('Toss 결제 취소 API 호출에 실패했습니다: ' . (string) ($tossCancel['error'] ?? 'unknown error'), 502, [
                     'pg_response' => $tossCancel,
@@ -596,7 +596,7 @@ if ($apiMethod === 'PATCH' && $od_id !== '') {
             $refundNote = 'KAKAOPAY INIAPI cancel complete (tid=' . $order['od_tno'] . ')';
             $refundedPgAmount = shop_orders_pg_cancel_amount($order);
         } elseif ($orderPg === 'nicepay') {
-            $niceCancel = shop_orders_nicepay_cancel_payment($order, $reason, $input);
+            $niceCancel = shop_orders_nicepay_cancel_payment($order, $reason);
             if (empty($niceCancel['ok'])) {
                 Response::error('Nicepay 결제 취소 API 호출에 실패했습니다: ' . (string) ($niceCancel['error'] ?? 'unknown error'), 502, [
                     'pg_response' => $niceCancel,

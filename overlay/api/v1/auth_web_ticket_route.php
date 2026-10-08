@@ -34,9 +34,10 @@ if (!function_exists('api_web_ticket_guest_ok')) {
         if ($uid === '' || (string) $order['mb_id'] !== '') {
             return false;
         }
-        $expected = function_exists('get_shop_uid')
-            ? get_shop_uid('order', $order['od_id'], $order['od_time'], $order['od_ip'])
-            : md5($order['od_id'] . $order['od_time'] . $order['od_ip']);
+        if (!function_exists('shop_api_order_uid')) {
+            require_once __DIR__ . '/shop/common_session_helpers.php';
+        }
+        $expected = shop_api_order_uid($order['od_id'], $order['od_time'], $order['od_ip']);
         return hash_equals((string) $expected, $uid);
     }
 }

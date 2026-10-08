@@ -143,6 +143,7 @@ if ($seg0 && $seg1 && $apiMethod === 'GET') {
 // -------------------------------------------------------------------------
 if (!$seg0 && $apiMethod === 'POST') {
     $me    = Auth::requireAuth();
+    api_require_write_quota('scrap', $me, 30, 300);
     $input = get_request_body();
 
     $boTable = isset($input['bo_table']) ? api_sanitize_bo_table($input['bo_table']) : '';

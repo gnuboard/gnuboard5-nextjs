@@ -416,6 +416,9 @@ if (!function_exists('g5_nextjs_add_mod_rewrite_pre_rules')) {
         $lines = array();
         $lines[] = '# Next.js theme bridge (active theme: theme/<cf_theme>/route.php via ' . $front . ')';
         $lines[] = 'RewriteRule (^|/)\.env(\..*)?$ - [F,L]';
+        // 그누보드 · 영카트 런타임 로그 폴더. 원본 data/.htaccess 는 .php · .html 같은 확장자만 막아 .log · .txt 는
+        // 내려받아졌다 — nginx 예시(docs/nginx/*-theme-locations.conf 의 /data/log/)와 같은 차단.
+        $lines[] = 'RewriteRule (^|/)data/log/ - [F,L]';
         $lines[] = '# /mobile, /shop are real directories and the PHP entry files exist, so these';
         $lines[] = '# must run before the file/directory passthrough below.';
         foreach (g5_nextjs_rewrite_pre_patterns() as $pattern) {

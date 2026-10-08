@@ -8,7 +8,7 @@ import { runtimeRouterPush } from "@/lib/runtime-router";
 import type { ApiMeta } from "@/lib/api-response";
 import type { QaConfig, QaItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { g5PathForRuntime } from "@/lib/config";
+import { g5PhpUrlForRuntime } from "@/lib/config";
 import { g5ShortHref } from "@/lib/g5-short-url";
 import { deleteQa, getQaConfig, getQas } from "@/services/qas";
 import { useAuthStore } from "@/store/auth";
@@ -135,7 +135,7 @@ export default function MyQasPage() {
         <div className="flex gap-2">
           {isSuperAdmin ? (
             <Button asChild variant="outline" size="icon" title="1:1문의 설정">
-              <a href={g5PathForRuntime("/adm/qa_config.php")}>
+              <a href={g5PhpUrlForRuntime("/adm/qa_config.php")}>
                 <Settings className="size-4" aria-hidden />
                 <span className="sr-only">1:1문의 설정</span>
               </a>

@@ -271,11 +271,13 @@ body{margin:0;background:#fff;color:#111827;font-family:-apple-system,BlinkMacSy
   try {
     document.getElementById("sm_form").submit();
   } catch (err) {
+    // 부모 창이 document.write 로 만든 같은 출처 문서다. "*" 로 보내면 이 페이지를 감싼 다른 출처도 받는다.
+    var targetOrigin = window.location.origin && window.location.origin !== "null" ? window.location.origin : "/";
     parent.postMessage({
       type: "shop-payment-result",
       status: "error",
       message: err && err.message ? err.message : "KCP payment form submit failed."
-    }, "*");
+    }, targetOrigin);
   }
 })();
 <\/script>

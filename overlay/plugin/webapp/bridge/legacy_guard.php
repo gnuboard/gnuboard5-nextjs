@@ -8,6 +8,7 @@ if (!defined('_GNUBOARD_')) {
  *
  *   shop/cartupdate.php  장바구니 담기 · 바꾸기 · 지우기는 POST 로만. 원본 어디에서도 GET 으로 부르지 않는데,
  *                        GET 을 받아 두면 다른 사이트의 링크 · 이미지 한 장으로 방문자의 장바구니를 바꿀 수 있다.
+ *                        POST 도 출처가 이 사이트일 때만 — 세션 쿠키가 SameSite=None 이라 다른 사이트의 자동 제출 폼에도 붙는다.
  *   shop/wishupdate.php  찜 삭제(w=d)는 원본이 GET 링크로 만든다 — 그래서 방법이 아니라 출처를 본다.
  *                        요청의 Origin(없으면 Referer) 호스트가 이 사이트일 때만 받는다.
  *
@@ -33,7 +34,7 @@ if (!function_exists('g5_webapp_legacy_shop_guard')) {
             if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
                 alert('올바른 방법으로 이용해 주십시오.', $back . '/cart.php');
             }
-            return;
+            // POST 도 아래 출처 검사를 거친다(같은 출처 폼 제출은 브라우저가 늘 Origin 을 싣는다).
         }
 
         $source = trim((string) ($_SERVER['HTTP_ORIGIN'] ?? ''));

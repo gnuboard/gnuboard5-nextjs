@@ -4,6 +4,7 @@ import { apiUrl } from "@/lib/config";
 import { crossSiteRequestMessage } from "@/lib/server/request-guard";
 import { fetchWithTimeout, isFetchTimeoutError } from "@/lib/server/fetch-timeout";
 import { forwardedLegacyCookieHeader } from "@/lib/server/forwarded-cookies";
+import { safeJsonForInlineScript } from "@/lib/runtime-config-script";
 
 export const dynamic = "force-dynamic";
 
@@ -273,8 +274,8 @@ function alertRedirect(
 <head><meta charset="utf-8"><title>Shop order</title></head>
 <body>
 <script>
-alert(${JSON.stringify(message)});
-location.replace(${JSON.stringify(target)});
+alert(${safeJsonForInlineScript(message)});
+location.replace(${safeJsonForInlineScript(target)});
 </script>
 </body>
 </html>`;

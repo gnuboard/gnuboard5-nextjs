@@ -333,6 +333,10 @@ if ($apiMethod === 'POST' && $action === '') {
     if ($recentReports >= 10) {
         Response::error('Too many reports. Please try again later.', 429);
     }
+    // 비회원은 기기 id 를 바꿔 가며(devices/sign 은 IP 당 시간 20개) 한도를 늘릴 수 있으니 발신 IP 로도 총량을 묶는다.
+    if (!$reporterMb) {
+        api_require_write_quota('guestreport', null, 5, 20);
+    }
 
     try {
         DB::execute(

@@ -1,5 +1,6 @@
 // @g5-server-runtime-only
 import { NextRequest, NextResponse } from "next/server";
+import { safeJsonForInlineScript } from "@/lib/runtime-config-script";
 import { firstLegacyParam } from "../_legacy-youngcart-redirect";
 
 export const dynamic = "force-dynamic";
@@ -59,8 +60,8 @@ function alertRedirect(request: NextRequest, message: string, targetPath: string
 <head><meta charset="utf-8"><title>Personal payment</title></head>
 <body>
 <script>
-alert(${JSON.stringify(message)});
-location.replace(${JSON.stringify(target)});
+alert(${safeJsonForInlineScript(message)});
+location.replace(${safeJsonForInlineScript(target)});
 </script>
 </body>
 </html>`;

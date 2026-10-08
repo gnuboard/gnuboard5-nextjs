@@ -97,6 +97,24 @@ if (!function_exists('webapp_session_files_dir')) {
     }
 }
 
+if (!function_exists('webapp_session_dir_is_shared_tmp')) {
+    /** 여러 계정 · 앱이 함께 쓰는 임시 폴더(/tmp · /var/tmp · 시스템 임시 폴더)인가. */
+    function webapp_session_dir_is_shared_tmp(string $dir): bool
+    {
+        $normalize = static function (string $path): string {
+            $real = @realpath($path);
+            return strtolower(rtrim(str_replace('\\', '/', $real !== false ? $real : $path), '/'));
+        };
+        $target = $normalize($dir);
+        foreach (array('/tmp', '/var/tmp', sys_get_temp_dir()) as $shared) {
+            if ($shared !== '' && $target === $normalize($shared)) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
 if (!function_exists('webapp_session_gc_run')) {
     /**
      * 만료된 우리 sess_ 파일을 시간 한도 안에서 지운다 — PHP 세션 청소와 같은 기준(수정 시각이 보관 시간을 넘음).
@@ -113,6 +131,13 @@ if (!function_exists('webapp_session_gc_run')) {
         $started = microtime(true);
         $cutoff = time() - max(60, $max_lifetime);
         $uid = function_exists('posix_geteuid') ? posix_geteuid() : null;
+        // 소유자를 알 수 없으면(posix 확장 없음) 공유 임시 폴더는 건드리지 않는다 — 같은 서버 다른 계정 · 다른 앱의
+        // 세션 파일까지 지우게 된다. 이 설치본 전용 폴더(session.save_path 를 따로 둔 경우)만 청소한다.
+        if ($uid === null && webapp_session_dir_is_shared_tmp($dir)) {
+            closedir($handle);
+            $result['complete'] = true;
+            return $result;
+        }
         $complete = true;
         while (($name = readdir($handle)) !== false) {
             if (strncmp($name, 'sess_', 5) !== 0) {

@@ -705,8 +705,8 @@ if (!$action && $apiMethod === 'DELETE') {
 // POST /v1/posts/{bo_table}/{wr_id}/good|nogood - Recommend or not recommend post
 // -------------------------------------------------------------------------
 if (($action === 'good' || $action === 'nogood') && $apiMethod === 'POST') {
-
     $member = Auth::requireAuth();
+    api_require_write_quota('postgood', $member, 30, 300);
     $flag = $action;
     $countColumn = $flag === 'good' ? 'wr_good' : 'wr_nogood';
 

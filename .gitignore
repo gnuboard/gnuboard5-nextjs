@@ -30,3 +30,7 @@ nextjs/.g5-tsconfig-*.json
 nextjs/.env.e2e
 nextjs/playwright-report/
 nextjs/themes/.active
+
+# Written by `next dev` (Next.js 16 agent rules) - not the repository AGENTS.md at the top.
+nextjs/AGENTS.md
+nextjs/CLAUDE.md

@@ -16,7 +16,8 @@ export function crossSiteRequestMessage(request: NextRequest): string | null {
 
   const requestOrigin = request.nextUrl.origin;
   const origin = request.headers.get("origin");
-  if (origin && originOf(origin) !== requestOrigin) {
+  // 샌드박스 iframe · data: 문서 · 일부 리다이렉트는 Origin 을 문자열 "null" 로 보낸다. 출처를 모르는 요청이므로 막는다.
+  if (origin && (origin.trim().toLowerCase() === "null" || originOf(origin) !== requestOrigin)) {
     return "Request origin is not allowed.";
   }
 
@@ -29,6 +30,7 @@ export function crossSiteRequestMessage(request: NextRequest): string | null {
   return null;
 }
 
+// GET/HEAD/OPTIONS 는 여기서 빠진다. GET 으로도 상태를 바꾸는 레거시 라우트는 runLegacyYoungcartAction 에 guardMutation: true 를 넘겨야 한다.
 export function shouldGuardMutation(request: NextRequest): boolean {
   return !["GET", "HEAD", "OPTIONS"].includes(request.method.toUpperCase());
 }

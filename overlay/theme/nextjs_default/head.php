@@ -16,6 +16,10 @@ if (!defined('_GNUBOARD_')) {
 
 require_once __DIR__ . '/bridge/app-shell.php';
 
+// 기본 보안 헤더는 앱 화면이 아닌 응답(그누보드 원본 화면으로 떨어지는 폴백)에도 붙인다. CSP 는 원본 화면의 인라인
+// 스크립트를 깨므로 여기서는 싣지 않는다 — 앱 화면은 아래에서 CSP 까지 다시 보낸다.
+nextjs_default_send_security_headers(false);
+
 if (!defined('_THEME_PREVIEW_') && nextjs_default_static_app_ready()) {
     nextjs_default_try_next_static_asset_response();
     nextjs_default_try_public_asset_response();

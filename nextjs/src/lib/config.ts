@@ -269,6 +269,14 @@ export function g5AssetUrlForRuntime(path: string): string {
   return g5PathForRuntime(normalized);
 }
 
+/**
+ * 그누보드가 직접 그리는 PHP 화면(관리자 /adm/ 등)으로 가는 링크 — 그림과 같은 규칙이다. 서버 실행 방식(Vercel 등)에서
+ * 경로만 쓰면 프런트 도메인의 /adm/ 로 가 404 · 403 이었다.
+ */
+export function g5PhpUrlForRuntime(path: string): string {
+  return g5AssetUrlForRuntime(path);
+}
+
 const G5_APP_ROUTE_ROOTS = new Set([
   "admin",
   "boards",

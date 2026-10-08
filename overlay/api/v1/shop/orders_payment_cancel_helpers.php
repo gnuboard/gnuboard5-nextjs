@@ -3,29 +3,29 @@ if (!defined('_GNUBOARD_')) {
     exit;
 }
 
-if (!function_exists('shop_orders_toss_config_value')) {
-    function shop_orders_toss_config_value(array $cfg, string $type): string
+if (!function_exists('shop_orders_had_pg_payment')) {
+    /**
+     * 실제로 PG 결제가 받아진 주문인가 — 이때만 주문자 취소가 PG 취소를 부르고 환불액을 기록한다. 무통장(영카트는 od_pg 에
+     * 상점 PG 를 늘 적는다)이나 거래번호 · 입금 시각이 없는 주문에 PG 취소를 부르면 장부와 부분취소 산식이 어긋난다.
+     */
+    function shop_orders_had_pg_payment(array $order): bool
     {
-        if ($type === 'secret_key') {
-            return trim((string) ($cfg['cf_toss_secret_key'] ?? $cfg['de_toss_secret_key'] ?? ''));
-        }
-        if ($type === 'client_key') {
-            return trim((string) ($cfg['cf_toss_client_key'] ?? $cfg['de_toss_client_key'] ?? ''));
-        }
-        return '';
+        $receiptTime = (string) ($order['od_receipt_time'] ?? '');
+        return !empty($order['od_pg'])
+            && trim((string) ($order['od_tno'] ?? '')) !== ''
+            && (string) ($order['od_settle_case'] ?? '') !== '무통장'
+            && (int) ($order['od_receipt_price'] ?? 0) > 0
+            && $receiptTime !== '' && strpos($receiptTime, '0000') !== 0 && strpos($receiptTime, '1000') !== 0;
     }
 }
 
 if (!function_exists('shop_orders_toss_secret_key')) {
     function shop_orders_toss_secret_key(array $cfg): string
     {
-        $configured = shop_orders_toss_config_value($cfg, 'secret_key');
-        if ($configured !== '') {
-            return $configured;
-        }
-        $clientKey = shop_orders_toss_config_value($cfg, 'client_key');
-        $isTestMode = $clientKey === '' || strpos($clientKey, 'test_') === 0;
-        return $isTestMode ? 'test_sk_DnyRpQWGrN9DRWAjpYzg7KwvxJX1' : '';
+        // 결제 승인과 같은 규칙(payment_toss_helpers.php pg_toss_secret_key) — 관리자 '결제 테스트' 를 따르고, 실결제인데
+        // live_ 키가 없으면 '' 로 취소를 멈춘다(키가 비었을 때 공개 테스트 키로 조용히 바꿔 부르지 않는다).
+        require_once __DIR__ . '/payment_helpers.php';
+        return pg_toss_secret_key($cfg, pg_detect_test_mode($cfg, 'toss'));
     }
 }
 
@@ -89,7 +89,7 @@ if (!function_exists('shop_orders_toss_api_request')) {
 }
 
 if (!function_exists('shop_orders_toss_cancel_payment')) {
-    function shop_orders_toss_cancel_payment(array $order, string $reason, array $input): array
+    function shop_orders_toss_cancel_payment(array $order, string $reason): array
     {
         $paymentKey = trim((string) ($order['od_tno'] ?? ''));
         if ($paymentKey === '') {
@@ -105,16 +105,9 @@ if (!function_exists('shop_orders_toss_cancel_payment')) {
         $payload = [
             'cancelReason' => $cancelReason,
         ];
-        $refundBank = trim((string) ($input['refund_bank'] ?? ''));
-        $refundAccount = trim((string) ($input['refund_account'] ?? ''));
-        $refundHolder = trim((string) ($input['refund_holder'] ?? ''));
-        if ($refundBank !== '' && $refundAccount !== '' && $refundHolder !== '') {
-            $payload['refundReceiveAccount'] = [
-                'bank' => $refundBank,
-                'accountNumber' => $refundAccount,
-                'holderName' => $refundHolder,
-            ];
-        }
+        // 환불 계좌(refundReceiveAccount)는 싣지 않는다 — 요청 본문 값을 그대로 실으면 주문자가 제3자 계좌로 환불을
+        // 돌릴 수 있다. 주문자 취소는 '주문' 상태(가상계좌는 입금 전)만 받으므로 환불 계좌가 필요한 경우가 없다
+        // (입금된 가상계좌 환불은 관리자 화면에서 한다 — 영카트 orderinquirycancel.php 도 받지 않는다).
 
         $cfg = shop_orders_payment_config();
         $idempotencyKey = 'cancel-' . hash('sha256', (string) ($order['od_id'] ?? '') . '|' . $paymentKey . '|' . (string) ($order['od_receipt_price'] ?? 0) . '|' . $reason);
@@ -567,7 +560,7 @@ if (!function_exists('shop_orders_nicepay_key')) {
 }
 
 if (!function_exists('shop_orders_nicepay_cancel_payment')) {
-    function shop_orders_nicepay_cancel_payment(array $order, string $reason, array $input): array
+    function shop_orders_nicepay_cancel_payment(array $order, string $reason): array
     {
         $tid = trim((string) ($order['od_tno'] ?? ''));
         if ($tid === '') {
@@ -597,14 +590,7 @@ if (!function_exists('shop_orders_nicepay_cancel_payment')) {
             'SignData' => bin2hex(hash('sha256', $mid . $cancelAmt . $ediDate . $merchantKey, true)),
             'CharSet' => 'utf-8',
         ];
-        $refundAccount = trim((string) ($input['refund_account'] ?? ''));
-        $refundBank = trim((string) ($input['refund_bank'] ?? ''));
-        $refundHolder = trim((string) ($input['refund_holder'] ?? ''));
-        if ($refundAccount !== '' && $refundBank !== '' && $refundHolder !== '') {
-            $params['RefundAcctNo'] = shop_orders_to_euckr($refundAccount);
-            $params['RefundBankCd'] = $refundBank;
-            $params['RefundAcctNm'] = shop_orders_to_euckr($refundHolder);
-        }
+        // 환불 계좌(RefundAcctNo · RefundBankCd · RefundAcctNm)는 싣지 않는다 — Toss 취소와 같은 이유.
 
         $post = shop_orders_post_form('https://pg-api.nicepay.co.kr/webapi/cancel_process.jsp', $params);
         if (empty($post['ok'])) {

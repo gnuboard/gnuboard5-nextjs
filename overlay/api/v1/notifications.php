@@ -68,7 +68,8 @@ function api_notif_resolve_actor(): array
         return [
             'kind'      => 'device',
             'device_id' => $deviceId,
-            'scope_sql'    => 'device_id = ?',
+            // 회원에게 넘어간 행(mb_id 가 있는 것)은 기기 서명만으로 닿지 않게 한다 — 기기 모드는 비회원 행만.
+            'scope_sql'    => 'mb_id IS NULL AND device_id = ?',
             'scope_params' => [$deviceId],
         ];
     }
@@ -267,6 +268,8 @@ if (!$seg0 && $apiMethod === 'GET') {
 // POST /v1/notifications — 새 이력 기록
 // -------------------------------------------------------------------------
 if (!$seg0 && $apiMethod === 'POST') {
+    // 기기 모드는 발신 IP 로 센다.
+    api_require_write_quota('notifcreate', $actor['kind'] === 'member' ? ['mb_id' => $actor['mb_id']] : null, 60, 600);
 
     $input = get_request_body();
 
@@ -322,10 +325,14 @@ if (!$seg0 && $apiMethod === 'POST') {
         }
     }
 
+    // 보낸 시각은 앱이 오프라인 동안 받은 알림을 나중에 올릴 때를 위해 받되, 미래(5분 넘게)나 30일보다 오래된 값은
+    // 버리고 서버 시각을 쓴다 — 임의 시각으로 알림함 정렬을 흐트러뜨리지 못하게.
     $sentAt = date('Y-m-d H:i:s');
     if (isset($input['nt_sent_at']) && is_string($input['nt_sent_at'])) {
         $ts = strtotime($input['nt_sent_at']);
-        if ($ts !== false) $sentAt = date('Y-m-d H:i:s', $ts);
+        if ($ts !== false && $ts <= time() + 300 && $ts >= time() - 30 * 86400) {
+            $sentAt = date('Y-m-d H:i:s', $ts);
+        }
     }
 
     $mb_id     = $actor['kind'] === 'member' ? $actor['mb_id']     : null;

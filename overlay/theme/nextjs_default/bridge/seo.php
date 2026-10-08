@@ -818,24 +818,18 @@ function nextjs_default_seo_post_entries($limit)
     return $entries;
 }
 
-/** 사이트맵 캐시 파일. data/cache 에 쓸 수 없는 호스팅이면 서버 임시 폴더를 쓴다(키에 사이트 주소가 들어가 섞이지 않는다). */
+/**
+ * 사이트맵 캐시 파일 — data/cache 에만 둔다. 쓸 수 없으면 캐시 없이 매번 만든다. 서버 임시 폴더(/tmp)는 같은 서버의
+ * 다른 계정이 같은 이름의 파일을 먼저 만들거나 링크로 바꿔 사이트맵 내용을 갈아 끼울 수 있어 쓰지 않는다.
+ */
 function nextjs_default_seo_sitemap_cache_path($asset)
 {
-    $dirs = array();
-    if (defined('G5_DATA_PATH')) {
-        $dirs[] = G5_DATA_PATH . '/cache';
-    }
-    if (function_exists('sys_get_temp_dir')) {
-        $dirs[] = sys_get_temp_dir();
+    $dir = defined('G5_DATA_PATH') ? G5_DATA_PATH . '/cache' : '';
+    if ($dir === '' || !is_dir($dir) || !is_writable($dir)) {
+        return '';
     }
 
-    foreach ($dirs as $dir) {
-        if ($dir !== '' && is_dir($dir) && is_writable($dir)) {
-            return rtrim($dir, '/\\') . '/nextjs_default-seo-' . md5($asset . '|' . nextjs_default_g5_url() . '|' . json_encode(nextjs_default_seo_settings())) . '.xml';
-        }
-    }
-
-    return '';
+    return rtrim($dir, '/\\') . '/nextjs_default-seo-' . md5($asset . '|' . nextjs_default_g5_url() . '|' . json_encode(nextjs_default_seo_settings())) . '.xml';
 }
 
 function nextjs_default_seo_sitemap_xml($asset)

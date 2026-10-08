@@ -4,7 +4,7 @@ import { G5Link as Link } from "@/components/ui/g5-link";
 import Image from "next/image";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { g5PathForRuntime } from "@/lib/config";
+import { g5PhpUrlForRuntime } from "@/lib/config";
 import { shouldBypassImageOptimization } from "@/lib/image";
 import { useAuthStore } from "@/store/auth";
 import { useMemberKey, type MemberKeyState } from "@/hooks/useMemberKey";
@@ -150,10 +150,10 @@ function SideviewMenu({
       {/* 그누보드 get_sideview 처럼 최고관리자에게만 관리자 화면의 회원 수정 · 포인트 내역을 새 탭으로 연다. */}
       {isSuperAdmin ? (
         <>
-          <SideviewItem href={g5PathForRuntime(`/adm/member_form.php?w=u&mb_id=${encodeURIComponent(mbId)}`)} external>
+          <SideviewItem href={g5PhpUrlForRuntime(`/adm/member_form.php?w=u&mb_id=${encodeURIComponent(mbId)}`)} external>
             회원정보변경
           </SideviewItem>
-          <SideviewItem href={g5PathForRuntime(`/adm/point_list.php?sfl=mb_id&stx=${encodeURIComponent(mbId)}`)} external>
+          <SideviewItem href={g5PhpUrlForRuntime(`/adm/point_list.php?sfl=mb_id&stx=${encodeURIComponent(mbId)}`)} external>
             포인트내역
           </SideviewItem>
         </>

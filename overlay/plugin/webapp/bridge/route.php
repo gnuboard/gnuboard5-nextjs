@@ -32,5 +32,9 @@ if ($g5_nextjs_route !== '' && is_file($g5_nextjs_route)) {
 }
 
 http_response_code(404);
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
 header('Content-Type: text/plain; charset=utf-8');
 echo 'Active Next.js theme route was not found.';

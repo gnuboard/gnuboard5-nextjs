@@ -3,6 +3,7 @@ import { apiUrl } from "@/lib/config";
 import { crossSiteRequestMessage, shouldGuardMutation } from "@/lib/server/request-guard";
 import { fetchWithTimeout, isFetchTimeoutError } from "@/lib/server/fetch-timeout";
 import { forwardedLegacyCookieHeader } from "@/lib/server/forwarded-cookies";
+import { safeJsonForInlineScript } from "@/lib/runtime-config-script";
 
 const TOKEN_COOKIE = "g5_token";
 
@@ -180,24 +181,25 @@ function legacyScriptResponse(
 }
 
 function legacyActionScript(message: string, target: string, mode: LegacyResponseMode) {
-  const alertLine = `alert(${JSON.stringify(message)});`;
+  // API 메시지는 <script> 안에 그대로 들어간다. JSON.stringify 만으로는 "</script>" 가 태그를 닫으므로 < > & U+2028/2029 를 이스케이프한다.
+  const alertLine = `alert(${safeJsonForInlineScript(message)});`;
   if (mode === "alert-close") {
     return `${alertLine}
 try { window.close(); } catch { /* Ignore browsers that block scripted popup close. */ }
-if (!window.closed) location.replace(${JSON.stringify(target)});`;
+if (!window.closed) location.replace(${safeJsonForInlineScript(target)});`;
   }
 
   if (mode === "alert-opener") {
     return `${alertLine}
 if (window.opener && !window.opener.closed) {
-  try { window.opener.location.replace(${JSON.stringify(target)}); } catch { /* Ignore blocked opener navigation. */ }
+  try { window.opener.location.replace(${safeJsonForInlineScript(target)}); } catch { /* Ignore blocked opener navigation. */ }
   try { window.close(); } catch { /* Ignore browsers that block scripted popup close. */ }
 }
-if (!window.closed) location.replace(${JSON.stringify(target)});`;
+if (!window.closed) location.replace(${safeJsonForInlineScript(target)});`;
   }
 
   return `${alertLine}
-location.replace(${JSON.stringify(target)});`;
+location.replace(${safeJsonForInlineScript(target)});`;
 }
 
 function resolveLegacyValue(value: LegacyActionValue, params: URLSearchParams) {

@@ -96,6 +96,7 @@ if ($apiMethod !== 'PUT' && $apiMethod !== 'POST') {
 }
 
 $member = Auth::requireAuth();
+api_require_write_quota('postfiles', $member, 30, 300);
 
 // 그누보드 표준 권한: 본인 OR cf_admin / gr_admin / bo_admin 중 하나
 if (!Auth::canManagePost($member, $bo_table, $post)) {

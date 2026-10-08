@@ -301,7 +301,6 @@ if ($action === 'register-result' && $apiMethod === 'GET') {
 // POST /v1/auth/register
 // -------------------------------------------------------------------------
 if ($action === 'register' && $apiMethod === 'POST') {
-
     $input = get_request_body();
     $socialSignupTicket = isset($input['social_signup_ticket'])
         ? trim((string) $input['social_signup_ticket'])
@@ -314,6 +313,7 @@ if ($action === 'register' && $apiMethod === 'POST') {
     $socialSignupProfile = null;
 
     if ($isSocialSignup) {
+        api_require_write_quota('socialsignup', null, 2, 10); // 캡차가 없는 소셜 가입 — 발신 IP 당 계정 생성 횟수
         list($socialSignupRow, $socialSignupProfile) = api_social_validate_signup_ticket(
             $socialSignupTicket,
             $socialCodeVerifier

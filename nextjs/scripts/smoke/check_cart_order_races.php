@@ -92,13 +92,15 @@ function race_check(string $label, bool $ok, string $extra = ''): void
 }
 
 /**
- * $table 에 쓰기 잠금을 걸고 요청을 보낸 뒤, 요청이 그 표에서 기다리는 동안 $whileWaiting 을 하고 잠금을 푼다.
+ * $table 에 잠금을 걸고 요청을 보낸 뒤, 요청이 그 표에서 기다리는 동안 $whileWaiting 을 하고 잠금을 푼다.
+ * $mode 가 READ 면 요청은 그 표를 읽을 수 있고 쓸 때(INSERT · UPDATE)에만 기다린다 — 요청 앞부분에서 그 표를 읽는
+ * 검사(주문 표: 카트 id 가 주문번호인지 보는 shop_api_client_cart_id_is_order)를 지나 쓰는 자리까지 오게 할 때.
  * @return array{0:bool,1:int,2:array} 기다렸나, 응답 상태, 응답 본문
  */
-function race_while_locked(string $table, string $url, string $token, string $cartId, array $body, callable $whileWaiting): array
+function race_while_locked(string $table, string $url, string $token, string $cartId, array $body, callable $whileWaiting, string $mode = 'WRITE'): array
 {
     $lock = new mysqli(G5_MYSQL_HOST, G5_MYSQL_USER, G5_MYSQL_PASSWORD, G5_MYSQL_DB);
-    $lock->query("LOCK TABLES {$table} WRITE");
+    $lock->query("LOCK TABLES {$table} " . ($mode === 'READ' ? 'READ' : 'WRITE'));
     $mh = curl_multi_init();
     $ch = curl_init($url);
     curl_setopt_array($ch, [
@@ -163,11 +165,11 @@ try {
         $ctIds[] = (int) ($added['data']['ct_id'] ?? 0);
     }
     if (in_array(0, $ctIds, true)) race_fail('could not add both items.');
-    // 주문 표를 잠그면 API 는 주문 행을 넣기 전에 기다린다 — 그동안 둘째 상품 재고를 0 으로
+    // 주문 표에 읽기 잠금을 걸면 API 는 주문 행을 넣을 때 기다린다 — 그동안 둘째 상품 재고를 0 으로
     [$waited, $status, $res] = race_while_locked("{$p}shop_order", "{$api}/shop/orders", $token, $cart, $orderer + $bank,
         static function () use ($db, $p, $itemB): void {
             $db->query("UPDATE {$p}shop_item SET it_stock_qty = 0 WHERE it_id='" . $db->real_escape_string($itemB) . "'");
-        });
+        }, 'READ');
     $orders = (int) race_one($db, "SELECT COUNT(*) n FROM {$p}shop_order WHERE mb_id='{$memberSql}' AND od_time >= '{$startedAt}'")['n'];
     $back = (int) race_one($db, "SELECT COUNT(*) n FROM {$p}shop_cart WHERE ct_id IN (" . implode(',', $ctIds) . ")
         AND od_id='{$cart}' AND ct_status='쇼핑' AND ct_stock_use=0")['n'];

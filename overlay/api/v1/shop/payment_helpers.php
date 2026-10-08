@@ -133,6 +133,35 @@ function pg_vbank_text(string $value, int $limit): string {
     return trim(function_exists('mb_substr') ? mb_substr($value, 0, $limit, 'UTF-8') : substr($value, 0, $limit));
 }
 
+/**
+ * 통보의 계좌번호가 발급 때 저장한 계좌 안내(od_bank_account)에 들어 있는가. 통보에 계좌번호가 없거나(은행 코드만
+ * 오는 PG) 저장된 안내가 비었으면 대조할 거리가 없어 통과시킨다 — 거래번호 · 금액 대조는 그와 별개로 한다.
+ */
+function pg_vbank_account_matches(string $storedAccount, string $notifiedAccount): bool {
+    $storedDigits = (string) preg_replace('/\D+/', '', $storedAccount);
+    // 가려진(*) 번호는 대조할 수 없다.
+    if ($storedDigits === '' || strpos($notifiedAccount, '*') !== false) {
+        return true;
+    }
+    // 띄어쓰기로 나뉜 덩어리마다 숫자만 본다 — 앞에 붙는 은행 코드(KCP 의 "04" 같은 짧은 숫자)는 계좌번호가 아니다.
+    $accounts = [];
+    foreach (preg_split('/\s+/', trim($notifiedAccount)) ?: [] as $chunk) {
+        $digits = (string) preg_replace('/\D+/', '', $chunk);
+        if (strlen($digits) >= 6) {
+            $accounts[] = $digits;
+        }
+    }
+    if ($accounts === []) {
+        return true;
+    }
+    foreach ($accounts as $digits) {
+        if (strpos($storedDigits, $digits) !== false) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /** pg_mark_vbank_deposited() 가 주문 잠금을 잡은 뒤에만 부른다. */
 function pg_mark_vbank_deposited_locked(string $provider, string $orderId, string $tno, int $amount, string $paidAt, string $depositName = '', string $bankAccount = '', array $cashReceipt = []): array {
     if (trim($paidAt) === '') {
@@ -157,8 +186,14 @@ function pg_mark_vbank_deposited_locked(string $provider, string $orderId, strin
     if ($orderPg !== '' && $orderPg !== strtolower(trim($provider))) {
         return ['ok' => false, 'error' => 'Provider mismatch.'];
     }
-    if ($tno !== '' && !empty($order['od_tno']) && (string) $order['od_tno'] !== $tno) {
+    // 거래번호는 계좌 발급(결제 확인) 때 저장한 값과 같아야 한다 — 통보에 거래번호가 없거나 주문에 저장된 것이
+    // 없으면 대조할 수 없으니 받지 않는다(빈 값으로 대조를 건너뛰는 길을 막는다).
+    $orderTno = trim((string) ($order['od_tno'] ?? ''));
+    if ($tno === '' || $orderTno === '' || !hash_equals($orderTno, $tno)) {
         return ['ok' => false, 'error' => 'Transaction id mismatch.'];
+    }
+    if (!pg_vbank_account_matches((string) ($order['od_bank_account'] ?? ''), $bankAccount)) {
+        return ['ok' => false, 'error' => 'Virtual account mismatch.'];
     }
     $expectedAmount = (int) ($order['od_misu'] ?? 0) > 0
         ? (int) ($order['od_misu'] ?? 0)
@@ -263,13 +298,11 @@ function pg_notify_allowed_ips(string $provider): array {
  * 보낸 통보로 주문이 입금 처리될 수 있었다. 이제 두 모드 모두 목록으로 거른다.
  *
  * 목록이 없는 PG 도 거른다(fail closed). 통보를 흉내 내 보는 로컬 시험에서만
- * SHOP_PG_NOTIFY_SKIP_IP_CHECK 로 명시해서 끈다 — 운영에서는 켜지 말 것.
- *
- * 막혔는데 이유를 모르면 손쓸 수 없으니 거른 주소를 남긴다. PG 가 통보 서버를 늘려 목록이
- * 낡으면 이 기록이 단서가 된다(그때는 pg_notify_allowed_ips 를 고쳐야 한다).
+ * SHOP_PG_NOTIFY_SKIP_IP_CHECK 로 명시해서 끈다 — 그것도 이 설치본 주소(G5_URL)가 로컬 · 사설망일 때만
+ * 듣는다. 운영 도메인에서 잘못 켜 두어도 IP 검사는 그대로 돈다.
  */
 function pg_notify_ip_allowed(string $provider): bool {
-    if ((getenv('SHOP_PG_NOTIFY_SKIP_IP_CHECK') ?: '') !== '') {
+    if ((getenv('SHOP_PG_NOTIFY_SKIP_IP_CHECK') ?: '') !== '' && pg_notify_skip_ip_check_permitted()) {
         return true;
     }
 
@@ -281,6 +314,15 @@ function pg_notify_ip_allowed(string $provider): bool {
     }
 
     return true;
+}
+
+/** IP 검사 끄기를 들어줄 설치본인가 — CLI(시험) 이거나 G5_URL 이 로컬 · 사설망 주소일 때만. */
+function pg_notify_skip_ip_check_permitted(): bool {
+    if (PHP_SAPI === 'cli') {
+        return true;
+    }
+    $url = defined('G5_URL') ? (string) G5_URL : '';
+    return $url !== '' && pg_is_local_origin($url);
 }
 
 function pg_text_response(string $text, int $status = 200, string $contentType = 'text/plain; charset=utf-8'): void {
@@ -321,6 +363,7 @@ function pg_kcp_site_key($cfg, string $siteCd): string {
 }
 
 require_once __DIR__ . '/payment_inicis_helpers.php';
+require_once __DIR__ . '/payment_inicis_inquiry_helpers.php'; // 가상계좌 입금통보를 INIAPI 거래조회로 다시 확인
 
 require_once __DIR__ . '/payment_nicepay_helpers.php';
 

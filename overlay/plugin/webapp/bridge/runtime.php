@@ -273,7 +273,21 @@ if (!defined('G5_TRUSTED_PROXY_REMOTE_ADDRS') && $g5_nextjs_trusted_proxy_addrs 
 
 $g5_nextjs_current_origin = g5_nextjs_runtime_current_origin($g5_nextjs_http_host);
 
-$g5_nextjs_local_hosts = array('localhost' => true);
+// 개발용 호스트(localhost · 127.0.0.x)는 요청이 이 컴퓨터 · 사설망에서 왔을 때만 믿는다 — 운영 서버에 바깥에서
+// "Host: localhost" 를 보내 개발용 CORS · 소셜 허용 목록이 켜지지 않게. 같은 서버의 프록시를 거치면 그대로 열리고,
+// 운영자가 G5_NEXTJS_LOCAL_HOSTS 로 직접 적은 호스트는 그와 별개로 늘 받는다.
+$g5_nextjs_remote_addr = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+$g5_nextjs_local_client = PHP_SAPI === 'cli'
+    || $g5_nextjs_remote_addr === ''
+    || filter_var($g5_nextjs_remote_addr, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
+$g5_nextjs_local_hosts = $g5_nextjs_local_client ? array(
+    '127.0.0.1' => true,
+    'localhost' => true,
+    'localhost' => true,
+    'localhost' => true,
+    'localhost' => true,
+    'localhost' => true,
+) : array();
 g5_nextjs_runtime_add_host_value(
     $g5_nextjs_local_hosts,
     g5_nextjs_runtime_env_value($g5_nextjs_env, 'G5_NEXTJS_LOCAL_HOSTS')
@@ -438,6 +452,8 @@ unset(
     $g5_nextjs_host,
     $g5_nextjs_http_host,
     $g5_nextjs_local_hosts,
+    $g5_nextjs_remote_addr,
+    $g5_nextjs_local_client,
     $g5_nextjs_is_local,
     $g5_nextjs_is_web_request,
     $g5_nextjs_current_origin,

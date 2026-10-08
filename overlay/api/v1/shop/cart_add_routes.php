@@ -4,6 +4,7 @@ if (!defined('_GNUBOARD_')) {
 }
 
 if ($apiMethod === 'POST' && $ct_id === '') {
+    api_require_write_quota('cartadd', $member, 60, 600);
 
     $input = json_decode(file_get_contents('php://input'), true);
     if (!$input) {

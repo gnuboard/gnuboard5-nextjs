@@ -378,7 +378,9 @@ function g5_api_defer_parent_basic_security_headers()
         }
     }
 
-    return strpos($server, 'nginx') !== false;
+    // nginx 는 저절로 맡기지 않는다 — 예시 설정(docs/nginx)을 옮기지 않은 서버에서 헤더가 빠진다. 예시 설정은
+    // fastcgi_hide_header 로 PHP 쪽 값을 지우고 다시 붙이므로 PHP 가 보내도 겹치지 않는다.
+    return false;
 }
 
 function g5_api_defer_parent_referrer_policy()
@@ -555,15 +557,10 @@ if (!function_exists('g5_api_send_deployment_status')) {
         }
 
         $dbOk = false;
-        $boardCount = null;
-        $boardNewCount = null;
 
         try {
             $row = DB::fetch('SELECT 1 AS ok');
             $dbOk = isset($row['ok']) && (int) $row['ok'] === 1;
-
-            $boardCount = DB::count('SELECT COUNT(*) FROM ' . DB::table('board_table'));
-            $boardNewCount = DB::count('SELECT COUNT(*) FROM ' . DB::table('board_new_table'));
         } catch (Throwable $e) {
             $dbOk = false;
             error_log('[api/status] Database check failed: ' . $e->getMessage());
@@ -573,7 +570,6 @@ if (!function_exists('g5_api_send_deployment_status')) {
             'name' => 'gnuboard5-nextjs25-api',
             'version' => '0.1.0',
             'time' => date('c'),
-            'g5_url' => defined('G5_URL') ? G5_URL : '',
             'features' => array(
                 'recent_write_table_fallback' => true,
                 'social_signup_bridge' => true,
@@ -587,8 +583,6 @@ if (!function_exists('g5_api_send_deployment_status')) {
             ),
             'database' => array(
                 'ok' => $dbOk,
-                'board_count' => $boardCount,
-                'board_new_count' => $boardNewCount,
                 // false 면 이름 잠금을 하나만 드는 옛 DB(MySQL 5.7.5 · MariaDB 10.0.2 미만) — 주문 · 포인트 경합 방어가 약해진다.
                 'multiple_named_locks' => $dbOk ? DB::supportsMultipleNamedLocks() : null,
             ),

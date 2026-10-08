@@ -12,6 +12,7 @@ if ($apiMethod === 'POST' && $action === 'prepare') {
 
     $member = Auth::getUser();
     $mb_id  = !empty($member['mb_id']) ? $member['mb_id'] : '';
+    api_require_write_quota('payprepare', $member, 20, 120);
     // 현재 활성 카트 식별자 — 무통장 흐름 (orders.php POST) 과 동일한 규약.
     // 로그인 회원의 경우 mb_id 기준으로 od_id=0 이던 행들을 cart_id 로 묶어준다.
     $cart_id = shop_api_cart_id($member);

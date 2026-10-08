@@ -318,6 +318,7 @@ if ($poId > 0 && !$seg1 && $apiMethod === 'GET') {
 // -------------------------------------------------------------------------
 if ($poId > 0 && $seg1 === 'vote' && !$seg2 && $apiMethod === 'POST') {
     $viewer = api_poll_viewer();
+    api_require_write_quota('pollvote', $viewer, 10, 60);
     $poll = api_poll_find($poId);
 
     if (!$poll) {
@@ -390,6 +391,7 @@ if ($poId > 0 && $seg1 === 'vote' && !$seg2 && $apiMethod === 'POST') {
 // -------------------------------------------------------------------------
 if ($poId > 0 && $seg1 === 'comments' && !$seg2 && $apiMethod === 'POST') {
     $viewer = api_poll_viewer();
+    api_require_write_quota('pollcomment', $viewer, 10, 60);
     $poll = api_poll_find($poId);
 
     if (!$poll) {

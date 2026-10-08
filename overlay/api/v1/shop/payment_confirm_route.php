@@ -4,6 +4,16 @@ if (!defined('_GNUBOARD_')) {
 }
 require_once __DIR__ . '/coupon_markers.php';
 require_once __DIR__ . '/payment_confirm_providers.php';
+
+if (!function_exists('shop_payment_awaiting_deposit')) {
+    /** 가상계좌가 발급만 되고 아직 입금 전인가 — 확인 응답이 '결제 완료' 로 읽히지 않게 따로 알린다. */
+    function shop_payment_awaiting_deposit(array $order): bool
+    {
+        return (string) ($order['od_settle_case'] ?? '') === '가상계좌'
+            && (string) ($order['od_status'] ?? '') === '주문'
+            && (int) ($order['od_misu'] ?? 0) > 0;
+    }
+}
 // =========================================================================
 // POST /v1/shop/payment/confirm
 // PG-side verification + order finalization
@@ -66,6 +76,7 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
                 'order_id' => (string) $order_id,
                 'tno'      => $storedTno,
                 'status'   => (string) $order['od_status'],
+                'awaiting_deposit' => shop_payment_awaiting_deposit($order),
                 'already_confirmed' => true,
             ]);
         }
@@ -153,6 +164,7 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
                     'tno'      => $lockedTno !== '' ? $lockedTno : (string) $verifyResult['tno'],
                     'status'   => $lockedStatus,
                     'uid'      => $alreadyConfirmedUid,
+                    'awaiting_deposit' => shop_payment_awaiting_deposit($lockedOrder),
                     'already_confirmed' => true,
                 ]);
             }
@@ -557,5 +569,6 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
         'tno'      => $verifyResult['tno'],
         'status'   => $finalStatus,
         'uid'      => $guestUid,
+        'awaiting_deposit' => $settleCase === '가상계좌' && $finalMisu > 0,
     ]);
 }

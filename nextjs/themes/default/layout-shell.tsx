@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, FolderOpen, LogIn, LogOut, Menu, Search, User, UserPlus, X } from "lucide-react";
 import { G5Link as Link } from "@/components/ui/g5-link";
-import { g5PathForRuntime } from "@/lib/config";
+import { g5PathForRuntime, g5PhpUrlForRuntime } from "@/lib/config";
 import { toG5ShortPath } from "@/lib/g5-short-url";
 import { G5_COMMUNITY_LOGO, SoluneBrandLogo } from "./brand-logo";
 import { SoluneCompanyInfo, useSoluneCompany } from "./site-company";
@@ -351,7 +351,7 @@ export function ServiceSwitch({
             <>
               <SoluneNotifyLink />
               {/* 사이드바가 없는 화면(쇼핑몰 · 마이페이지)에서도 관리자 화면으로 갈 수 있게 머리줄에도 둔다. */}
-              {user?.is_super_admin && <a href={g5PathForRuntime("/adm/")}>관리자</a>}
+              {user?.is_super_admin && <a href={g5PhpUrlForRuntime("/adm/")}>관리자</a>}
               {isShop ? null : (
                 <>
                   <Link href="/mypage">마이페이지</Link>

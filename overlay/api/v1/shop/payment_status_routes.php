@@ -332,6 +332,12 @@ if ($apiMethod === 'POST' && in_array($action, ['notify', 'toss-notify', 'toss-w
         $amount = (int) preg_replace('/[^0-9]/', '', (string) ($input['amt_input'] ?? $input['TotPrice'] ?? '0'));
         $paidAt = pg_parse_pg_datetime((string) ($input['dt_trans'] ?? ''), (string) ($input['tm_trans'] ?? ''));
         $bankAccount = trim((string) ($input['nm_inputbank'] ?? '') . ' ' . (string) ($input['no_vacct'] ?? ''));
+        // 이니시스에 다시 물어 입금 전 · 취소 · 금액 불일치로 나오면 받지 않는다(조회를 못 하면 아래 기존 검사로만).
+        $inquiry = pg_inicis_vbank_deposit_check($cfg, $orderId, $tid, $amount);
+        if ($inquiry['verdict'] === 'rejected') {
+            pg_append_order_history($orderId, 'inicis 가상계좌 입금통보 보류: 이니시스 거래조회 결과가 다르다(' . $inquiry['reason'] . ')');
+            pg_text_response('DB Error', 409);
+        }
         $result = pg_mark_vbank_deposited(
             'inicis',
             $orderId,
@@ -341,6 +347,9 @@ if ($apiMethod === 'POST' && in_array($action, ['notify', 'toss-notify', 'toss-w
             (string) ($input['nm_input'] ?? ''),
             $bankAccount
         );
+        if (!empty($result['ok']) && empty($result['already']) && $inquiry['verdict'] !== 'confirmed') {
+            pg_append_order_history($orderId, 'inicis 가상계좌 입금: 이니시스 거래조회로 확인하지 못해 통보 검사로만 처리(' . $inquiry['reason'] . ')');
+        }
         pg_text_response(!empty($result['ok']) ? 'OK' : 'DB Error', !empty($result['ok']) ? 200 : 409);
     }
 
@@ -349,6 +358,11 @@ if ($apiMethod === 'POST' && in_array($action, ['notify', 'toss-notify', 'toss-w
             pg_text_response('<html><body><form><input type="hidden" name="result" value="9999"></form></body></html>', 403, 'text/html; charset=euc-kr');
         }
         $txCd = (string) ($input['tx_cd'] ?? '');
+        // 입금(TX00) 말고도 KCP 가 보내는 통보(TX01~TX07 — 환불 · 구매확인 · 배송 등)는 받았다고만 답한다(코어
+        // kcp_notification.lib.php 와 같은 목록). 빈 값이나 모르는 코드는 거절한다.
+        if (preg_match('/\ATX0[0-7]\z/', $txCd) !== 1) {
+            pg_text_response('<html><body><form><input type="hidden" name="result" value="9999"></form></body></html>', 400, 'text/html; charset=euc-kr');
+        }
         if ($txCd !== 'TX00') {
             pg_text_response('<html><body><form><input type="hidden" name="result" value="0000"></form></body></html>', 200, 'text/html; charset=euc-kr');
         }

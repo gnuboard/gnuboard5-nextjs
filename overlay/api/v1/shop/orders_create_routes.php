@@ -4,6 +4,7 @@ if (!defined('_GNUBOARD_')) {
 }
 
 if ($apiMethod === 'POST' && $od_id === '') {
+    api_require_write_quota('ordercreate', $member, 10, 60);
 
     $input = json_decode(file_get_contents('php://input'), true);
     if (!$input) {

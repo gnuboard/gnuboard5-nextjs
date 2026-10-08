@@ -182,3 +182,17 @@ function api_public_request_origin(bool $allowForwardedHost = false): string
     $origin = api_public_origin_from_url($scheme . '://' . $host);
     return api_public_origin_allowed($origin) ? $origin : '';
 }
+
+/**
+ * 쓰기 진입점의 횟수 한도 — 회원이면 회원 id 로, 아니면 발신 IP 로 센다(Throttle::checkMemberQuota). 넘으면 429 로 끝낸다.
+ * 사람이 다시 시도하는 속도 · 오프라인 큐가 한꺼번에 올리는 양보다 넉넉하게 잡아, 끝없는 생성(메일 · 푸시 폭주, 행 적재)만 막는다.
+ */
+function api_require_write_quota(string $bucket, $member, int $perMinute, int $perHour): void
+{
+    $mbId = is_array($member) ? trim((string) ($member['mb_id'] ?? '')) : '';
+    $subject = $mbId !== '' ? 'mb:' . $mbId : 'ip:' . (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+    $message = Throttle::checkMemberQuota($bucket, $subject, $perMinute, $perHour);
+    if ($message !== null) {
+        Response::error($message, 429, ['code' => 'RATE_LIMITED']);
+    }
+}

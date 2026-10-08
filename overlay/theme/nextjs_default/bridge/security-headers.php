@@ -483,15 +483,18 @@ function nextjs_default_require_legacy_rss_route_allowed($bo_table)
     }
 }
 
+/**
+ * 기본 보안 헤더 3개(nosniff · X-Frame-Options · Referrer-Policy)를 웹서버에 맡길지 — 상수로 명시했을 때만 맡긴다.
+ * 예전에는 nginx 면 저절로 맡겼는데, 예시 설정(docs/nginx)을 옮기지 않은 nginx 에서는 세 헤더가 통째로 빠졌다.
+ * 예시 설정은 fastcgi_hide_header 로 PHP 쪽 값을 지우고 다시 붙이므로 PHP 가 늘 보내도 겹치지 않는다.
+ */
 function nextjs_default_defer_parent_basic_security_headers()
 {
     if (defined('G5_NEXTJS_DEFAULT_DEFER_PARENT_BASIC_SECURITY_HEADERS')) {
         return (bool) G5_NEXTJS_DEFAULT_DEFER_PARENT_BASIC_SECURITY_HEADERS;
     }
 
-    $server = isset($_SERVER['SERVER_SOFTWARE']) ? strtolower((string) $_SERVER['SERVER_SOFTWARE']) : '';
-
-    return strpos($server, 'nginx') !== false;
+    return false;
 }
 
 function nextjs_default_send_security_headers($include_csp = true)

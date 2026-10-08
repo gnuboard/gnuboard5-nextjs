@@ -58,13 +58,20 @@ if ($seg0 === 'sign' && $apiMethod === 'POST') {
         // 남의 기기 ID 만 알면 그 기기의 알림을 읽고 지우거나 자기 계정으로 가져갈 수 있다.
         // 앱은 처음 한 번 받아 기기 저장소에 보관한다. 저장이 실패해 곧바로 다시 묻는 경우만 — 등록 10분 안이고
         // 처음 등록한 IP 와 같을 때만 — 다시 내준다. 시간만 보면 그 10분 동안 ID 를 아는 남도 받아 갈 수 있다.
+        // 같은 NAT(사내망 · 가족 Wi-Fi) 뒤의 남이 받아 가지 않게 브라우저/앱 식별(User-Agent)도 같아야 하고, 그 기기로
+        // 이미 알림이 쌓였으면(서명을 받아 쓰고 있다는 뜻) 다시 내주지 않는다 — 읽고 지울 거리가 생긴 뒤에는 닫는다.
         $existingDevice = DB::fetch(
-            "SELECT first_signed_at, first_ip FROM {$deviceTable} WHERE device_id = ? LIMIT 1",
+            "SELECT first_signed_at, first_ip, user_agent FROM {$deviceTable} WHERE device_id = ? LIMIT 1",
             [$device_id]
         );
         if ($existingDevice && (
             strtotime((string) $existingDevice['first_signed_at']) < time() - 600
             || !hash_equals((string) $existingDevice['first_ip'], (string) $ip)
+            || !hash_equals((string) $existingDevice['user_agent'], $ua)
+            || DB::count(
+                "SELECT COUNT(*) FROM " . DB::table('notification_log_table') . " WHERE device_id = ? LIMIT 1",
+                [$device_id]
+            ) > 0
         )) {
             Response::error('This device is already registered.', 409, ['code' => 'device_already_registered']);
         }

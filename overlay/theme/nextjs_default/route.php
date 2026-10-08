@@ -17,6 +17,21 @@ g5_nextjs_redirect_legacy_admin_request();
 $active_theme_path = defined('G5_THEME_PATH') ? realpath(G5_THEME_PATH) : false;
 $nextjs_default_theme_path = realpath(__DIR__);
 
+/** 짧은 안내문 응답(404 등)으로 끝낸다 — 앱 화면을 거치지 않는 응답에도 기본 보안 헤더를 붙인다(본문이 글자뿐이라 CSP 는 전부 막는다). */
+function nextjs_default_plain_text_exit($status, $message)
+{
+    http_response_code($status);
+    if (!headers_sent()) {
+        header('X-Content-Type-Options: nosniff');
+        header('X-Frame-Options: DENY');
+        header('Referrer-Policy: strict-origin-when-cross-origin');
+        header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
+        header('Content-Type: text/plain; charset=utf-8');
+    }
+    echo $message;
+    exit;
+}
+
 function nextjs_default_legacy_redirect($script, $params = array())
 {
     $query = array_merge($_GET, $params);
@@ -46,10 +61,7 @@ function nextjs_default_public_asset_response($asset)
 
     $path = nextjs_default_static_app_path($asset);
     if (!is_file($path)) {
-        http_response_code(404);
-        header('Content-Type: text/plain; charset=utf-8');
-        echo 'Static asset not found.';
-        exit;
+        nextjs_default_plain_text_exit(404, 'Static asset not found.');
     }
 
     $mime_types = array(
@@ -82,10 +94,7 @@ function nextjs_default_public_asset_response($asset)
     ) {
         $body = file_get_contents($path);
         if ($body === false) {
-            http_response_code(404);
-            header('Content-Type: text/plain; charset=utf-8');
-            echo 'Static asset not found.';
-            exit;
+            nextjs_default_plain_text_exit(404, 'Static asset not found.');
         }
 
         $body = g5_nextjs_relocate_portable_build($body, nextjs_default_g5_url());
@@ -345,10 +354,7 @@ function nextjs_default_render_legacy_rss_route($path)
         exit;
     }
 
-    http_response_code(404);
-    header('Content-Type: text/plain; charset=utf-8');
-    echo 'RSS route not found.';
-    exit;
+    nextjs_default_plain_text_exit(404, 'RSS route not found.');
 }
 
 function nextjs_default_redirect_to_short_route_if_needed()
@@ -495,10 +501,7 @@ function nextjs_default_dispatch_inactive_legacy_route()
 if (!$active_theme_path || !$nextjs_default_theme_path || $active_theme_path !== $nextjs_default_theme_path) {
     nextjs_default_dispatch_inactive_legacy_route();
 
-    http_response_code(404);
-    header('Content-Type: text/plain; charset=utf-8');
-    echo 'G5 Next.js 25 theme is not active.';
-    exit;
+    nextjs_default_plain_text_exit(404, 'G5 Next.js 25 theme is not active.');
 }
 
 require_once __DIR__ . '/bridge/app-shell.php';
@@ -555,10 +558,7 @@ function nextjs_default_legacy_admin_login_script($request_path)
 function nextjs_default_prepare_legacy_script($script, $public_script_name)
 {
     if (!is_file($script)) {
-        http_response_code(404);
-        header('Content-Type: text/plain; charset=utf-8');
-        echo 'Legacy route not found.';
-        exit;
+        nextjs_default_plain_text_exit(404, 'Legacy route not found.');
     }
 
     $previous_cwd = getcwd();
@@ -605,10 +605,7 @@ function nextjs_default_dispatch_passthrough_legacy_route($request_path)
         }
     }
 
-    http_response_code(404);
-    header('Content-Type: text/plain; charset=utf-8');
-    echo 'Legacy passthrough route not found.';
-    exit;
+    nextjs_default_plain_text_exit(404, 'Legacy passthrough route not found.');
 }
 
 $asset = isset($_GET['g5_nextjs_default_asset']) ? $_GET['g5_nextjs_default_asset'] : '';

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { LogOut, Settings, UserRound } from "lucide-react";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { G5Link as Link } from "@/components/ui/g5-link";
-import { g5BaseUrlForRuntime, g5PathForRuntime } from "@/lib/config";
+import { g5BaseUrlForRuntime, g5PhpUrlForRuntime } from "@/lib/config";
 import { shouldBypassImageOptimization } from "@/lib/image";
 import { formatNumber } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth";
@@ -89,7 +89,7 @@ export function SoluneLoginCard() {
           {/* 레퍼런스 outlogin 스킨처럼 최고관리자에게만 관리자 화면(그누보드 /adm/) 단추를 낸다.
               /adm/ 는 PHP 화면이라 앱 라우터가 아닌 일반 링크로 연다. */}
           {user.is_super_admin && (
-            <a className="solune-member-admin" href={g5PathForRuntime("/adm/")}>
+            <a className="solune-member-admin" href={g5PhpUrlForRuntime("/adm/")}>
               <Settings size={14} aria-hidden />
               관리자
             </a>

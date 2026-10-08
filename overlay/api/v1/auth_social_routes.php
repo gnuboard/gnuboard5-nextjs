@@ -282,14 +282,9 @@ if ($action === 'social' && isset($apiSegments[1]) && $apiSegments[1] === 'excha
         [$ticket]
     );
 
-    if (!$row) {
-        Response::error('Ticket not found.', 404);
-    }
-    if (!empty($row['used_at'])) {
-        Response::error('Ticket already used.', 410);
-    }
-    if (strtotime($row['expires_at']) < time()) {
-        Response::error('Ticket expired.', 410);
+    // 없음 · 사용됨 · 만료를 같은 응답으로 — 어느 쪽인지로 티켓을 더듬지 못하게(교환 단계의 410 과 같은 문구).
+    if (!$row || !empty($row['used_at']) || strtotime($row['expires_at']) < time()) {
+        Response::error('Ticket already used or expired.', 410);
     }
     // PKCE: 앱이 start.php 에 challenge 를 보냈던 ticket 은 짝이 되는 verifier 가 있어야
     // 쓸 수 있다. 콜백 URL 을 가로챈 다른 앱은 ticket 은 있어도 verifier 가 없다.

@@ -15,6 +15,7 @@ $tokenTable = DB::table('push_token_table');
 
 if ($apiMethod === 'POST') {
     $me = Auth::requireAuth();
+    api_require_write_quota('pushtoken', $me, 20, 120);
     $input = get_request_body();
 
     $errors = Validator::validate(['push_token' => 'required'], $input);

@@ -82,7 +82,10 @@ export function safeRelativeRedirect(value: string): string {
     !decoded.startsWith("/") ||
     decoded.startsWith("//") ||
     decoded.includes("\\") ||
-    /[\r\n]/.test(decoded)
+    // 브라우저는 주소 속 탭 · 줄바꿈을 지운다("/\t/evil.com" → "//evil.com"). 제어문자와
+    // 한 번 더 인코딩된 제어문자(%09 · %0a · %0d · %00 …)도 받지 않는다. PHP nextjs_default_safe_relative_redirect() 와 같은 규칙.
+    /[\x00-\x1f\x7f]/.test(decoded) ||
+    /%(?:[01][0-9a-f]|7f)/i.test(decoded)
   ) {
     return "";
   }

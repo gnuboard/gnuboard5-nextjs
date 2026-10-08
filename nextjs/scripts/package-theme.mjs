@@ -259,3 +259,7 @@ console.log(`[package-theme] wrote ${toArchivePath(zipPath)}`);
 console.log(`[package-theme] manifest ${toArchivePath(manifestPath)}`);
 console.log(`[package-theme] sha256 ${zipHash}`);
 console.log(`[package-theme] files ${files.length}`);
+// 명령은 nextjs/ 에서 돌리지만 결과물은 저장소 맨 위의 dist/themes/ · theme/<이름>/ 에 생긴다 — nextjs/ 안을 찾다가
+// "아무것도 안 생겼다"고 헷갈리지 않게 전체 경로로 한 번 더 알려 준다.
+console.log(`[package-theme] zip:          ${zipPath}`);
+console.log(`[package-theme] theme folder: ${themeDir}`);
