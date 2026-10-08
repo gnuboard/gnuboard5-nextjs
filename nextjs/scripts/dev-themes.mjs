@@ -78,7 +78,8 @@ for (const theme of themes) {
       cwd: nextRoot,
       env: {
         ...process.env,
-        G5_NEXT_DIST_DIR: `.next-dev-${theme.name}`,
+        // dev-theme.mjs 와 같은 이름 — 포트마다 빌드 폴더가 달라야 Next 의 개발 서버 lock 이 겹치지 않는다.
+        G5_NEXT_DIST_DIR: `.next-dev-${theme.name}-${theme.port}`,
         NEXT_PUBLIC_APP_URL: `http://${host}:${theme.port}`,
       },
       shell: false,

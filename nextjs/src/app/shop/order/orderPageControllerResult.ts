@@ -80,6 +80,8 @@ export function buildOrderPageControllerResult({
       selectedSendCoupon: discounts.selectedSendCoupon,
       orderCouponBase: discounts.orderCouponBase,
       orderAmountAfterCoupons: discounts.orderAmountAfterCoupons,
+      couponDiscount: discounts.couponDiscount,
+      sendCouponDiscount: discounts.sendCouponDiscount,
       shippingCost: discounts.shippingCost,
       pointBalance: orderData.pointBalance,
       settlePointUnit: discounts.settlePointUnit,

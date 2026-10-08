@@ -121,6 +121,8 @@ interface ProductDetailViewProps {
   onReviewPageChange: (page: number) => void;
   qaPage: number;
   qaLastPage: number;
+  /** 상품문의 목록이 알려 준 전체 건수 — 받기 전에는 null(상품 정보의 qa_count 를 쓴다). */
+  qaTotal: number | null;
   onQaPageChange: (page: number) => void;
   qas: ShopQA[];
   onQaChanged: () => void;
@@ -197,6 +199,7 @@ export function ProductDetailView({
   onReviewPageChange,
   qaPage,
   qaLastPage,
+  qaTotal,
   onQaPageChange,
   qas,
   onQaChanged,
@@ -261,7 +264,7 @@ export function ProductDetailView({
   const tabs: ProductDetailTab[] = [
     { id: "description", label: "상품설명" },
     { id: "reviews", label: "상품후기", count: product.review_count ?? 0 },
-    { id: "qa", label: "상품문의", count: product.qa_count ?? 0 },
+    { id: "qa", label: "상품문의", count: qaTotal ?? product.qa_count ?? 0 },
     { id: "shipping", label: "배송정보" },
   ];
 

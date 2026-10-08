@@ -48,9 +48,15 @@ body[data-g5-theme-source="default"]:has(.solune-shop-page) .product-quick-add-d
   .product-quick-add-body { padding: 20px 20px 4px; }
   .product-quick-add-body > * { margin-block: 0; }
   .product-quick-add-body > * + * { margin-top: 14px; }
-  .product-options label,
-  .product-supply-options label { margin-bottom: 6px; color: var(--solune-text-soft); font-size: 12.5px; font-weight: 600; }
   .product-quick-add-body select { height: 44px; border-radius: 8px; border-color: var(--solune-border-strong); background-color: var(--solune-surface); color: var(--solune-text); font-size: 14px; }
+  /* 옵션 고르기 칸은 상품 상세와 같은 말씨(theme.shop.detail.css): 높이 56 · 모서리 10, 칸 안 이름표, 묶음 제목. */
+  .product-options-heading, .product-selected-title { color: var(--solune-muted); font-size: 11px; font-weight: 500; letter-spacing: 0.14em; }
+  .product-option-label { color: var(--solune-muted-soft); font-size: 10px; font-weight: 400; }
+  .product-quick-add-body .product-option-field select { height: 56px; border-color: var(--solune-border); border-radius: 10px; }
+  .product-quick-add-body .product-option-field select:hover:not(:disabled) { border-color: var(--solune-border-strong); }
+  .product-quick-add-body .product-option-field select:focus { border-color: var(--solune-text); }
+  .product-quick-add-body .product-option-field select:disabled { background-color: var(--solune-surface-soft); color: var(--solune-muted); opacity: 1; }
+  .product-option-chevron { color: var(--solune-muted); }
 
   /* 선택된 옵션 줄마다 수량 단추 셋을 붙여 하나의 조절기로. */
   .product-quantity-controls { gap: 0; }
@@ -75,4 +81,75 @@ body[data-g5-theme-source="default"]:has(.solune-shop-page) .product-quick-add-d
   .product-quick-add-detail:hover { background: var(--solune-primary-soft); color: var(--solune-primary); }
   .product-quick-add-submit { background: var(--solune-primary); color: var(--solune-primary-ink); }
   .product-quick-add-submit:hover:not(:disabled) { background: var(--solune-primary-hover); }
+}
+
+/* --- 후기 · 문의 작성 창 (ProductWriteDialog) ----------------------------------------------
+   옵션 고르기 창과 같은 틀(.product-quick-add-dialog)에 넓이와 입력칸 말씨만 더한다: 칸 이름 12.5 · 600,
+   입력칸 높이 44 · 모서리 8, 별점 · 안내는 옅은 회색 상자, 비밀글은 고르면 초록 테두리 상자. */
+body[data-g5-theme-source="default"]:has(.solune-shop-page) .product-quick-add-dialog.product-write-dialog {
+  @media (min-width: 640px) { max-width: 560px; }
+
+  .product-write-body label.block,
+  .product-write-photos > p { margin-bottom: 6px; color: var(--solune-text-soft); font-size: 12.5px; font-weight: 600; }
+  .product-write-body input:is([type="text"], [type="email"], [type="tel"], :not([type])) {
+    height: 44px;
+    border-color: var(--solune-border-strong);
+    border-radius: 8px;
+    background: var(--solune-surface);
+    color: var(--solune-text);
+    font-size: 14px;
+    box-shadow: none;
+  }
+  .product-write-body :is(input, textarea)::placeholder { color: var(--solune-muted-soft); }
+  .product-write-body :is(input, textarea):focus-visible { border-color: var(--solune-text); box-shadow: none; }
+  .product-write-editor { border-color: var(--solune-border-strong); border-radius: 8px; background: var(--solune-surface); font-size: 14px; }
+
+  .product-write-score { border-radius: 12px; background: var(--solune-surface-soft); }
+  .product-write-score-label { color: var(--solune-text); }
+  .product-write-star:focus-visible { outline: 2px solid var(--solune-primary); }
+  /* 고르지 않은 별: 회색 상자 위에서도 보이게 흰 속 · 진한 테두리선. */
+  .product-write-star svg:not(.fill-amber-400) { color: var(--solune-border-strong); fill: var(--solune-surface); }
+  .product-write-photo-add { border-color: var(--solune-border-strong); border-radius: 10px; color: var(--solune-muted); }
+  .product-write-photo-add:hover { border-color: var(--solune-primary); background: var(--solune-primary-soft); color: var(--solune-primary); }
+  .product-write-secret { border-color: var(--solune-border); border-radius: 10px; color: var(--solune-text); }
+  .product-write-secret:has(input:checked) { border-color: var(--solune-primary); background: var(--solune-primary-soft); }
+  .product-write-secret input { accent-color: var(--solune-primary); }
+  .product-write-notice { border-radius: 10px; background: var(--solune-surface-soft); color: var(--solune-muted); }
+}
+
+/* --- 주문서 쿠폰 선택 창 (OrderCouponDialog) ----------------------------------------------
+   같은 틀에 쿠폰 한 장 = 모서리 10 테두리 상자. 할인금액을 크게, 적용 단추는 초록 테두리 알약, 적용된 쿠폰은 초록 상자. */
+body[data-g5-theme-source="default"]:has(.solune-shop-page) .product-quick-add-dialog.shop-order-coupon-dialog {
+  .product-quick-add-head { display: block; }
+  .shop-order-coupon-list > li + li { margin-top: 8px; }
+  .shop-order-coupon-item { border-color: var(--solune-border); border-radius: 10px; background: var(--solune-surface); color: var(--solune-text); }
+  .shop-order-coupon-item:not(:disabled):hover { border-color: var(--solune-primary); background: var(--solune-primary-soft); }
+  .shop-order-coupon-item:focus-visible { outline: 2px solid var(--solune-primary); outline-offset: 2px; }
+  .shop-order-coupon-item:disabled:not([data-applied]) { background: var(--solune-surface-soft); color: var(--solune-muted); }
+  .shop-order-coupon-item[data-applied] { border-color: var(--solune-primary); background: var(--solune-primary-soft); }
+  .shop-order-coupon-amount { color: var(--solune-primary); font-size: 17px; font-weight: 800; letter-spacing: -0.02em; }
+  .shop-order-coupon-action { border-color: var(--solune-primary); color: var(--solune-primary); }
+  .shop-order-coupon-item[data-applied] .shop-order-coupon-action { background: var(--solune-primary); color: var(--solune-primary-ink); }
+}
+
+/* --- 포토 후기 창 (ReviewPhotoDialog) ----------------------------------------------------
+   레퍼런스 solune #solune-review-lightbox: 모서리 16 패널, 왼쪽 어두운 사진 칸, 오른쪽 흰 글 칸(머리 · 본문 · 옅은
+   회색 바닥). 별은 금색, "사진 N장" 은 옅은 회색 알약, 이전 · 다음 후기는 모서리 10 흰 단추. */
+body[data-g5-theme-source="default"]:has(.solune-shop-page) .review-photo-dialog {
+  border: 0;
+  border-radius: 16px;
+  background: var(--solune-surface);
+  color: var(--solune-text);
+  box-shadow: 0 0 0 1px var(--solune-border), 0 24px 60px -16px rgb(20 20 15 / 0.45);
+
+  .review-photo-head, .review-photo-foot { border-color: var(--solune-border); }
+  .review-photo-head p:first-child { color: var(--solune-text); }
+  .review-photo-meta .text-amber-500 { color: var(--ondam-star); }
+  .review-photo-title { color: var(--solune-text); letter-spacing: -0.02em; }
+  .review-photo-text { color: var(--solune-text-soft); font-size: 14.5px; line-height: 1.8; }
+  .review-photo-chip { background: var(--solune-surface-soft); color: var(--solune-text-soft); }
+  .review-photo-foot { background: var(--solune-surface-soft); }
+  .review-photo-nav { border-color: var(--solune-border); border-radius: 10px; background: var(--solune-surface); color: var(--solune-text); }
+  .review-photo-nav:hover:not(:disabled) { border-color: var(--solune-text); }
+  .review-photo-close:focus-visible, .review-photo-nav:focus-visible { outline: 2px solid var(--solune-primary); outline-offset: 2px; }
 }

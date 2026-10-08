@@ -1,7 +1,6 @@
 "use client";
 
 import { createElement, useId, type KeyboardEvent, type ReactNode } from "react";
-import { Star } from "lucide-react";
 import { SafeHtml, safeHtmlForPolicy } from "@/components/SafeHtml";
 import { htmlToPlainText } from "@/lib/sanitize";
 import { G5Link as Link } from "@/components/ui/g5-link";
@@ -13,9 +12,11 @@ import type {
   ShopReview,
   ShopReviewSummary,
 } from "@/lib/api";
-import { cn, formatDate, formatPrice } from "@/lib/utils";
+import { cn, formatPrice } from "@/lib/utils";
 import { useThemeSlot } from "@/components/providers/ThemeSlotsProvider";
-import { ReviewForm, QaForm, QaListItem } from "./ProductReviewQaForms";
+import { ReviewForm, QaForm } from "./ProductReviewQaForms";
+import { QaListItem } from "./ProductQaItem";
+import { ReviewList, ReviewSummaryBox } from "./ProductReviewList";
 
 export type ProductDetailTab = {
   id: string;
@@ -167,6 +168,7 @@ export function ProductDetailTabs({
             legacyProductForm={legacyProductForm}
             onQaSubmitted={onQaSubmitted}
             qas={qas}
+            qaTotal={tabs.find((tab) => tab.id === "qa")?.count ?? qas.length}
             onQaChanged={onQaChanged}
             loginHref={loginHref}
             qaPage={qaPage}
@@ -285,6 +287,10 @@ function DescriptionTab({
   );
 }
 
+/**
+ * 사용후기 탭 — 레퍼런스 solune itemuse.skin.php: 평점 요약 상자(오른쪽 끝에 [사용후기 쓰기]), 포토 후기 줄,
+ * "최신순 · N개", 후기마다 접힌 한 줄(누르면 본문 — ProductReviewList).
+ */
 function ReviewsTab({
   product,
   canWriteReview,
@@ -316,112 +322,43 @@ function ReviewsTab({
   reviewScores: ReviewScore[];
   loginHref: string;
 }) {
+  const writeClass =
+    "product-review-write h-11 rounded-md border-0 bg-primary px-6 text-[13.5px] font-semibold text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground max-sm:w-full";
+  const photoCount = reviewSummary?.photo_count ?? 0;
   return (
-    <div className="space-y-4">
-      {canWriteReview ? (
-        <ReviewForm
-          itId={product.it_id}
-          policy={shippingPolicy}
-          initialOpen={legacyProductForm === "review"}
-          onSubmitted={onReviewSubmitted}
-        />
-      ) : (
-        <div className="rounded-lg border p-4 text-sm text-muted-foreground">
-          후기 작성은 로그인 후 가능합니다.{" "}
-          <Link href={loginHref} className="text-primary hover:underline">
-            로그인
-          </Link>
-        </div>
-      )}
-      <div className="grid gap-4 rounded-lg border p-4 md:grid-cols-[180px_1fr]">
-        <div className="flex flex-col justify-center">
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold">{reviewAverage.toFixed(1)}</span>
-            <span className="text-sm text-muted-foreground">/ 5</span>
-          </div>
-          <div className="mt-2 flex">
-            {Array.from({ length: 5 }).map((_, index) => (
-              <Star
-                key={index}
-                className={cn(
-                  "h-4 w-4",
-                  index < Math.round(reviewAverage)
-                    ? "fill-amber-400 text-amber-400"
-                    : "text-muted-foreground/30"
-                )}
-              />
-            ))}
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            리뷰 {reviewTotal.toLocaleString()}개
-            {reviewSummary && ` · 사진 ${reviewSummary.photo_count.toLocaleString()}개`}
-          </p>
-        </div>
-        <div className="space-y-2">
-          {reviewScores.map((item) => (
-            <div
-              key={item.score}
-              className="grid grid-cols-[36px_1fr_44px] items-center gap-2 text-xs"
-            >
-              <span className="text-muted-foreground">{item.score}점</span>
-              <div className="h-2 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-amber-400"
-                  style={{ width: `${Math.min(100, Math.max(0, item.percentage))}%` }}
-                />
-              </div>
-              <span className="text-right text-muted-foreground">
-                {item.count.toLocaleString()}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-      {reviews.length === 0 ? (
-        <p className="py-8 text-center text-muted-foreground">아직 리뷰가 없습니다.</p>
-      ) : (
-        reviews.map((review) => (
-          /* 후기 하나를 주소로 가리킬 수 있게 이름표를 단다(?is_id= — 레퍼런스 itemuse.skin.php 의 #is_N).
-             찾아오면 ProductDetailClient 가 data-focused 로 잠깐 표시하고 초점을 준다(탭 차례에는 넣지 않는다). */
-          <div
-            key={review.is_id}
-            id={`is_${review.is_id}`}
-            data-review-id={review.is_id}
-            tabIndex={-1}
-            className="rounded-lg border p-4 outline-none transition-[background-color,box-shadow] duration-1000 data-[focused=true]:bg-primary/5 data-[focused=true]:ring-2 data-[focused=true]:ring-primary"
-          >
-            <div className="mb-2 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="flex">
-                  {Array.from({ length: 5 }).map((_, index) => (
-                    <Star
-                      key={index}
-                      className={cn(
-                        "h-3.5 w-3.5",
-                        index < review.is_score
-                          ? "fill-amber-400 text-amber-400"
-                          : "text-muted-foreground/30"
-                      )}
-                    />
-                  ))}
-                </div>
-                <span className="text-sm font-medium">{review.mb_nick}</span>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {formatDate(review.is_time)}
-              </span>
-            </div>
-            <h4 className="font-medium">{review.is_subject}</h4>
-            <SafeHtml
-              className="prose prose-sm mt-1 max-w-none text-sm text-muted-foreground"
-              html={review.is_content}
-              policy="user"
+    <section className="product-reviews">
+      <ReviewSummaryBox
+        average={reviewAverage}
+        total={reviewTotal}
+        photoCount={photoCount}
+        scores={reviewScores}
+        action={
+          canWriteReview ? (
+            <ReviewForm
+              itId={product.it_id}
+              itName={product.it_name}
+              itImage={product.image_url}
+              policy={shippingPolicy}
+              initialOpen={legacyProductForm === "review"}
+              onSubmitted={onReviewSubmitted}
+              triggerLabel="사용후기 쓰기"
+              triggerClassName={writeClass}
             />
-          </div>
-        ))
-      )}
-      <ReviewPager page={reviewPage} lastPage={reviewLastPage} onPageChange={onReviewPageChange} />
-    </div>
+          ) : (
+            <Link href={loginHref} className={cn("inline-flex items-center justify-center", writeClass)} title="로그인 후 쓸 수 있습니다">
+              사용후기 쓰기
+            </Link>
+          )
+        }
+      />
+      <ReviewList
+        reviews={reviews}
+        total={reviewTotal}
+        photoCount={photoCount}
+        product={{ name: product.it_name, price: product.it_price, image: product.image_url }}
+        pager={<ReviewPager page={reviewPage} lastPage={reviewLastPage} onPageChange={onReviewPageChange} />}
+      />
+    </section>
   );
 }
 
@@ -480,12 +417,17 @@ function ReviewPager({
   );
 }
 
+/**
+ * 상품문의 탭 — 레퍼런스 solune itemqa.skin.php: 머리에 건수와 [문의하기], 안내 한 줄, 그 아래 문의마다 접힌 한 줄
+ * (누르면 Q · A 가 펼쳐진다 — ProductQaItem). 처음에는 모두 접혀 있어 어떤 문의가 있는지 한눈에 훑는다.
+ */
 function QaTab({
   product,
   canWriteQa,
   legacyProductForm,
   onQaSubmitted,
   qas,
+  qaTotal,
   onQaChanged,
   loginHref,
   qaPage,
@@ -497,84 +439,66 @@ function QaTab({
   legacyProductForm: string;
   onQaSubmitted: () => void;
   qas: ShopQA[];
+  qaTotal: number;
   onQaChanged: () => void;
   loginHref: string;
   qaPage: number;
   qaLastPage: number;
   onQaPageChange: (page: number) => void;
 }) {
+  const writeClass = "product-qa-write h-9 rounded-none border-foreground bg-foreground px-4 text-[13px] font-bold text-background hover:bg-primary hover:text-primary-foreground";
   return (
-    <div className="space-y-4">
-      {canWriteQa ? (
-        <QaForm
-          itId={product.it_id}
-          initialOpen={legacyProductForm === "qa"}
-          onSubmitted={onQaSubmitted}
-        />
-      ) : (
-        <div className="rounded-lg border p-4 text-sm text-muted-foreground">
-          문의 작성은 로그인 후 가능합니다.{" "}
-          <Link href={loginHref} className="text-primary hover:underline">
-            로그인
-          </Link>
+    <section className="product-qa">
+      <div className="product-qa-head flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-foreground pb-4">
+        <h3 className="product-qa-title text-[15px] font-bold">
+          상품문의 <span className="font-semibold tabular-nums text-muted-foreground">{qaTotal.toLocaleString()}</span>
+        </h3>
+        <div className="ml-auto">
+          {canWriteQa ? (
+            <QaForm
+              itId={product.it_id}
+              itName={product.it_name}
+              itImage={product.image_url}
+              initialOpen={legacyProductForm === "qa"}
+              onSubmitted={onQaSubmitted}
+              triggerLabel="문의하기"
+              triggerClassName={writeClass}
+            />
+          ) : (
+            <Link href={loginHref} className={cn("inline-flex items-center border", writeClass)} title="로그인 후 문의할 수 있습니다">
+              문의하기
+            </Link>
+          )}
         </div>
-      )}
+      </div>
+      <p className="product-qa-notice mt-3.5 text-xs leading-relaxed text-muted-foreground">
+        비밀글은 작성자와 관리자만 볼 수 있습니다. 주문·배송 문의는{" "}
+        <Link href="/mypage/qas" className="text-foreground underline underline-offset-2">
+          1:1문의
+        </Link>
+        를 이용해 주세요.
+      </p>
       {qas.length === 0 ? (
-        <p className="py-8 text-center text-muted-foreground">아직 문의가 없습니다.</p>
+        <p className="py-12 text-center text-sm text-muted-foreground">상품문의가 없습니다.</p>
       ) : (
-        qas.map((qa) => (
-          /* 문의 하나를 주소로 가리킬 수 있게 이름표를 단다(?iq_id= — 레퍼런스 #iq_N). 찾아오면
-             ProductDetailClient 가 data-focused 로 잠깐 표시하고 초점을 준다 — 후기 카드와 같다. */
-          <div
-            key={qa.iq_id}
-            id={`iq_${qa.iq_id}`}
-            data-qa-id={qa.iq_id}
-            tabIndex={-1}
-            className="rounded-lg outline-none transition-[background-color,box-shadow] duration-1000 data-[focused=true]:bg-primary/5 data-[focused=true]:ring-2 data-[focused=true]:ring-primary"
-          >
-            <QaCard qa={qa} onQaChanged={onQaChanged} />
-          </div>
-        ))
+        <ol className="product-qa-list mt-3">
+          {qas.map((qa) => (
+            /* 문의 하나를 주소로 가리킬 수 있게 이름표를 단다(?iq_id= — 레퍼런스 #iq_N). 찾아오면
+               ProductDetailClient 가 data-focused 로 잠깐 표시하고 초점을 준다 — 후기 카드와 같다. 그 문의는 펴진 채 그려진다. */
+            <li
+              key={qa.iq_id}
+              id={`iq_${qa.iq_id}`}
+              data-qa-id={qa.iq_id}
+              tabIndex={-1}
+              className="outline-none transition-[background-color,box-shadow] duration-1000 data-[focused=true]:bg-primary/5 data-[focused=true]:ring-2 data-[focused=true]:ring-primary"
+            >
+              <QaListItem qa={qa} onChanged={onQaChanged} />
+            </li>
+          ))}
+        </ol>
       )}
       <ReviewPager page={qaPage} lastPage={qaLastPage} onPageChange={onQaPageChange} label="상품문의 쪽 번호" />
-    </div>
-  );
-}
-
-function QaCard({ qa, onQaChanged }: { qa: ShopQA; onQaChanged: () => void }) {
-  if (qa.can_edit || qa.can_delete) {
-    return <QaListItem qa={qa} onChanged={onQaChanged} />;
-  }
-  const isLocked = qa.can_view === false;
-  return (
-    <div className="rounded-lg border p-4">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-sm font-medium">{qa.mb_nick}</span>
-        <span className="text-xs text-muted-foreground">{formatDate(qa.iq_time)}</span>
-      </div>
-      <h4 className="font-medium">{isLocked ? "비밀글입니다." : qa.iq_subject}</h4>
-      {isLocked ? (
-        <p className="mt-1 text-sm text-muted-foreground">
-          작성자와 관리자만 내용을 볼 수 있습니다.
-        </p>
-      ) : (
-        <SafeHtml
-          className="prose prose-sm mt-1 max-w-none text-sm text-muted-foreground"
-          html={qa.iq_question}
-          policy="user"
-        />
-      )}
-      {!isLocked && qa.iq_answer && (
-        <div className="mt-3 rounded-md bg-muted p-3">
-          <p className="text-sm font-medium">답변</p>
-          <SafeHtml
-            className="prose prose-sm mt-1 max-w-none text-sm text-muted-foreground"
-            html={qa.iq_answer}
-            policy="user"
-          />
-        </div>
-      )}
-    </div>
+    </section>
   );
 }
 

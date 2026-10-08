@@ -254,6 +254,17 @@ export function productDetailFormFromSearch(search: string) {
   return "";
 }
 
+/** 후기 본문의 사진 주소(올린 차례). 웹 에디터 · 사진 첨부 모두 본문에 <img> 로 들어 있다. */
+export function reviewImageUrls(html: string): string[] {
+  const urls: string[] = [];
+  const pattern = /<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']/gi;
+  for (let match = pattern.exec(html); match; match = pattern.exec(html)) {
+    const url = match[1].replace(/&amp;/g, "&").trim();
+    if (url && !url.startsWith("data:") && !urls.includes(url)) urls.push(url);
+  }
+  return urls;
+}
+
 export function isLegacyShortProductPath(pathname: string) {
   return /^\/shop\/[^/]+\/?$/.test(pathname);
 }

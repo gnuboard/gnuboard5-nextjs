@@ -1,4 +1,8 @@
 @import "tailwindcss";
+/* 개발 서버 빌드 폴더(.next-dev-* — 터보팩 캐시)는 훑지 않는다. Tailwind 는 .gitignore 에 든 것만 건너뛰는데,
+   원본 .gitattributes 가 nextjs/.gitignore 를 내보내지 않아 공개 저장소에서는 이 폴더를 훑었다 — 두 번째 npm run dev
+   부터 캐시 속 깨진 글자를 클래스로 읽어 "Parsing CSS source code failed" 로 첫 화면이 500 이었다. */
+@source not "../../.next-dev-*";
 @plugin "@tailwindcss/typography";
 @plugin "daisyui";
 

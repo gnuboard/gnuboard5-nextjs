@@ -146,7 +146,9 @@ const childEnv = {
   G5_THEME_SOURCE: themeSource,
   G5_THEME_NAME: themeName,
   G5_NEXT_RUNTIME: process.env.G5_NEXT_RUNTIME || 'server',
-  G5_NEXT_DIST_DIR: process.env.G5_NEXT_DIST_DIR || `.next-dev-${themeName}`,
+  // 빌드 폴더에 포트를 붙인다 — Next 16 은 빌드 폴더 안의 lock 으로 개발 서버를 하나만 띄우게 막아, 같은 테마를
+  // 다른 포트로 하나 더 띄우면(npm run dev 와 dev:nextjs_default) "Another next dev server is already running" 으로 멈췄다.
+  G5_NEXT_DIST_DIR: process.env.G5_NEXT_DIST_DIR || `.next-dev-${themeName}-${port}`,
   G5_API_INTERNAL_URL:
     process.env.G5_API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost/api/v1',
   NEXT_PUBLIC_G5_URL: process.env.NEXT_PUBLIC_G5_URL || 'http://localhost',

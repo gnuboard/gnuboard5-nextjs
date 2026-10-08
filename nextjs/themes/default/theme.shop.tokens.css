@@ -17,7 +17,8 @@
 /* 상품 "담기" 창(ProductQuickAddDialog)은 화면 맨 위층(body 바로 아래)에 따로 그려져 .solune-shop-page 밖에 있다.
    그대로 두면 커뮤니티 파랑 · 둥근 모서리를 받아 상점과 따로 놀았다 — 상점 화면에서 연 창에도 같은 토큰을 준다. */
 .solune-shop-page,
-body:has(.solune-shop-page) .product-quick-add-dialog {
+body:has(.solune-shop-page) .product-quick-add-dialog,
+body:has(.solune-shop-page) .review-photo-dialog {
   --shop-service-h: 41px;
   --shop-mainbar-h: 72px;
   --shop-mainbar-h-shrunk: 56px;
@@ -82,7 +83,9 @@ body:has(.solune-shop-page) .product-quick-add-dialog {
 :root.dark .solune-shop-page,
 :root[data-solune-theme="dark"] .solune-shop-page,
 :root.dark body:has(.solune-shop-page) .product-quick-add-dialog,
-:root[data-solune-theme="dark"] body:has(.solune-shop-page) .product-quick-add-dialog {
+:root[data-solune-theme="dark"] body:has(.solune-shop-page) .product-quick-add-dialog,
+:root.dark body:has(.solune-shop-page) .review-photo-dialog,
+:root[data-solune-theme="dark"] body:has(.solune-shop-page) .review-photo-dialog {
   --solune-page: #14140f;
   --solune-surface: #1c1c18;
   --solune-surface-soft: #24241f;

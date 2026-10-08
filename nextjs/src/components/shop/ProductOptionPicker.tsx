@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import { Minus, Plus, X } from "lucide-react";
+import { useEffect, useId, useState, type Dispatch, type ReactNode, type SelectHTMLAttributes, type SetStateAction } from "react";
+import { ChevronDown, Minus, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/utils";
 import {
@@ -39,8 +39,41 @@ export type ProductOptionPickerProps = {
   displayTotal: number;
 };
 
+// 고르는 칸 — 높이 56 · 모서리 10, 위 20 은 칸 안에 뜬 이름표 자리. 기본 ▼ 를 끄고 ChevronDown 을 얹는다.
 const SELECT_CLASS =
-  "w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-50";
+  "h-14 w-full cursor-pointer appearance-none rounded-[10px] border bg-background pb-0 pl-3.5 pr-10 pt-5 text-sm outline-none transition-colors focus:border-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground";
+
+/** 묶음 제목(선택옵션 · 추가옵션 · 선택된 옵션) — 작은 글자, 넓은 자간. */
+const HEADING_CLASS = "text-[11px] font-medium tracking-[0.14em] text-muted-foreground";
+
+/**
+ * 옵션 고르기 칸 하나 — 이름표를 칸 안 왼쪽 위에 작게 띄운다(레퍼런스 solune 상품 상세 .get_item_options).
+ * 이름표는 누름을 그대로 아래 칸에 넘긴다(pointer-events: none) — 글자 위를 눌러도 목록이 열린다.
+ */
+function OptionSelectField({
+  label,
+  children,
+  ...selectProps
+}: { label: string; children: ReactNode } & Omit<SelectHTMLAttributes<HTMLSelectElement>, "id" | "className">) {
+  const id = useId();
+  return (
+    <div className="product-option-field relative">
+      <label
+        htmlFor={id}
+        className="product-option-label pointer-events-none absolute left-3.5 top-2.5 z-[1] text-[10px] leading-none tracking-[0.06em] text-muted-foreground"
+      >
+        {label}
+      </label>
+      <select id={id} className={SELECT_CLASS} {...selectProps}>
+        {children}
+      </select>
+      <ChevronDown
+        aria-hidden="true"
+        className="product-option-chevron pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+      />
+    </div>
+  );
+}
 
 function signedPrice(price: number) {
   return `${price >= 0 ? "+" : ""}${formatPrice(price)}`;
@@ -75,21 +108,23 @@ export function ProductOptionPicker({
   return (
     <>
       {hasOptionSubjects && (
-        <div className="product-options space-y-3">
-          {optionSubjects.map((subject, levelIndex) => {
-            const isLastLevel = levelIndex === optionSubjects.length - 1;
-            return (
-              <div key={levelIndex}>
-                <label className="mb-1 block text-sm font-medium">{subject}</label>
-                <select
-                  aria-label={subject}
+        <div className="product-options">
+          <h3 className={`product-options-heading mb-3 ${HEADING_CLASS}`}>선택옵션</h3>
+          <div className="space-y-3">
+            {optionSubjects.map((subject, levelIndex) => {
+              const isLastLevel = levelIndex === optionSubjects.length - 1;
+              const waitingForPrevious = levelIndex > 0 && !optionSelections[levelIndex - 1];
+              return (
+                <OptionSelectField
+                  key={levelIndex}
+                  label={subject}
                   data-shop-option-select="1"
                   value={optionSelections[levelIndex] || ""}
-                  disabled={levelIndex > 0 && !optionSelections[levelIndex - 1]}
+                  disabled={waitingForPrevious}
                   onChange={(event) => onSelectOptionValue(levelIndex, event.target.value)}
-                  className={SELECT_CLASS}
                 >
-                  <option value="">{subject}</option>
+                  {/* 이름은 칸 안 이름표가 이미 보여 주므로 첫 항목은 "선택하세요"(레퍼런스는 코어 PHP 가 정해 이름이 두 번 보였다). */}
+                  <option value="">{waitingForPrevious ? "앞 옵션을 먼저 선택하세요" : "선택하세요"}</option>
                   {getAvailableValues(levelIndex).map((item) => (
                     <option key={item.value} value={item.value} disabled={item.soldOut}>
                       {item.value}
@@ -97,25 +132,25 @@ export function ProductOptionPicker({
                       {item.soldOut ? "  [품절]" : ""}
                     </option>
                   ))}
-                </select>
-              </div>
-            );
-          })}
+                </OptionSelectField>
+              );
+            })}
+          </div>
         </div>
       )}
 
       {supplyGroups.length > 0 && (
-        <div className="product-supply-options space-y-3">
-          {supplyGroups.map((group) => (
-            <div key={group.subject}>
-              <label className="mb-1 block text-sm font-medium">{group.subject}</label>
-              <select
-                aria-label={group.subject}
+        <div className="product-supply-options">
+          <h3 className={`product-options-heading mb-3 ${HEADING_CLASS}`}>추가옵션</h3>
+          <div className="space-y-3">
+            {supplyGroups.map((group) => (
+              <OptionSelectField
+                key={group.subject}
+                label={group.subject}
                 value={group.selectedIoId}
                 onChange={(event) => onSelectSupplyOption(event.target.value)}
-                className={SELECT_CLASS}
               >
-                <option value="">{group.subject}</option>
+                <option value="">선택하세요</option>
                 {group.options.map((option) => {
                   const purchasable = isShopOptionPurchasable(option);
                   return (
@@ -126,13 +161,14 @@ export function ProductOptionPicker({
                     </option>
                   );
                 })}
-              </select>
-            </div>
-          ))}
+              </OptionSelectField>
+            ))}
+          </div>
         </div>
       )}
 
       <div className="product-selected space-y-2" aria-label="선택된 옵션">
+        <p className={`product-selected-title pb-1 ${HEADING_CLASS}`} aria-hidden="true">선택된 옵션</p>
         {!hasOptionSubjects && (
           <SelectedOptionLine
             label={productName}

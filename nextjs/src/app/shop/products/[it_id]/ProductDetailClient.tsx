@@ -93,6 +93,8 @@ export default function ProductDetailClient({
   // 상품문의 쪽 — 사용후기와 같다(서버가 연 쪽 · 마지막 쪽 · 주소의 ?iq_id= 를 첫 불러오기에서만).
   const [qaShownPage, setQaShownPage] = useState(1);
   const [qaLastPage, setQaLastPage] = useState(1);
+  // 상품문의 전체 건수 — 목록을 받을 때마다 meta.total 로(문의를 쓰거나 지우면 탭 · 머리 건수가 바로 맞는다).
+  const [qaTotal, setQaTotal] = useState<number | null>(null);
   const [pendingFocusIqId, setPendingFocusIqId] = useState(0);
   const [addingToCart, setAddingToCart] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -254,6 +256,7 @@ export default function ProductDetailClient({
     setReviews([]);
     setReviewSummary(null);
     setQas([]);
+    setQaTotal(null);
     setReviewPage(1);
     setPendingFocusIsId(reviewFocusIdFromSearch(productQueryString));
     setPendingFocusIqId(qaFocusIdFromSearch(productQueryString));
@@ -338,8 +341,9 @@ export default function ProductDetailClient({
     scrollToProductDetailTabs();
   }, []);
 
-  const applyQaPage = useCallback((result: { items: ShopQA[]; meta?: { current_page?: number; last_page?: number } } | null, fallbackPage: number) => {
+  const applyQaPage = useCallback((result: { items: ShopQA[]; meta?: { current_page?: number; last_page?: number; total?: number } } | null, fallbackPage: number) => {
     setQas(result?.items ?? []);
+    setQaTotal(typeof result?.meta?.total === "number" ? result.meta.total : null);
     setQaShownPage(result?.meta?.current_page ?? fallbackPage);
     setQaLastPage(result?.meta?.last_page ?? 1);
   }, []);
@@ -568,6 +572,7 @@ export default function ProductDetailClient({
       onReviewPageChange={handleReviewPageChange}
       qaPage={qaShownPage}
       qaLastPage={qaLastPage}
+      qaTotal={qaTotal}
       onQaPageChange={handleQaPageChange}
       qas={qas}
       onQaChanged={reloadQas}

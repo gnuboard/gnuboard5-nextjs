@@ -18,3 +18,15 @@ nextjs/.deploy/
 .env.local
 .env*.local
 nextjs/.g5-next-build-work/
+
+# nextjs 개발 서버 · 작업 파일 — 개발 저장소의 nextjs/.gitignore 와 같다(원본 .gitattributes 가 하위 .gitignore 를
+# 내보내지 않아 동기화로 오지 않는다). .next-dev-* 를 빼먹으면 Tailwind 가 터보팩 캐시를 훑어 CSS 가 깨진다.
+nextjs/.next-dev-*/
+nextjs/.dev/
+nextjs/.dev-logs/
+nextjs/.dev-*.log
+nextjs/.g5-next-build.lock
+nextjs/.g5-tsconfig-*.json
+nextjs/.env.e2e
+nextjs/playwright-report/
+nextjs/themes/.active

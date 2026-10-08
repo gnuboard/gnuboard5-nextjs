@@ -84,17 +84,17 @@ export default function OrderPage() {
               inputClassName={inputClassName}
               {...recipientInfo}
             />
+          </div>
+
+          {/* 쿠폰 / 포인트 · 결제수단 · 결제 금액은 오른쪽 한 덩어리 — 레퍼런스 주문서(shop/orderform.sub.php)도
+              결제정보(주문할인 · 배송비할인) · 총 주문금액 · #od_pay_sl · 포인트를 #sod_frm_pay 에 모은다. */}
+          <div className="shop-order-aside min-w-0 space-y-8 lg:col-span-1">
             {isMemberOrder && (
               <OrderCouponPointSection
                 inputClassName={inputClassName}
                 {...couponPointSection}
               />
             )}
-          </div>
-
-          {/* 결제수단은 결제 금액 바로 위 — 레퍼런스 주문서(shop/orderform.sub.php)도
-              #od_pay_sl 을 총 주문금액과 같은 오른쪽 덩어리에 둔다. */}
-          <div className="shop-order-aside min-w-0 space-y-8 lg:col-span-1">
             <OrderPaymentMethodSection
               inputClassName={inputClassName}
               {...paymentMethodSection}

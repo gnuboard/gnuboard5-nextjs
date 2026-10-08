@@ -44,6 +44,12 @@ body[data-g5-theme-source="default"] .solune-shop-page {
   .shop-order-section :is(input, select, textarea):focus-visible { border-color: var(--solune-text); }
   .shop-order-section button { border-radius: 10px; }
 
+  /* 쿠폰 / 포인트(오른쪽): 영카트 결제정보처럼 줄마다 할인금액 + 쿠폰적용 · 아래에 포인트 */
+  .shop-order-benefit-row + .shop-order-benefit-row { border-top: 1px solid var(--solune-border); padding-top: 12px; }
+  .shop-order-benefit-row strong { font-weight: 700; }
+  .shop-order-point { border-color: var(--solune-border); }
+  .shop-order-point button { min-height: 42px; }
+
   /* 받으시는 분: 배송지 고르기를 회색 막대 안의 칸처럼 */
   .shop-order-address-choice { gap: 4px; border-radius: 10px; padding: 4px; background: var(--solune-surface-soft); }
   .shop-order-address-choice button { border: 0; background: none; box-shadow: none; color: var(--solune-muted); font-weight: 500; }

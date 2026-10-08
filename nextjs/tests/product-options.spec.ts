@@ -4,6 +4,7 @@ import {
   OPTION_SEPARATOR,
   baseOptionLabel,
   optionPriceSuffix,
+  reviewImageUrls,
   supplyOptionGroups,
   supplyOptionLabel,
 } from "../src/components/shop/productDetailHelpers";
@@ -63,4 +64,21 @@ test("고른 옵션 줄 이름은 영카트 io_value 와 같다", () => {
   expect(baseOptionLabel(["색상", "높이"], `실버${OPTION_SEPARATOR}1단`)).toBe("색상:실버 / 높이:1단");
   expect(baseOptionLabel(["색상"], "실버")).toBe("색상:실버");
   expect(supplyOptionLabel(`전용 액세서리${OPTION_SEPARATOR}노트북 파우치`)).toBe("전용 액세서리:노트북 파우치");
+});
+
+test("후기 본문의 사진 주소는 올린 차례로 한 번씩, data: 와 빈 주소는 뺀다", () => {
+  const html = [
+    '<p>좋아요</p><p><img src="/data/editor/a.jpg" alt=""></p>',
+    "<img alt='' src='https://example.com/b.png?w=1&amp;h=2'>",
+    '<img src="/data/editor/a.jpg">',
+    '<img src="data:image/png;base64,AAAA">',
+    '<img src="">',
+    '<IMG SRC="/data/editor/c.webp" />',
+  ].join("");
+  expect(reviewImageUrls(html)).toEqual([
+    "/data/editor/a.jpg",
+    "https://example.com/b.png?w=1&h=2",
+    "/data/editor/c.webp",
+  ]);
+  expect(reviewImageUrls("<p>사진 없는 후기</p>")).toEqual([]);
 });

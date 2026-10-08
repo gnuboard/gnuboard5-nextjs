@@ -85,6 +85,8 @@ type BuildCouponPointSectionPropsInput = {
   selectedSendCoupon: MyCoupon | undefined;
   orderCouponBase: number;
   orderAmountAfterCoupons: number;
+  couponDiscount: number;
+  sendCouponDiscount: number;
   shippingCost: number;
   pointBalance: number;
   settlePointUnit: number;

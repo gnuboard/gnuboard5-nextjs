@@ -41,13 +41,13 @@ export function OrderSummarySidebar({
           )}
           {couponDiscount > 0 && (
             <div className="flex justify-between text-green-700">
-              <span>쿠폰 할인</span>
+              <span>주문할인</span>
               <span>-{formatPrice(couponDiscount)}</span>
             </div>
           )}
           {sendCouponDiscount > 0 && (
             <div className="flex justify-between text-green-700">
-              <span>배송비 쿠폰</span>
+              <span>배송비할인</span>
               <span>-{formatPrice(sendCouponDiscount)}</span>
             </div>
           )}

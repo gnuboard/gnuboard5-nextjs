@@ -69,9 +69,17 @@ body[data-g5-theme-source="default"] .solune-shop-page {
 
   /* 옵션 · 수량 */
   .product-options { order: 9; margin-top: 28px; border-top: 1px solid var(--solune-border); padding-top: 22px; }
-  .product-supply-options { order: 10; margin-top: 14px; }
-  .product-options label, .product-supply-options label { font-size: 12.5px; font-weight: 600; }
-  .product-options select, .product-supply-options select { height: 44px; border-radius: 8px; border-color: var(--solune-border-strong); background-color: var(--solune-surface); }
+  .product-supply-options { order: 10; margin-top: 28px; }
+  /* 레퍼런스(solune item.form.skin): 묶음 제목은 11px · 자간 .14em, 고르는 칸은 높이 56 · 모서리 10 · 옅은 테두리에
+     이름표를 칸 안 왼쪽 위(10px)에 띄운다. 마우스를 올리면 테두리 한 단계 진하게, 고르는 중엔 본문색,
+     앞 옵션을 기다리는 칸은 옅은 회색 바탕. ▼ 는 ProductOptionPicker 의 ChevronDown. */
+  .product-options-heading, .product-selected-title { color: var(--solune-muted); font-size: 11px; font-weight: 500; letter-spacing: 0.14em; }
+  .product-option-label { color: var(--solune-muted-soft); font-size: 10px; font-weight: 400; }
+  .product-option-field select { height: 56px; border-color: var(--solune-border); border-radius: 10px; background-color: var(--solune-surface); color: var(--solune-text); font-size: 14px; }
+  .product-option-field select:hover:not(:disabled) { border-color: var(--solune-border-strong); }
+  .product-option-field select:focus { border-color: var(--solune-text); }
+  .product-option-field select:disabled { background-color: var(--solune-surface-soft); color: var(--solune-muted); opacity: 1; }
+  .product-option-chevron { color: var(--solune-muted); }
 
   /* 선택된 옵션 · 총 결제금액은 옅은 회색 둥근 상자 하나(레퍼런스 "선택된 옵션" 상자 #sit_sel_option).
      두 덩어리가 이어 붙어 한 상자로 보이도록 위·아래의 모서리와 여백을 나눠 준다. 줄마다 흰 카드 —
@@ -138,6 +146,58 @@ body[data-g5-theme-source="default"] .solune-shop-page {
   }
   .solune-pdp-aside-eyebrow { margin: 0 0 14px; color: var(--solune-muted); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; }
   .solune-pdp-aside .product-options { margin-top: 0; border-top: 0; padding-top: 0; }
+  /* 따라다니는 상자는 머리에 이미 "선택옵션"(.solune-pdp-aside-eyebrow)이 있다 — 같은 제목이 두 번 서지 않게. */
+  .solune-pdp-aside .product-options > .product-options-heading { display: none; }
+
+  /* 상품문의 탭 — 레퍼런스 solune itemqa.skin(default_shop.css): 머리 아래 본문색 선, 문의마다 옅은 선으로 가른
+     한 줄, 상태 칩은 네모(답변완료 = 초록 테두리 · 옅은 초록), 제목 14.5 · 600 이고 올리면 초록. 펼치면 Q 는 글자,
+     A 는 옅은 회색 상자. 삭제는 올렸을 때만 경고색. */
+  .product-qa-head { border-color: var(--solune-text); }
+  .product-qa-title { color: var(--solune-text); }
+  .product-qa-title span { color: var(--solune-muted); }
+  .product-qa-write { border-color: var(--solune-text); background: var(--solune-text); color: var(--solune-surface); }
+  .product-qa-write:hover { border-color: var(--solune-primary); background: var(--solune-primary); color: var(--solune-primary-ink); }
+  .product-qa-notice { color: var(--solune-muted); font-size: 12.5px; }
+  .product-qa-notice a { color: var(--solune-text); }
+  .product-qa-item { border-color: var(--solune-border); }
+  .product-qa-row { color: var(--solune-text); cursor: pointer; }
+  .product-qa-row:hover .product-qa-subject { color: var(--solune-primary); }
+  .product-qa-row:focus-visible { outline: 2px solid var(--solune-primary); outline-offset: 2px; }
+  .product-qa-subject { color: var(--solune-text); font-size: 14.5px; }
+  .product-qa-status { border-radius: 0; border-color: var(--solune-border-strong); background: var(--solune-surface-soft); color: var(--solune-text-soft); }
+  .product-qa-status.is-done { border-color: var(--solune-primary); background: var(--solune-primary-soft); color: var(--solune-primary); }
+  .product-qa-meta, .product-qa-caret { color: var(--solune-muted); font-size: 12.5px; }
+  .product-qa-content { color: var(--solune-text-soft); font-size: 14px; line-height: 1.85; }
+  .product-qa-mark { color: var(--solune-text); }
+  .product-qa-answer { background: var(--solune-surface-soft); }
+  .product-qa-cmd button { height: 28px; border-color: var(--solune-border); border-radius: 8px; background: var(--solune-surface); color: var(--solune-text-soft); font-size: 11px; }
+  .product-qa-cmd button:hover { border-color: var(--solune-text); color: var(--solune-text); }
+  .product-qa-cmd .product-qa-delete:hover { border-color: var(--ondam-sale); color: var(--ondam-sale); }
+
+  /* 사용후기 탭 — 레퍼런스 solune itemuse.skin(default_shop.css · style.css): 평점 요약 상자(평균 40px, 별 · 막대는
+     금색), 오른쪽 끝 초록 [사용후기 쓰기], "포토 후기"와 "최신순" 머리 아래 본문색 선, 후기마다 옅은 선으로 가른 줄,
+     [내용 보기] 는 모서리 8 테두리 단추, 오른쪽 사진은 모서리 12 + "+N" 알약. */
+  .product-review-summary { border-color: var(--solune-border); border-radius: 14px; background: var(--solune-surface); }
+  .product-review-avg { color: var(--solune-text); font-size: 40px; letter-spacing: -0.03em; }
+  .product-review-stars, .product-review-item-stars { color: var(--ondam-star); }
+  .product-review-count { color: var(--solune-muted-soft); }
+  .product-review-bars li { color: var(--solune-muted); }
+  .product-review-bar { background: var(--solune-surface-soft); }
+  .product-review-bar > span { background: var(--ondam-star); }
+  .product-review-write { height: 46px; border-radius: 10px; background: var(--solune-primary); color: var(--solune-primary-ink); }
+  .product-review-write:hover { background: var(--solune-primary-hover); color: var(--solune-primary-ink); }
+  .product-review-photos-head, .product-review-sort { border-color: var(--solune-text); }
+  .product-review-photos-head { color: var(--solune-text); }
+  .product-review-photos-head span, .product-review-sort { color: var(--solune-muted); }
+  .product-review-photo, .product-review-thumb { background: var(--solune-surface-soft); }
+  .product-review-thumb { border-radius: 12px; }
+  .product-review-item { border-color: var(--solune-border); }
+  .product-review-name, .product-review-subject { color: var(--solune-text); }
+  .product-review-date { color: var(--solune-muted-soft); }
+  .product-review-content { color: var(--solune-text-soft); font-size: 14.5px; line-height: 1.75; }
+  .product-review-toggle { border-color: var(--solune-border); border-radius: 8px; background: var(--solune-surface); color: var(--solune-text); }
+  .product-review-toggle:hover, .product-review-toggle:focus-visible { border-color: var(--solune-text); }
+  :is(.product-review-photo, .product-review-thumb, .product-review-toggle):focus-visible { outline: 2px solid var(--solune-primary); outline-offset: 2px; }
   .solune-pdp-aside .product-supply-options { margin-top: 14px; }
   .solune-pdp-aside .product-selected { margin-top: 16px; }
   .solune-pdp-aside .product-total-value { font-size: 20px; }

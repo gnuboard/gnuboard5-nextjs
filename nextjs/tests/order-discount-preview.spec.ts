@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { ShopCartItem, ShopPolicy } from "../src/lib/api";
+import { orderCouponChoices, sendCouponChoices } from "../src/app/shop/order/orderCouponChoices";
 import { buildCouponPreview } from "../src/app/shop/order/orderCouponPreview";
 import { buildOrderDiscountPreview } from "../src/app/shop/order/orderDiscountPreview";
 import { calculatePointUsage } from "../src/app/shop/order/orderPointUsage";
@@ -201,5 +202,33 @@ test.describe("order discount preview", () => {
     expect(disabled.pointUse).toBe(0);
     expect(disabled.normalizedPointUseInput).toBe("0");
     expect(disabled.pointWarn.length).toBeGreaterThan(0);
+  });
+
+  test("lists order coupons like YoungCart ordercoupon.php — minimum and over-discount are blocked", () => {
+    const choices = orderCouponChoices(
+      [
+        coupon({ cp_id: "ok", cp_price: 1000 }),
+        coupon({ cp_id: "min", cp_price: 1000, cp_minimum: 20000 }),
+        coupon({ cp_id: "over", cp_price: 10000 }),
+        coupon({ cp_id: "pct", cp_type: 1, cp_price: 10, cp_maximum: 500 }),
+      ],
+      10000
+    );
+
+    expect(choices.map((choice) => [choice.coupon.cp_id, choice.discount, choice.blockedReason === ""])).toEqual([
+      ["ok", 1000, true],
+      ["min", 0, false],
+      ["over", 10000, false],
+      ["pct", 500, true],
+    ]);
+    expect(orderCouponChoices([coupon()], 0)[0].blockedReason).not.toBe("");
+  });
+
+  test("lists send coupons against the amount after the order coupon and caps them at shipping", () => {
+    const sendCoupon = coupon({ cp_id: "send", cp_method: 3, cp_price: 5000, cp_minimum: 9000 });
+
+    expect(sendCouponChoices([sendCoupon], 9000, 3000)[0]).toMatchObject({ discount: 3000, blockedReason: "" });
+    expect(sendCouponChoices([sendCoupon], 8000, 3000)[0].blockedReason).not.toBe("");
+    expect(sendCouponChoices([sendCoupon], 9000, 0)[0].blockedReason).not.toBe("");
   });
 });
