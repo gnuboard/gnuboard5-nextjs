@@ -1,19 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { g5BaseUrlForRuntime, g5PathForRuntime } from "@/lib/config";
-
-/**
- * 로고 그림 주소. 정적 테마는 그누보드와 같은 도메인이라 경로만(하위 폴더면 그 앞이 붙는다) 쓰고,
- * 서버 실행 방식(Vercel 등)은 그누보드가 다른 도메인이라 그누보드 주소(NEXT_PUBLIC_G5_URL)를 앞에 붙인다 —
- * 데모에서 쇼핑몰 로고(data/common/logo_img)를 프런트 도메인에서 찾아 404 가 났다.
- */
-function brandLogoSrc(src: string): string {
-  if (process.env.G5_NEXT_RUNTIME === "server") {
-    return `${g5BaseUrlForRuntime()}${src.startsWith("/") ? src : `/${src}`}`;
-  }
-  return g5PathForRuntime(src);
-}
+import { g5AssetUrlForRuntime } from "@/lib/config";
 
 /** 그누보드 기본 로고와, 관리자가 쇼핑몰 설정에서 올리는 영카트 로고(없으면 설치 때 넣은 기본 그림). */
 export const G5_COMMUNITY_LOGO = "/img/logo.png";
@@ -45,7 +33,7 @@ export function SoluneBrandLogo({ src, alt, width, height, className }: SoluneBr
     <img
       ref={checkLoaded}
       className={className ? `solune-brand-logo ${className}` : "solune-brand-logo"}
-      src={brandLogoSrc(src)}
+      src={g5AssetUrlForRuntime(src)}
       alt={alt}
       width={width}
       height={height}

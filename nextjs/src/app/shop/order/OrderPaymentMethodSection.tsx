@@ -1,6 +1,6 @@
 "use client";
 
-import { g5PathForRuntime } from "@/lib/config";
+import { g5AssetUrlForRuntime } from "@/lib/config";
 import {
   PAYMENT_METHODS,
   easyPayButtonLabel,
@@ -54,7 +54,7 @@ function EasyPayServiceTile({ option, pressed, onSelect }: { option: EasyPayOpti
       className={`${TILE_CLASS} shop-pay-method--brand justify-center ${tileStateClass(pressed)}`}
     >
       <img
-        src={g5PathForRuntime(option.src)}
+        src={g5AssetUrlForRuntime(option.src)}
         alt={option.label}
         className="shop-pay-method-logo max-h-6 w-full max-w-[88px] object-contain"
         loading="lazy"
@@ -138,7 +138,7 @@ export function OrderPaymentMethodSection({
             >
               {iconSrc ? (
                 <img
-                  src={g5PathForRuntime(iconSrc)}
+                  src={g5AssetUrlForRuntime(iconSrc)}
                   alt=""
                   aria-hidden
                   className="shop-pay-method-icon h-7 w-9 shrink-0 object-contain"

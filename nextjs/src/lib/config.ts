@@ -256,6 +256,19 @@ export function g5PathForRuntime(path: string): string {
   return `${basePath}${normalized === "/" ? "" : normalized}` || "/";
 }
 
+/**
+ * 그누보드 쪽 정적 파일(img/ · data/ 의 그림 등) 주소. 정적 테마는 그누보드와 같은 도메인이라 경로만(하위 폴더면
+ * 그 앞이 붙는다) 쓰고, 서버 실행 방식(Vercel 등)은 그누보드가 다른 도메인이라 그누보드 주소(NEXT_PUBLIC_G5_URL)를
+ * 앞에 붙인다 — 데모에서 쇼핑몰 로고 · 결제수단 아이콘을 프런트 도메인에서 찾아 404 가 났다.
+ */
+export function g5AssetUrlForRuntime(path: string): string {
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  if (process.env.G5_NEXT_RUNTIME === "server") {
+    return `${g5BaseUrlForRuntime()}${normalized}`;
+  }
+  return g5PathForRuntime(normalized);
+}
+
 const G5_APP_ROUTE_ROOTS = new Set([
   "admin",
   "boards",
