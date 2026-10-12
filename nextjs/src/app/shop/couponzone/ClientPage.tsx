@@ -152,7 +152,8 @@ export default function CouponZonePage() {
                   )}
                   {targetText && (
                     <span className="inline-flex min-w-0 items-center gap-1">
-                      적용:
+                      {/* 적용 대상 이름이 길면 이 글자가 줄어 "적 / 용:" 으로 꺾였다 — 이름 쪽만 말줄임한다. */}
+                      <span className="shrink-0 whitespace-nowrap">적용:</span>
                       {z.target_href ? (
                         <a
                           href={z.target_href}

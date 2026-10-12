@@ -60,13 +60,47 @@
 @media (min-width: 1280px) { .solune-shop-page .ondam-catrow:not(:has(.swiper-slide:nth-child(11))) .solune-catrow-pager-reserve { display: none; } }
 .solune-shop-page .solune-catrow-pager-reserve { pointer-events: none; }
 
-/* Swiper 가 서기 전에는 제 CSS 의 .swiper-slide { width: 100% } 가 남아 한 장이 줄을 통째로
-   차지하고 줄 높이도 부푼다. 그 틈에도 한 줄로 보이게 받쳐 둔다(배너는 뺀다 — 거기서는 한 장이
-   줄을 다 차지하는 것이 세워진 뒤의 모습과 같다). */
-.solune-shop-page :is(.solune-catrow-swiper, .solune-review-swiper, .solune-shop-swiper):not(.swiper-initialized) .swiper-slide {
-  width: auto;
-  max-width: 33.333%;
+/* Swiper 가 서기 전(첫 로딩 자리 잡기 · 넘김 스크립트가 붙기 전)에는 제 CSS 의 .swiper-slide { width: 100% } 가 남아
+   한 장이 줄을 통째로 차지한다. 분류 · 진열 · 후기 줄은 그 틈에도 칸 폭과 간격을 세워진 뒤와 같게 둔다 — 칸이 글자
+   막대 폭으로 쪼그라들어 서로 붙거나(분류 · 진열) 줄의 반만 차지하던(후기) 것을 막고, 응답 뒤에 칸이 넓어지며 아래를
+   밀어내지 않게(배너는 뺀다 — 거기서는 한 장이 줄을 다 차지하는 것이 세워진 뒤의 모습과 같다). 값은
+   shop-home-swipers.tsx(분류: 2 · 3 · 4 · 8 · 10칸, 간격 14 / 후기: 1 · 2 · 3 · 4장, 간격 22)와 shop-row.tsx(진열: 걸치는
+   줄 2.5 · 3.5 · 4.5 · 5.5장, 아니면 2 · 3 · 4 · 5장, 간격 14 · 16 · 20 · 20)의 slidesPerView · spaceBetween 그대로. */
+.solune-shop-page .solune-catrow-swiper:not(.swiper-initialized) { --pre-spv: 2; --pre-gap: 14px; }
+@media (min-width: 640px) { .solune-shop-page .solune-catrow-swiper:not(.swiper-initialized) { --pre-spv: 3; } }
+@media (min-width: 780px) { .solune-shop-page .solune-catrow-swiper:not(.swiper-initialized) { --pre-spv: 4; } }
+@media (min-width: 1080px) { .solune-shop-page .solune-catrow-swiper:not(.swiper-initialized) { --pre-spv: 8; } }
+@media (min-width: 1280px) { .solune-shop-page .solune-catrow-swiper:not(.swiper-initialized) { --pre-spv: 10; } }
+.solune-shop-page .solune-shop-swiper:not(.swiper-initialized) { --pre-spv: 2; --pre-gap: 14px; }
+.solune-shop-page .solune-shop-swiper[data-solune-swiper-peek]:not(.swiper-initialized) { --pre-spv: 2.5; }
+.solune-shop-page .solune-review-swiper:not(.swiper-initialized) { --pre-spv: 1; --pre-gap: 22px; }
+@media (min-width: 640px) {
+  .solune-shop-page .solune-shop-swiper:not(.swiper-initialized) { --pre-spv: 3; --pre-gap: 16px; }
+  .solune-shop-page .solune-shop-swiper[data-solune-swiper-peek]:not(.swiper-initialized) { --pre-spv: 3.5; }
+  .solune-shop-page .solune-review-swiper:not(.swiper-initialized) { --pre-spv: 2; }
 }
+@media (min-width: 900px) {
+  .solune-shop-page .solune-shop-swiper:not(.swiper-initialized) { --pre-spv: 4; --pre-gap: 20px; }
+  .solune-shop-page .solune-shop-swiper[data-solune-swiper-peek]:not(.swiper-initialized) { --pre-spv: 4.5; }
+  .solune-shop-page .solune-review-swiper:not(.swiper-initialized) { --pre-spv: 3; }
+}
+@media (min-width: 1200px) {
+  .solune-shop-page .solune-shop-swiper:not(.swiper-initialized) { --pre-spv: 5; }
+  .solune-shop-page .solune-shop-swiper[data-solune-swiper-peek]:not(.swiper-initialized) { --pre-spv: 5.5; }
+  .solune-shop-page .solune-review-swiper:not(.swiper-initialized) { --pre-spv: 4; }
+}
+.solune-shop-page :is(.solune-catrow-swiper, .solune-shop-swiper, .solune-review-swiper):not(.swiper-initialized) .swiper-slide {
+  width: calc((100% - (var(--pre-spv) - 1) * var(--pre-gap)) / var(--pre-spv));
+  max-width: none;
+  margin-right: var(--pre-gap);
+}
+
+/* 자리 잡기 카드(shop-home-skeletons.tsx)의 막대: 진짜 카드와 같은 글줄 안에 서는 인라인 상자라 줄 높이는
+   진짜 글자와 같고, 막대는 그 안에서 글자 몸통만큼만 칠한다. 담기 단추 자리(chip)는 진짜 단추 크기. */
+.solune-shop-page .solune-skel-line { display: inline-block; max-width: 100%; height: 0.78em; border-radius: 4px; vertical-align: middle; }
+.solune-shop-page .solune-skel-chip { display: inline-block; width: 40px; height: 26.5px; border-radius: 6px; }
+.solune-shop-page .solune-skel-card { pointer-events: none; }
+@media (min-width: 640px) { .solune-shop-page .solune-skel-narrow { display: none; } }
 
 /* --- 진열 줄 (히트 · 최신 · 추천 · 할인 · 많이 보고 계신 상품) ------------- */
 /* 한 줄에 다 들어가면 넘길 것이 없다. Swiper 가 잠그면 화살표를 통째로 감춘다. */

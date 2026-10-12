@@ -171,7 +171,7 @@ if ($action === 'social' && isset($apiSegments[1]) && $apiSegments[1] === 'link-
 
     list($socialSignupRow, $socialSignupProfile) = api_social_validate_signup_ticket($ticket, $codeVerifier);
 
-    $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+    $ip = api_client_ip(); // 로그인 실패 잠금 — 지어낼 수 없는 주소만(request_helpers.php)
     $lockedMsg = Throttle::checkLoginAttempt($mbId, $ip);
     if ($lockedMsg !== null) {
         Response::error($lockedMsg, 429);
@@ -362,7 +362,7 @@ if ($action === 'password-reset' && $apiMethod === 'POST') {
     $memberTable = DB::table('member_table');
 
     if ($step === 'request') {
-        $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+        $ip = api_rate_limit_ip(); // 프록시 뒤면 손님마다 (request_helpers.php)
         $enumMsg = Throttle::checkEnumProbe($ip);
         if ($enumMsg !== null) {
             Response::error($enumMsg, 429);
@@ -451,7 +451,7 @@ if ($action === 'password-reset' && $apiMethod === 'POST') {
     }
 
     if ($step === 'reset') {
-        $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+        $ip = api_rate_limit_ip(); // 프록시 뒤면 손님마다 (request_helpers.php)
         $enumMsg = Throttle::checkEnumProbe($ip);
         if ($enumMsg !== null) {
             Response::error($enumMsg, 429);

@@ -58,8 +58,10 @@ export function SoluneThemeSwap() {
       type="button"
       className="solune-theme-swap"
       onClick={toggle}
-      aria-label={theme === "dark" ? "밝은 모드로 전환" : "어두운 모드로 전환"}
+      // 켜고 끄는 단추라 이름은 고정하고 상태는 aria-pressed 로 — 이름까지 바꾸면 "밝은 모드로 전환, 눌림"처럼 모순되게 읽힌다.
+      aria-label="어두운 모드"
       aria-pressed={mounted ? theme === "dark" : undefined}
+      title={theme === "dark" ? "밝은 모드로 전환" : "어두운 모드로 전환"}
     >
       {mounted && theme === "dark" ? (
         <Moon size={17} aria-hidden />

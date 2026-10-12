@@ -99,7 +99,8 @@ if ($action === 'resend-verification' && $apiMethod === 'POST') {
     require_once __DIR__ . '/members_helpers.php'; // api_member_send_email_verification_mail()
 
     $input  = get_request_body();
-    $ip     = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+    $ip     = api_rate_limit_ip(); // 조회 시도 한도 — 프록시 뒤면 손님마다 (request_helpers.php)
+    $loginIp = api_client_ip(); // 로그인 실패 잠금 — 지어낼 수 없는 주소만(request_helpers.php)
     $config = api_get_config();
 
     if (!isset($input['mb_password']) || (string) $input['mb_password'] === '') {
@@ -140,7 +141,7 @@ if ($action === 'resend-verification' && $apiMethod === 'POST') {
         Response::error('이 사이트는 메일 인증을 사용하지 않습니다.', 400);
     }
 
-    $lockedMsg = Throttle::checkLoginAttempt($mb_id, $ip);
+    $lockedMsg = Throttle::checkLoginAttempt($mb_id, $loginIp);
     if ($lockedMsg !== null) {
         Response::error($lockedMsg, 429);
     }
@@ -151,7 +152,7 @@ if ($action === 'resend-verification' && $apiMethod === 'POST') {
         [$mb_id]
     );
     if (!$member || !$member['mb_id'] || !Auth::verifyPassword($password, (string) $member['mb_password'])) {
-        Throttle::recordLoginFailure($mb_id, $ip);
+        Throttle::recordLoginFailure($mb_id, $loginIp);
         Response::error('Invalid member ID or password.', 401);
     }
     if (!empty($member['mb_leave_date'])) {

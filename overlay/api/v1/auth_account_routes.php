@@ -6,7 +6,7 @@ if (!defined('_GNUBOARD_')) {
 if ($action === 'check-id' && $apiMethod === 'GET') {
 
     // Enum-위험 — IP 당 quota 적용. 초과 시 429.
-    $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+    $ip = api_rate_limit_ip(); // 프록시 뒤면 손님마다 (request_helpers.php)
     $enumMsg = Throttle::checkEnumProbe($ip);
     if ($enumMsg !== null) {
         Response::error($enumMsg, 429);
@@ -76,7 +76,7 @@ if ($action === 'check-id' && $apiMethod === 'GET') {
 // -------------------------------------------------------------------------
 if ($action === 'check-email' && $apiMethod === 'GET') {
 
-    $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+    $ip = api_rate_limit_ip(); // 프록시 뒤면 손님마다 (request_helpers.php)
     $enumMsg = Throttle::checkEnumProbe($ip);
     if ($enumMsg !== null) {
         Response::error($enumMsg, 429);
@@ -151,7 +151,7 @@ if ($action === 'login' && $apiMethod === 'POST') {
     $mb_id     = (string) $input['mb_id'];
     $password  = (string) $input['mb_password'];
     $autoLogin = !empty($input['auto_login']) || !empty($input['remember']) || !empty($input['remember_me']);
-    $ip        = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+    $ip        = api_client_ip(); // 로그인 실패 잠금 — 지어낼 수 없는 주소만(request_helpers.php)
 
     // Brute-force 차단 — 같은 (mb_id, ip) 가 5회 실패하면 15분 lock-out.
     // 아직 카운트 row 가 없는 첫 시도라면 즉시 통과.

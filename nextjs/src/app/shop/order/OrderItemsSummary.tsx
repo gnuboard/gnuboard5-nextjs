@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { shouldBypassImageOptimization } from "@/lib/image";
 import { ProductImageFallback } from "@/components/shop/ProductImageFallback";
 import type { ShopCartItem } from "@/lib/api";
 import { formatPrice } from "@/lib/utils";
@@ -26,6 +27,7 @@ export function OrderItemsSummary({ items }: { items: ShopCartItem[] }) {
                 {item.image_url ? (
                   <Image
                     src={item.image_url}
+                    unoptimized={shouldBypassImageOptimization(item.image_url)}
                     alt={item.it_name}
                     fill
                     className="object-cover"

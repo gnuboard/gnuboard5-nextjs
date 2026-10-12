@@ -2,41 +2,74 @@ import { SoluneCatrowPagerReserve, SoluneReviewHead, SoluneShopRowHead, SoluneSt
 import { shopTypeHref } from "./shop-links";
 import { SOLUNE_SHOP_HOME_SECTIONS } from "./shop-home-sections";
 
+/*
+ * 카드 자리 잡기는 진짜 카드와 같은 클래스 · 같은 줄 수로 그린다. 막대(solune-skel-line)는 글줄 안에 서는
+ * 인라인 상자라 줄 높이가 진짜 글자와 같다 — 상품명 두 줄 · 후기 본문 세 줄처럼 자리도 진짜만큼 잡혀, 응답 뒤에
+ * 카드가 늘어나며 아래 진열을 밀어내지 않는다(예전 막대는 글줄보다 낮아 줄마다 50~70px, 후기는 200px 넘게 밀렸다).
+ */
 function SoluneShopProductCardSkeleton({ index }: { index: number }) {
   return (
-    <article className="sct_li" aria-hidden="true">
+    <article className="sct_li solune-skel-card" aria-hidden="true">
       <div className="sct_img skeleton" />
-      <div className="ondam-card-brand">
-        <div className={`skeleton h-3 ${index % 2 === 0 ? "w-16" : "w-12"}`} />
-      </div>
-      <div className="sct_txt">
-        <div className={`skeleton h-4 ${index % 3 === 0 ? "w-4/5" : "w-3/5"}`} />
-      </div>
+      <p className="ondam-card-brand">
+        <span className={`skeleton solune-skel-line ${index % 2 === 0 ? "w-16" : "w-12"}`} />
+      </p>
+      <p className="sct_txt">
+        <span className={`skeleton solune-skel-line ${index % 3 === 0 ? "w-[88%]" : "w-[78%]"}`} />
+        <br />
+        <span className={`skeleton solune-skel-line ${index % 2 === 0 ? "w-1/2" : "w-2/5"}`} />
+        {/* 폰 폭(두 장 반)의 좁은 칸에서는 상품명이 대개 세 줄이다 — 그때만 셋째 줄을 둔다. */}
+        <br className="solune-skel-narrow" />
+        <span className="skeleton solune-skel-line solune-skel-narrow w-1/3" />
+      </p>
+      {/* 가격 · 아래 줄은 flex 상자라 막대를 진짜와 같은 글자 상자(ondam-card-now · span)에 넣어야 줄 높이가 같다. */}
       <div className="ondam-card-prices">
-        <div className="skeleton h-4 w-20" />
+        <span className="ondam-card-now">
+          <span className="skeleton solune-skel-line w-20" />
+        </span>
       </div>
       <div className="ondam-card-meta">
-        <div className="skeleton h-3 w-10" />
-        <div className="skeleton h-3 w-14" />
-        <div className="skeleton ml-auto h-7 w-11" />
+        <span>
+          <span className="skeleton solune-skel-line w-9" />
+        </span>
+        <span>
+          <span className="skeleton solune-skel-line w-12" />
+        </span>
+        <span className="skeleton solune-skel-chip ml-auto" />
       </div>
     </article>
   );
 }
 
-function SoluneShopReviewCardSkeleton() {
+function SoluneShopReviewCardSkeleton({ index }: { index: number }) {
   return (
-    <article className="ondam-review-card" aria-hidden="true">
-      <div className="skeleton aspect-square w-full" />
+    <article className="ondam-review-card solune-skel-card" aria-hidden="true">
+      <div className="ondam-review-thumb skeleton" />
       <div className="ondam-review-body">
-        <div className="skeleton mb-3 h-4 w-20" />
-        <div className="skeleton mb-2 h-4 w-4/5" />
-        <div className="skeleton mb-2 h-3 w-full" />
-        <div className="skeleton mb-2 h-3 w-3/4" />
-        <div className="mt-4 flex justify-between">
-          <div className="skeleton h-3 w-14" />
-          <div className="skeleton h-3 w-16" />
+        <p className="ondam-review-score">
+          <span className="skeleton solune-skel-line w-16" />
+        </p>
+        <p className="ondam-review-title">
+          <span className={`skeleton solune-skel-line ${index % 2 === 0 ? "w-3/4" : "w-3/5"}`} />
+        </p>
+        <p className="ondam-review-text">
+          <span className="skeleton solune-skel-line w-full" />
+          <br />
+          <span className="skeleton solune-skel-line w-[92%]" />
+          <br />
+          <span className={`skeleton solune-skel-line ${index % 2 === 0 ? "w-2/3" : "w-1/2"}`} />
+        </p>
+        <div className="ondam-review-meta">
+          <span>
+            <span className="skeleton solune-skel-line w-12" />
+          </span>
+          <span>
+            <span className="skeleton solune-skel-line w-14" />
+          </span>
         </div>
+        <p className="ondam-review-item">
+          <span className="skeleton solune-skel-line w-1/2" />
+        </p>
       </div>
     </article>
   );
@@ -63,7 +96,7 @@ export function SoluneShopProductRowsSkeleton() {
             href={shopTypeHref(section.type)}
             headingId={`solune-shop-loading-${section.key}`}
           />
-          <SoluneStaticTrack className="solune-shop-swiper" wrapperClass="swiper-wrapper sct">
+          <SoluneStaticTrack className="solune-shop-swiper" wrapperClass="swiper-wrapper sct" peek={section.peek}>
             {Array.from({ length: 6 }, (_, index) => (
               <SoluneShopProductCardSkeleton key={index} index={index} />
             ))}
@@ -75,7 +108,7 @@ export function SoluneShopProductRowsSkeleton() {
         <SoluneReviewHead headingId="solune-shop-loading-reviews" />
         <SoluneStaticTrack className="solune-review-swiper" wrapperClass="swiper-wrapper ondam-review-grid">
           {Array.from({ length: 4 }, (_, index) => (
-            <SoluneShopReviewCardSkeleton key={index} />
+            <SoluneShopReviewCardSkeleton key={index} index={index} />
           ))}
         </SoluneStaticTrack>
       </section>

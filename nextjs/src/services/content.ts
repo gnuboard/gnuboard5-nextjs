@@ -23,7 +23,7 @@ export function getContentList(revalidate = 3600): Promise<ContentListItem[]> {
 }
 
 export async function getContent(coId: string, revalidate = 3600): Promise<ContentData | null> {
-  const result = await fetchApiResult(apiUrl(`/content/${coId}`), contentDataSchema, {
+  const result = await fetchApiResult(apiUrl(`/content/${encodeURIComponent(coId)}`), contentDataSchema, {
     next: { revalidate },
   });
 

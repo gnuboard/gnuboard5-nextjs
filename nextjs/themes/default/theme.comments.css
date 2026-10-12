@@ -1,0 +1,103 @@
+/* --- 댓글 (레퍼런스 view_comment · .cv-cmt-card, 2026-10) -------------------------------------
+   앱 CommentSection 의 board-comment* 손잡이. 머리: 옅은 띠에 "댓글" + 채운 둥근 개수 알약, 오른쪽 [접기].
+   줄: 40px 이니셜(또는 회원 그림) 원 · 이름 · "○○ 님에게" · 날짜 · 본문, 오른쪽 ⋮ 메뉴(답글 · 수정 · 삭제).
+   답글은 한 단에 30px 들이고 └ 이음선을 긋는다. 줄 사이 선은 카드 끝에서 끝까지, 얹거나 초점이 들면 옅은 바탕. */
+body[data-g5-theme-source="default"] .solune-inner-shell [data-slot="card-content"]:has(> .board-comments-head) {
+  --cmt-pad: 2rem;
+  --cmt-indent: 30px;
+}
+@media (max-width: 767px) {
+  body[data-g5-theme-source="default"] .solune-inner-shell [data-slot="card-content"]:has(> .board-comments-head) {
+    --cmt-pad: 1.25rem;
+    --cmt-indent: 18px;
+  }
+}
+
+body[data-g5-theme-source="default"] .solune-inner-shell {
+  /* 머리 띠: 카드 위 모서리까지 닿으므로 카드 모서리에서 테두리 1px 을 뺀 만큼 둥글린다. */
+  .board-comments-head {
+    margin: -1.5rem calc(-1 * var(--cmt-pad)) 0;
+    border-bottom: 1px solid var(--solune-border);
+    border-radius: calc(var(--solune-radius-md) - 1px) calc(var(--solune-radius-md) - 1px) 0 0;
+    padding: 14px var(--cmt-pad);
+    background: var(--solune-surface-soft);
+  }
+  .board-comments-head h3 { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--solune-text); font-size: 0.95rem; font-weight: 800; }
+  .board-comments-count {
+    display: inline-grid;
+    min-width: 22px;
+    height: 22px;
+    place-items: center;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: var(--solune-primary);
+    color: var(--solune-primary-ink);
+    font-size: 12px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  .board-comments-fold { height: 34px; border-color: var(--solune-border); border-radius: 10px; padding-inline: 14px; background: var(--solune-surface); color: var(--solune-text-soft); font-size: 13px; font-weight: 700; }
+  .board-comments-fold:hover { border-color: var(--solune-border-strong); color: var(--solune-text); }
+
+  /* 줄 */
+  .board-comments-list { margin: 0 calc(-1 * var(--cmt-pad)); }
+  .board-comment {
+    border-bottom: 1px solid var(--solune-border);
+    padding: 20px var(--cmt-pad) 18px calc(var(--cmt-pad) + var(--comment-depth, 0) * var(--cmt-indent));
+    transition: background-color 0.15s ease;
+  }
+  .board-comment:last-child { border-bottom: 1px solid var(--solune-border); }
+  .board-comment:hover,
+  .board-comment:focus-within { background: var(--solune-surface-soft); }
+  /* 주소의 #c_번호 로 찾아온 댓글: 둥근 테두리 대신 줄 전체를 옅은 파랑으로. */
+  .board-comment.is-highlighted { border-radius: 0; box-shadow: none; background: var(--solune-primary-soft); }
+  .board-comment-row { gap: 14px; }
+  .board-comment-avatar { width: 40px; height: 40px; background: var(--solune-primary-soft); color: var(--solune-primary); font-size: 15px; font-weight: 800; }
+  /* └ 이음선: 아바타 왼쪽 위에서 꺾여 들어온다. */
+  .board-comment--reply::before {
+    position: absolute;
+    top: 26px;
+    left: calc(var(--cmt-pad) + var(--comment-depth, 0) * var(--cmt-indent) - 18px);
+    width: 11px;
+    height: 13px;
+    border-bottom: 1px solid var(--solune-border-strong);
+    border-left: 1px solid var(--solune-border-strong);
+    content: "";
+  }
+  .board-comment-meta { gap: 2px 8px; }
+  .board-comment-name { color: var(--solune-text); font-size: 13.5px; font-weight: 800; }
+  .board-comment-to,
+  .board-comment-date { color: var(--solune-muted); font-size: 12px; }
+  .board-comment-date { font-variant-numeric: tabular-nums; }
+  .board-comment-body { margin-top: 6px; color: var(--solune-text-soft); font-size: 14.5px; line-height: 1.7; }
+  .board-comment-body > * { font-size: inherit; line-height: inherit; }
+  .board-comment-menu { width: 32px; height: 32px; border-color: var(--solune-border); border-radius: 8px; background: var(--solune-surface); color: var(--solune-muted); }
+  .board-comment-menu:hover,
+  .board-comment-menu[data-state="open"] { border-color: var(--solune-border-strong); background: var(--solune-surface); color: var(--solune-text); }
+
+  /* 손가락으로 누르는 화면은 ⋮ 단추를 40px 로 키운다(마우스 화면은 32px). */
+  @media (pointer: coarse) {
+    .board-comment-menu { width: 40px; height: 40px; }
+  }
+
+  /* 쓰기 칸 · 로그인 안내: 목록 아래 선에서 띄운다. */
+  .board-comment-form { padding-top: 20px; }
+  .board-comment-login { padding-top: 24px; }
+}
+
+/* ⋮ 메뉴는 body 바로 아래(Popover)에 그려지므로 .solune-inner-shell 밖이다. 항목은 손가락 화면에서 44px. */
+body[data-g5-theme-source="default"] .board-comment-menu-list {
+  min-width: 7.5rem;
+  border-color: var(--solune-border);
+  border-radius: 10px;
+  padding: 4px;
+  background: var(--solune-surface);
+  color: var(--solune-text);
+  box-shadow: 0 10px 28px -12px rgb(15 23 42 / 0.28);
+}
+body[data-g5-theme-source="default"] .board-comment-menu-item { border-radius: 7px; padding: 8px 12px; color: var(--solune-text-soft); font-size: 13.5px; font-weight: 600; }
+body[data-g5-theme-source="default"] .board-comment-menu-item:is(:hover, :focus-visible) { background: var(--solune-surface-soft); color: var(--solune-text); }
+body[data-g5-theme-source="default"] .board-comment-menu-item.text-destructive { color: var(--solune-danger); }
+@media (pointer: coarse) {
+  body[data-g5-theme-source="default"] .board-comment-menu-item { min-height: 44px; }
+}

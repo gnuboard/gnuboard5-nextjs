@@ -1,6 +1,15 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, memo } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  memo,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { apiClient } from "@/lib/api";
@@ -10,6 +19,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { MoreVertical } from "lucide-react";
+import { MemberAvatar } from "@/components/MemberAvatar";
 import { formatDate } from "@/lib/utils";
 import { toastError } from "@/lib/toast";
 import { SafeHtml } from "@/components/SafeHtml";
@@ -64,6 +76,8 @@ interface CommentItemProps {
   useEditor?: boolean;
   /** 주소의 #c_번호 로 찾아온 댓글 — 잠깐 강조한다. */
   highlighted?: boolean;
+  /** 답글이면 받는 댓글의 이름("○○ 님에게"). 받는 댓글이 지워졌으면 없다. */
+  replyToName?: string;
 }
 
 /** 강조를 유지하는 시간(ms). 눈이 그 자리를 찾을 만큼만 둔다. */
@@ -104,6 +118,115 @@ function pinCommentInView(target: HTMLElement): () => void {
   return stop;
 }
 
+/** 마우스가 ⋮ 단추와 메뉴 사이 틈을 지나는 동안 닫히지 않게 기다리는 시간(ms). */
+const MENU_HOVER_CLOSE_MS = 160;
+
+interface CommentAction {
+  key: string;
+  label: string;
+  onSelect: () => void;
+  destructive?: boolean;
+}
+
+/**
+ * 댓글 ⋮ 메뉴(답글 · 수정 · 삭제).
+ * - 마우스: 단추에 얹으면 열리고, 단추 · 메뉴에서 벗어나면 잠깐 뒤 닫힌다(사이 틈을 지나도 닫히지 않게 기다린다).
+ * - 터치 · 펜: hover 가 없으니 눌러서 열고, 바깥을 누르면 닫힌다.
+ * - 키보드: Enter · Space 로 열고 첫 항목으로 초점이 들어간다. Esc 로 닫으면 단추로 돌아온다.
+ * hover 로 열고 닫을 때는 초점을 옮기지 않는다 — 댓글을 쓰다 마우스가 지나가도 입력 칸의 초점을 빼앗지 않게.
+ * (DropdownMenu 는 열릴 때 언제나 메뉴로 초점을 옮겨 hover 에 맞지 않아 Popover 로 그린다.)
+ */
+function CommentActionsMenu({ label, actions }: { label: string; actions: CommentAction[] }) {
+  const [open, setOpen] = useState(false);
+  const openedByHover = useRef(false);
+  const closeTimer = useRef<number | null>(null);
+
+  const cancelClose = useCallback(() => {
+    if (closeTimer.current !== null) {
+      window.clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }, []);
+  useEffect(() => cancelClose, [cancelClose]);
+
+  const openByHover = (event: ReactPointerEvent) => {
+    if (event.pointerType !== "mouse") return;
+    cancelClose();
+    if (!open) {
+      openedByHover.current = true;
+      setOpen(true);
+    }
+  };
+  const closeSoon = (event: ReactPointerEvent) => {
+    if (event.pointerType !== "mouse" || !openedByHover.current) return;
+    cancelClose();
+    closeTimer.current = window.setTimeout(() => setOpen(false), MENU_HOVER_CLOSE_MS);
+  };
+  const run = (action: CommentAction) => {
+    cancelClose();
+    setOpen(false);
+    action.onSelect();
+  };
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        cancelClose();
+        if (next) openedByHover.current = false;
+        setOpen(next);
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="board-comment-menu size-8 shrink-0"
+          aria-label={label}
+          onPointerEnter={openByHover}
+          onPointerLeave={closeSoon}
+          // hover 로 이미 열린 메뉴를 마우스로 누르면 닫지 않는다(누르는 순간 닫혔다 깜박이지 않게).
+          onClick={(event) => {
+            if (open && openedByHover.current) event.preventDefault();
+          }}
+        >
+          <MoreVertical className="size-4" aria-hidden />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        className="board-comment-menu-list w-auto min-w-[7rem] p-1"
+        onPointerEnter={(event) => {
+          if (event.pointerType === "mouse") cancelClose();
+        }}
+        onPointerLeave={closeSoon}
+        onOpenAutoFocus={(event) => {
+          if (openedByHover.current) event.preventDefault();
+        }}
+        onCloseAutoFocus={(event) => {
+          if (openedByHover.current) event.preventDefault();
+        }}
+      >
+        <div role="group" aria-label={label} className="flex flex-col">
+          {actions.map((action) => (
+            <button
+              key={action.key}
+              type="button"
+              className={`board-comment-menu-item rounded px-2 py-1.5 text-left text-sm outline-none hover:bg-accent focus-visible:bg-accent${
+                action.destructive ? " text-destructive" : ""
+              }`}
+              onClick={() => run(action)}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function isContentEmpty(content: string): boolean {
   return !htmlToPlainText(content);
 }
@@ -136,6 +259,7 @@ const CommentItem = memo(function CommentItem({
   onDelete,
   useEditor,
   highlighted = false,
+  replyToName,
 }: CommentItemProps) {
   const { user } = useAuthStore();
   const [replyContent, setReplyContent] = useState("");
@@ -148,7 +272,15 @@ const CommentItem = memo(function CommentItem({
 
   const isOwner = user && (user.mb_id === comment.mb_id || user.mb_level >= 10);
   const isReplyOpen = replyTo === comment.wr_id;
-  const indent = (comment.wr_comment_reply?.length ?? 0) * 24;
+  const depth = comment.wr_comment_reply?.length ?? 0;
+  const displayName = comment.mb_nick || comment.wr_name;
+  const actions: CommentAction[] = [
+    ...(user
+      ? [{ key: "reply", label: isReplyOpen ? "답글 닫기" : "답글", onSelect: () => onReply(isReplyOpen ? -1 : comment.wr_id) }]
+      : []),
+    ...(isOwner && !editing ? [{ key: "edit", label: "수정", onSelect: () => startEdit() }] : []),
+    ...(isOwner ? [{ key: "delete", label: "삭제", onSelect: () => onDelete(comment.wr_id), destructive: true }] : []),
+  ];
 
   const handleReplySubmit = async () => {
     if (isContentEmpty(replyContent)) return;
@@ -188,142 +320,130 @@ const CommentItem = memo(function CommentItem({
 
   return (
     // id 는 그누보드 댓글(view_comment 의 c_번호)과 같은 주소 — 최근 댓글 링크의 #c_번호 가 여기로 온다.
+    // 깊이는 --comment-depth 로 넘긴다 — 들여쓰기 · 이음선(└)은 테마가 그린다(기본은 한 단에 24px).
     <div
       id={`c_${comment.wr_id}`}
       tabIndex={-1}
-      style={{ marginLeft: `${indent}px` }}
-      className={`py-3 border-b last:border-b-0 scroll-mt-24 outline-none transition-colors duration-500 ${
+      data-depth={depth}
+      style={{ "--comment-depth": depth } as CSSProperties}
+      className={`board-comment${depth > 0 ? " board-comment--reply" : ""}${highlighted ? " is-highlighted" : ""} relative border-b py-3 pl-[calc(var(--comment-depth)*24px)] last:border-b-0 scroll-mt-24 outline-none transition-colors duration-500 ${
         highlighted ? "rounded-md bg-primary/5 ring-1 ring-primary/30" : ""
       }`}
     >
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-2 text-sm">
-          <MemberSideview
-            mbId={comment.mb_id}
-            name={comment.mb_nick || comment.wr_name}
-            iconUrl={comment.member?.mb_icon_path}
-            boTable={boTable}
-            className="font-medium"
-          />
-          <span className="text-muted-foreground text-xs">
-            {formatDate(comment.wr_datetime)}
-          </span>
-        </div>
-        <div className="flex items-center gap-1">
-          {user && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => onReply(isReplyOpen ? -1 : comment.wr_id)}
-            >
-              답글
-            </Button>
-          )}
-          {isOwner && !editing && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={startEdit}
-            >
-              수정
-            </Button>
-          )}
-          {isOwner && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs text-destructive"
-              onClick={() => onDelete(comment.wr_id)}
-            >
-              삭제
-            </Button>
-          )}
-        </div>
-      </div>
-      {editing ? (
-        <div className="comment-edit-form mt-2 space-y-2">
-          {useEditor ? (
-            <CommentEditor
-              content={editContent}
-              onChange={setEditContent}
-              placeholder="댓글을 입력하세요"
+      <div className="board-comment-row flex items-start gap-3">
+        <MemberAvatar
+          name={displayName}
+          member={{
+            mb_image_path: comment.mb_image_path,
+            mb_icon_path: comment.mb_icon_path ?? comment.member?.mb_icon_path,
+          }}
+          className="board-comment-avatar grid size-9 shrink-0 place-items-center rounded-full bg-muted text-sm font-semibold"
+          size={40}
+        />
+        <div className="board-comment-main min-w-0 flex-1">
+          <div className="board-comment-meta flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+            <MemberSideview
+              mbId={comment.mb_id}
+              name={displayName}
+              iconUrl={comment.member?.mb_icon_path}
+              boTable={boTable}
+              className="board-comment-name font-medium"
             />
-          ) : (
-            <Textarea
-              value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-              placeholder="댓글을 입력하세요"
-              rows={3}
-              className="text-sm"
-              aria-label="댓글 수정"
-              autoFocus
-            />
-          )}
-          <div className="flex items-center justify-end gap-2">
-            <SecretCommentCheck
-              id={`wr_secret_edit_${comment.wr_id}`}
-              checked={editSecret}
-              onChange={setEditSecret}
-            />
-            <Button variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={saving}>
-              취소
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleEditSave}
-              disabled={saving || isContentEmpty(editContent)}
-            >
-              {saving ? "저장 중..." : "저장"}
-            </Button>
+            {replyToName ? (
+              <span className="board-comment-to text-xs text-muted-foreground">{replyToName} 님에게</span>
+            ) : null}
+            <time className="board-comment-date text-xs text-muted-foreground" dateTime={comment.wr_datetime}>
+              {formatDate(comment.wr_datetime)}
+            </time>
           </div>
-        </div>
-      ) : (
-        <CommentBody content={comment.wr_content} />
-      )}
+          {editing ? (
+            <div className="comment-edit-form mt-2 space-y-2">
+              {useEditor ? (
+                <CommentEditor
+                  content={editContent}
+                  onChange={setEditContent}
+                  placeholder="댓글을 입력하세요"
+                />
+              ) : (
+                <Textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  placeholder="댓글을 입력하세요"
+                  rows={3}
+                  className="text-sm"
+                  aria-label="댓글 수정"
+                  autoFocus
+                />
+              )}
+              <div className="flex items-center justify-end gap-2">
+                <SecretCommentCheck
+                  id={`wr_secret_edit_${comment.wr_id}`}
+                  checked={editSecret}
+                  onChange={setEditSecret}
+                />
+                <Button variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={saving}>
+                  취소
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleEditSave}
+                  disabled={saving || isContentEmpty(editContent)}
+                >
+                  {saving ? "저장 중..." : "저장"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="board-comment-body mt-1">
+              <CommentBody content={comment.wr_content} />
+            </div>
+          )}
 
-      {/* Reply Form */}
-      {isReplyOpen && (
-        <div className="mt-3 space-y-2">
-          {useEditor ? (
-            <CommentEditor
-              content={replyContent}
-              onChange={setReplyContent}
-              placeholder="답글을 입력하세요"
-            />
-          ) : (
-            <Textarea
-              value={replyContent}
-              onChange={(e) => setReplyContent(e.target.value)}
-              placeholder="답글을 입력하세요"
-              rows={2}
-              className="text-sm"
-            />
+          {/* Reply Form */}
+          {isReplyOpen && (
+            <div className="mt-3 space-y-2">
+              {useEditor ? (
+                <CommentEditor
+                  content={replyContent}
+                  onChange={setReplyContent}
+                  placeholder="답글을 입력하세요"
+                />
+              ) : (
+                <Textarea
+                  value={replyContent}
+                  onChange={(e) => setReplyContent(e.target.value)}
+                  placeholder="답글을 입력하세요"
+                  rows={2}
+                  className="text-sm"
+                />
+              )}
+              <div className="flex items-center justify-end gap-2">
+                <SecretCommentCheck
+                  id={`wr_secret_reply_${comment.wr_id}`}
+                  checked={replySecret}
+                  onChange={setReplySecret}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onReply(-1)}
+                >
+                  취소
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleReplySubmit}
+                  disabled={submitting || isContentEmpty(replyContent)}
+                >
+                  {submitting ? "등록 중..." : "답글 등록"}
+                </Button>
+              </div>
+            </div>
           )}
-          <div className="flex items-center justify-end gap-2">
-            <SecretCommentCheck
-              id={`wr_secret_reply_${comment.wr_id}`}
-              checked={replySecret}
-              onChange={setReplySecret}
-            />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onReply(-1)}
-            >
-              취소
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleReplySubmit}
-              disabled={submitting || isContentEmpty(replyContent)}
-            >
-              {submitting ? "등록 중..." : "답글 등록"}
-            </Button>
-          </div>
         </div>
-      )}
+        {/* 답글 · 수정 · 삭제는 오른쪽 ⋮ 메뉴 하나로(레퍼런스 view_comment 의 더보기 단추). */}
+        {actions.length > 0 ? <CommentActionsMenu label={`${displayName} 댓글 메뉴`} actions={actions} /> : null}
+      </div>
     </div>
   );
 });
@@ -462,17 +582,44 @@ export function CommentSection({ boTable, wrId, initialComments, useEditor: init
 
   // 에디터 리셋용 key
   const [editorKey, setEditorKey] = useState(0);
+  // 목록 접기(레퍼런스 댓글 머리의 [접기]). 쓰기 칸은 접지 않는다.
+  const [folded, setFolded] = useState(false);
+
+  // 답글의 받는 사람: 같은 댓글 묶음(wr_comment)에서 wr_comment_reply 가 한 글자 짧은 댓글(그누보드 답글 규칙).
+  const replyToNames = useMemo(() => {
+    const byKey = new Map(comments.map((item) => [`${item.wr_comment}|${item.wr_comment_reply ?? ""}`, item.mb_nick || item.wr_name]));
+    return new Map(
+      comments
+        .filter((item) => (item.wr_comment_reply ?? "") !== "")
+        .map((item) => [item.wr_id, byKey.get(`${item.wr_comment}|${item.wr_comment_reply.slice(0, -1)}`)])
+    );
+  }, [comments]);
 
   return (
     <Card>
       <CardContent className="pt-6">
-        <h3 className="text-lg font-semibold mb-4">
-          댓글 <span className="text-primary">{comments.length}</span>
-        </h3>
+        <div className="board-comments-head mb-4 flex items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold">
+            댓글 <span className="board-comments-count text-primary">{comments.length}</span>
+          </h3>
+          {comments.length > 0 ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="board-comments-fold"
+              aria-expanded={!folded}
+              aria-controls="board-comments-list"
+              onClick={() => setFolded((value) => !value)}
+            >
+              {folded ? "펼치기" : "접기"}
+            </Button>
+          ) : null}
+        </div>
 
         {/* Comment List */}
         {comments.length > 0 && (
-          <div className="mb-6">
+          <div id="board-comments-list" className="board-comments-list mb-6" hidden={folded}>
             {comments.map((comment) => (
               <CommentItem
                 key={comment.wr_id}
@@ -485,6 +632,7 @@ export function CommentSection({ boTable, wrId, initialComments, useEditor: init
                 onDelete={handleDelete}
                 useEditor={useEditor}
                 highlighted={highlightedId === comment.wr_id}
+                replyToName={replyToNames.get(comment.wr_id)}
               />
             ))}
           </div>
@@ -492,7 +640,7 @@ export function CommentSection({ boTable, wrId, initialComments, useEditor: init
 
         {/* New Comment Form */}
         {user ? (
-          <div className="space-y-3">
+          <div className="board-comment-form space-y-3">
             {useEditor ? (
               <CommentEditor
                 key={editorKey}
@@ -519,7 +667,7 @@ export function CommentSection({ boTable, wrId, initialComments, useEditor: init
             </div>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground text-center py-4">
+          <p className="board-comment-login text-sm text-muted-foreground text-center py-4">
             댓글을 작성하려면 로그인이 필요합니다.
           </p>
         )}

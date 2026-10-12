@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { isExternalMenuLink, isUnsafeMenuLink, menuAnchorTarget, menuHref } from "../src/components/layout/menu";
+import { isExternalMenuLink, isUnsafeMenuLink, menuAnchorTarget, menuHref, menuNavLink } from "../src/components/layout/menu";
 import { g5BaseUrlForRuntime } from "../src/lib/config";
 import { relativeRedirectTargetsShop } from "../src/lib/g5-short-url-utils";
 import {
@@ -23,6 +23,24 @@ test.describe("menu links", () => {
     expect(menuHref("#content")).toBe("#content");
     expect(menuHref("mailto:help@example.com")).toBe("mailto:help@example.com");
     expect(menuHref("tel:01012345678")).toBe("tel:01012345678");
+  });
+
+  test("keeps a parent menu whose link is empty or unsafe by linking it to its first sub-menu", () => {
+    const children = [{ href: "/notice" }, { href: "https://example.com/help", target: "_blank" as const }];
+
+    expect(menuNavLink({ me_link: "/free", me_target: "blank" }, children)).toEqual({ href: "/free", target: "_blank" });
+    // 링크가 비었거나 위험하면 메뉴를 빼지 않고(빼면 하위 메뉴까지 사라진다) 첫 하위 메뉴로 잇는다.
+    expect(menuNavLink({ me_link: "", me_target: "" }, children)).toEqual({ href: "/notice", target: undefined });
+    expect(menuNavLink({ me_link: "javascript:alert(1)", me_target: "self" }, children.slice(1))).toEqual({
+      href: "https://example.com/help",
+      target: "_blank",
+    });
+    // 제자리("#") 상위 메뉴도 첫 하위 메뉴로, 하위 메뉴 가운데 제자리인 것은 건너뛴다.
+    expect(menuNavLink({ me_link: "#", me_target: "" }, [{ href: "#" }, { href: "/faq" }])).toEqual({ href: "/faq", target: undefined });
+    // 이을 하위 메뉴가 없으면 — 제자리는 관리자가 둔 그대로, 빈 · 위험한 링크는 보일 것이 없다.
+    expect(menuNavLink({ me_link: "#", me_target: "" }, [])).toEqual({ href: "#", target: undefined });
+    expect(menuNavLink({ me_link: " ", me_target: "" }, [])).toBeNull();
+    expect(menuNavLink({ me_link: "javascript:void(0)", me_target: "" }, [])).toBeNull();
   });
 
   test("follows the administrator new-window setting", () => {

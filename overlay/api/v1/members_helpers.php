@@ -137,7 +137,7 @@ function api_member_require_current_password(array $input, array $member): void
 
     // 로그인 · 탈퇴와 같은 실패 횟수 제한 — 토큰만 가진 사람이 이 경로로 비밀번호를 대입하지 못하게.
     $mbId = (string) ($member['mb_id'] ?? '');
-    $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+    $ip = api_client_ip(); // 로그인 실패 잠금 — 지어낼 수 없는 주소만(request_helpers.php)
     $lockedMsg = Throttle::checkLoginAttempt($mbId, $ip);
     if ($lockedMsg !== null) {
         Response::error($lockedMsg, 429);

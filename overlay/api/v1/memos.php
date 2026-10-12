@@ -184,8 +184,25 @@ if (!$id && $apiMethod === 'POST') {
 
     global $config;
     $memoSendPoint = isset($config['cf_memo_send_point']) ? (int) $config['cf_memo_send_point'] : 0;
-    if (!$isAdmin && $memoSendPoint > 0 && ((int) $me['mb_point'] - $memoSendPoint) < 0) {
-        Response::error('보유 포인트가 부족하여 쪽지를 보낼 수 없습니다.', 422);
+    $pointLock = '';
+    if (!$isAdmin && $memoSendPoint > 0) {
+        // 잔액 확인과 차감 사이에 같은 회원의 다른 요청이 끼지 않게 회원 포인트 잠금 안에서 한다 — 쇼핑몰 포인트 사용과
+        // 같은 이름(shop/common.php shop_api_member_point_lock_name)이라 쪽지 · 주문이 같은 잔액을 두 번 쓰지 못한다.
+        $pointLock = 'g5pt_order_' . md5((string) $me['mb_id']);
+        $gotLock = DB::fetch('SELECT GET_LOCK(?, 5) AS l', [$pointLock]);
+        if ((int) ($gotLock['l'] ?? 0) !== 1) {
+            Response::error('포인트 처리 중입니다. 잠시 후 다시 시도해 주세요.', 409);
+        }
+        register_shutdown_function(static function () use ($pointLock): void {
+            DB::fetch('SELECT RELEASE_LOCK(?) AS l', [$pointLock]);
+        });
+        // 잔액은 포인트 내역 합계로 다시 본다(mb_point 는 요청 앞에서 읽은 사본).
+        $balance = function_exists('get_point_sum')
+            ? (int) get_point_sum((string) $me['mb_id'])
+            : (int) (DB::fetch("SELECT mb_point FROM {$memberTable} WHERE mb_id = ? LIMIT 1", [$me['mb_id']])['mb_point'] ?? 0);
+        if ($balance - $memoSendPoint < 0) {
+            Response::error('보유 포인트가 부족하여 쪽지를 보낼 수 없습니다.', 422);
+        }
     }
 
     $now = date('Y-m-d H:i:s');
@@ -225,15 +242,7 @@ if (!$id && $apiMethod === 'POST') {
         throw $e;
     }
 
-    // 받는 사람에게 알림 — 웹 알림함과 앱 푸시가 같은 한 건이다.
-    Notify::emit(
-        'memo.received',
-        $recvMbId,
-        ($me['mb_nick'] ?: $me['mb_id']) . '님의 쪽지',
-        mb_substr(strip_tags((string) $memoText), 0, 80, 'UTF-8'),
-        ['me_id' => $recvMemoId, 'sender' => $me['mb_id'], 'link' => '/mypage/memos/' . $recvMemoId]
-    );
-
+    // 포인트는 잠금을 쥔 채로 깎고 곧바로 푼다(알림 · 훅은 잠금 밖에서).
     if (!$isAdmin && $memoSendPoint > 0 && function_exists('insert_point')) {
         $recvNick = isset($recv['mb_nick']) ? $recv['mb_nick'] : $recvMbId;
         insert_point(
@@ -245,6 +254,18 @@ if (!$id && $apiMethod === 'POST') {
             $recvMemoId
         );
     }
+    if ($pointLock !== '') {
+        DB::fetch('SELECT RELEASE_LOCK(?) AS l', [$pointLock]);
+    }
+
+    // 받는 사람에게 알림 — 웹 알림함과 앱 푸시가 같은 한 건이다.
+    Notify::emit(
+        'memo.received',
+        $recvMbId,
+        ($me['mb_nick'] ?: $me['mb_id']) . '님의 쪽지',
+        mb_substr(strip_tags((string) $memoText), 0, 80, 'UTF-8'),
+        ['me_id' => $recvMemoId, 'sender' => $me['mb_id'], 'link' => '/mypage/memos/' . $recvMemoId]
+    );
 
     // 그누보드 훅 — 보낸 회원 목록(id · nick), 닉네임 문자열, 이동 주소(API 는 빈 값), 본문.
     // 알림은 위에서 이미 보냈다 — plugin/webapp/notify/events.php 는 API 요청에서 건너뛴다.

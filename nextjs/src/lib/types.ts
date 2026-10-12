@@ -244,6 +244,9 @@ export interface Comment {
   wr_ip: string;
   wr_option: string;
   mb_nick?: string;
+  /** 회원아이콘 · 회원이미지 주소(API post_comments_helpers 가 댓글마다 싣는다) — 아바타 원에 쓴다. */
+  mb_icon_path?: string | null;
+  mb_image_path?: string | null;
   member?: Pick<Member, 'mb_id' | 'mb_nick' | 'mb_icon_path'>;
 }
 

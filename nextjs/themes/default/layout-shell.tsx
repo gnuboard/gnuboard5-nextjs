@@ -7,7 +7,7 @@ import { g5PathForRuntime, g5PhpUrlForRuntime } from "@/lib/config";
 import { toG5ShortPath } from "@/lib/g5-short-url";
 import { G5_COMMUNITY_LOGO, SoluneBrandLogo } from "./brand-logo";
 import { SoluneCompanyInfo, useSoluneCompany } from "./site-company";
-import { isUnsafeMenuLink, menuAnchorTarget, menuHref, type MenuItem } from "@/components/layout/menu";
+import { menuNavLink, type MenuItem } from "@/components/layout/menu";
 import { useRuntimeMenus } from "@/hooks/useRuntimeMenus";
 import { useAuthStore } from "@/store/auth";
 import type { G5ThemeConfig, G5ThemeLayoutShellProps } from "@/lib/theme-types";
@@ -33,17 +33,14 @@ const FOOTER_LINKS = [
  *  관리자 > 메뉴설정은 링크를 그누보드 전체 주소(G5_URL/bbs/new.php 등)로 저장한다 — menuHref 가 앱 화면이
  *  있는 주소는 앱 주소(/recent 등)로, 그누보드 첫 주소는 앱 홈으로 바꿔, 프런트를 다른 주소에 둬도 앱 안에 머문다. */
 function menuToNavItem(menu: MenuItem): NavItem | null {
-  const raw = (menu.me_link || "").trim();
   const label = (menu.me_name || "").trim();
-  if (!raw || !label || isUnsafeMenuLink(raw)) return null;
-  return {
-    label,
-    href: menuHref(raw),
-    target: menuAnchorTarget(menu.me_target),
-    children: (menu.children ?? [])
-      .map(menuToNavItem)
-      .filter((item): item is NavItem => item !== null),
-  };
+  if (!label) return null;
+  const children = (menu.children ?? [])
+    .map(menuToNavItem)
+    .filter((item): item is NavItem => item !== null);
+  // 링크가 비었거나 위험한 상위 메뉴는 첫 하위 메뉴의 링크로 잇는다 — 빼면 하위 메뉴까지 사라진다(menuNavLink).
+  const link = menuNavLink(menu, children);
+  return link ? { label, ...link, children } : null;
 }
 
 /** The reference header always shows a menu rail, so fall back to core routes

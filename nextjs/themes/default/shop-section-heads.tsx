@@ -23,6 +23,9 @@ export interface SoluneShopRowHeadProps {
 
 /** 진열 줄 머리 — 왼쪽에 눈썹·제목·전체 보기, 오른쪽 끝에 화살표 둘, 아래 진행 막대 자리. */
 export function SoluneShopRowHead({ eyebrow, title, sub, href, headingId, prevRef, nextRef, progressRef }: SoluneShopRowHeadProps) {
+  // Swiper 가 아직 붙지 않은 줄(로딩 자리 잡기 · 넘김 스크립트 전)은 넘길 수 없으니 두 화살표를 옅게(disabled) 둔다.
+  // 붙은 뒤에는 Swiper 가 갈 수 있는 쪽만 진하게 바꾼다 — 진하게 섰다가 옅어지는 깜박임이 없다.
+  const pending = !prevRef && !nextRef;
   return (
     <header className="solune-shop-section-head solune-shop-section-head--row">
       <span className="solune-shop-eyebrow">{eyebrow}</span>
@@ -34,10 +37,10 @@ export function SoluneShopRowHead({ eyebrow, title, sub, href, headingId, prevRe
         </Link>
       ) : null}
       <div className="solune-shop-swiper-nav">
-        <button ref={prevRef} type="button" className="solune-shop-swiper-prev" aria-label={`${title} 이전`}>
+        <button ref={prevRef} type="button" className="solune-shop-swiper-prev" aria-label={`${title} 이전`} disabled={pending}>
           <ChevronLeft size={18} aria-hidden />
         </button>
-        <button ref={nextRef} type="button" className="solune-shop-swiper-next" aria-label={`${title} 다음`}>
+        <button ref={nextRef} type="button" className="solune-shop-swiper-next" aria-label={`${title} 다음`} disabled={pending}>
           <ChevronRight size={18} aria-hidden />
         </button>
       </div>
@@ -65,14 +68,17 @@ export function SoluneReviewHead({ headingId }: { headingId: string }) {
 export function SoluneStaticTrack({
   className,
   wrapperClass,
+  peek,
   children,
 }: {
   className: string;
   wrapperClass: string;
+  /** 진열 줄의 마지막 칸 반쯤 걸치기(shop-row.tsx 의 peek) — 초기화 전 칸 수 규칙이 이것으로 갈린다. */
+  peek?: boolean;
   children: ReactNode[];
 }) {
   return (
-    <div className={`swiper ${className}`}>
+    <div className={`swiper ${className}`} data-solune-swiper-peek={peek ? "1" : undefined}>
       <div className={wrapperClass}>
         {children.map((child, index) => (
           <div key={index} className="swiper-slide">
@@ -92,9 +98,14 @@ export function SoluneStaticTrack({
 export function SoluneCatrowPagerReserve() {
   return (
     <div className="solune-catrow-pager solune-catrow-pager-reserve" aria-hidden="true">
-      <span className="solune-catrow-nav" />
+      {/* 진짜 단추와 같은 모양을 흐리게(아직 넘길 수 없음) — 빈 동그라미보다 무엇이 올지 알아보기 쉽다. */}
+      <span className="solune-catrow-nav swiper-button-disabled">
+        <ChevronLeft size={16} />
+      </span>
       <span className="solune-catrow-scrollbar" />
-      <span className="solune-catrow-nav" />
+      <span className="solune-catrow-nav swiper-button-disabled">
+        <ChevronRight size={16} />
+      </span>
     </div>
   );
 }

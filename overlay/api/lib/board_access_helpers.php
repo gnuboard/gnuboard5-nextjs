@@ -342,3 +342,29 @@ function api_export_user_writes(string $mb_id, bool $is_comment, int $limit = 20
     }
     return array_slice($rows, 0, $limit);
 }
+
+/**
+ * 글 목록 질의의 칸. ?fields=toc 면 문서 목차(매뉴얼 같은 문서 테마)에 쓸 칸만 — 제목 · 분류 · 순서 · 작성 시각.
+ * 본문(wr_content)을 읽지 않는다.
+ */
+function api_board_list_columns(bool $tocOnly): string
+{
+    if ($tocOnly) {
+        return 'wr_id, wr_num, wr_reply, wr_subject, wr_seo_title, wr_datetime, wr_option, ca_name';
+    }
+    return 'wr_id, wr_num, wr_reply, wr_subject, wr_seo_title, wr_name, mb_id, '
+        . 'wr_datetime, wr_hit, wr_good, wr_nogood, wr_comment, '
+        . 'wr_option, ca_name, wr_link1, wr_link2, wr_ip, wr_content';
+}
+
+/**
+ * ?fields=toc 목록의 줄 — 작성자 별명 · 썸네일(이미지 크기 계산) · 발췌를 만들지 않고 공지 · 비밀 표시만 단다.
+ */
+function api_board_toc_rows(array $rows, bool $isNotice): array
+{
+    return array_map(static function (array $row) use ($isNotice): array {
+        $row['is_notice'] = $isNotice;
+        $row['is_secret'] = api_is_secret_option($row['wr_option']);
+        return $row;
+    }, $rows);
+}

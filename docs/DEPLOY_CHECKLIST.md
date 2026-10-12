@@ -147,6 +147,16 @@ G5_TRUSTED_PROXY_REMOTE_ADDRS=10.0.0.10,172.16.0.5
 Leave this blank when nginx and PHP-FPM are on the same host and PHP sees
 `127.0.0.1` or `::1`. Do not put arbitrary client IP ranges here.
 
+The API takes the visitor IP from `X-Forwarded-For` (for rate limits and the
+PG deposit-notice IP check) only when `REMOTE_ADDR` is in this list (IP or
+CIDR); loopback is not trusted for that on its own. List only proxies that
+append the visitor to `X-Forwarded-For` (nginx `$proxy_add_x_forwarded_for`,
+Cloudflare, a load balancer). On the server runtime, if a Next.js server on
+the same host proxies `/api/v1` to PHP behind nginx, add `127.0.0.1` and keep
+the Next.js port closed to the internet. Even with an empty list, requests
+that come through this host or a private-network proxy are rate-limited per
+visitor.
+
 상태 API가 `501 Handler not implemented` 또는 `404`이면 서버의 `api/index.php` 또는 `api/v1/status.php` 업로드가 누락된 것이다.
 
 ## 5. 최신글 API 확인

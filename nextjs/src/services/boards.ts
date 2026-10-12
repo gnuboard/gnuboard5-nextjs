@@ -61,7 +61,7 @@ export function getBoard(boTable: string, revalidate = 30): Promise<Board | null
     `board:${boTable}`,
     SHARED_BOARD_TTL_MS,
     async () => {
-      const result = await fetchApiResult(apiUrl(`/boards/${boTable}`), boardSchema, {
+      const result = await fetchApiResult(apiUrl(`/boards/${encodeURIComponent(boTable)}`), boardSchema, {
         next: { revalidate },
       });
 
@@ -81,7 +81,7 @@ export function getBoardCategoryCounts(boTable: string): Promise<BoardCategoryCo
     SHARED_BOARD_TTL_MS,
     async () => {
       const result = await fetchApiResult(
-        apiUrl(`/boards/${boTable}/category-counts`),
+        apiUrl(`/boards/${encodeURIComponent(boTable)}/category-counts`),
         boardCategoryCountsSchema,
         { next: { revalidate: 300 } }
       );
@@ -99,6 +99,7 @@ export async function getBoardPosts({
   stx,
   sca,
   withExcerpt = false,
+  fields,
   revalidate = 30,
 }: {
   boTable: string;
@@ -109,6 +110,8 @@ export async function getBoardPosts({
   sca?: string;
   /** 카드에 본문 발췌(wr_excerpt)를 보이는 목록(갤러리)만 켠다 — API ?with=excerpt. */
   withExcerpt?: boolean;
+  /** "toc" — 제목 · 분류 · 순서만(API ?fields=toc, 문서 목차용). 모르는 백엔드는 무시하고 전체 목록을 낸다. */
+  fields?: "toc";
   revalidate?: number;
 }): Promise<{ list: WritePost[]; total: number; totalPage: number; error?: string }> {
   const params = new URLSearchParams();
@@ -118,10 +121,11 @@ export async function getBoardPosts({
   if (stx) params.set("stx", stx);
   if (sca) params.set("sca", sca);
   if (withExcerpt) params.set("with", "excerpt");
+  if (fields) params.set("fields", fields);
 
   const suffix = params.toString() ? `?${params.toString()}` : "";
   const result = await fetchApiResult(
-    apiUrl(`/boards/${boTable}/posts${suffix}`),
+    apiUrl(`/boards/${encodeURIComponent(boTable)}/posts${suffix}`),
     writePostListSchema,
     { next: { revalidate } }
   );
@@ -152,7 +156,7 @@ export async function getPostDetailResult({
   token?: string;
 }): Promise<PostDetailResult> {
   const result = await fetchApiResult(
-    apiUrl(`/posts/${boTable}/${wrId}`),
+    apiUrl(`/posts/${encodeURIComponent(boTable)}/${encodeURIComponent(String(wrId))}`),
     postDetailSchema,
     {
       ...(token ? { cache: "no-store" as const } : { next: { revalidate: 30 } }),
@@ -185,7 +189,7 @@ export async function getPostDetailBySeoResult({
   slug: string;
 }): Promise<PostDetailResult> {
   const result = await fetchApiResult(
-    apiUrl(`/posts/${boTable}/seo/${encodeURIComponent(slug)}`),
+    apiUrl(`/posts/${encodeURIComponent(boTable)}/seo/${encodeURIComponent(slug)}`),
     postDetailSchema,
     { next: { revalidate: 30 } }
   );

@@ -29,7 +29,8 @@ foreach ($rows as $row) {
     // Convert local Gnuboard links when possible while preserving every
     // administrator-configured menu item as a usable fallback.
     $link = convertMenuLink($row['me_link'], $row['me_name']);
-    if ($link === '') {
+    // 링크가 빈 하위 메뉴는 보일 것이 없어 뺀다. 상위 메뉴는 아래에서 하위 메뉴가 있으면 첫 하위 메뉴의 링크로 잇는다.
+    if ($link === '' && strlen($code) > 2) {
         continue;
     }
 
@@ -55,6 +56,20 @@ foreach ($children as $parentCode => $kids) {
     if (isset($parents[$parentCode])) {
         $parents[$parentCode]['children'] = $kids;
     }
+}
+
+// 링크가 빈 상위 메뉴 — 빼면 하위 메뉴까지 사라진다(메뉴 동기화 규칙: 관리자 메뉴를 임의로 지우지 않고, 상위 메뉴도
+// 링크다). 하위 메뉴가 있으면 첫 하위 메뉴의 링크 · 새 창 설정을 쓰고, 하위 메뉴도 없으면 보일 것이 없어 뺀다.
+foreach ($parents as $parentCode => $parent) {
+    if ($parent['me_link'] !== '') {
+        continue;
+    }
+    if (empty($parent['children'])) {
+        unset($parents[$parentCode]);
+        continue;
+    }
+    $parents[$parentCode]['me_link'] = $parent['children'][0]['me_link'];
+    $parents[$parentCode]['me_target'] = $parent['children'][0]['me_target'];
 }
 
 Response::success(array_values($parents));

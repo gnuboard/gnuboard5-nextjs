@@ -298,15 +298,16 @@ function pg_notify_allowed_ips(string $provider): array {
  * 보낸 통보로 주문이 입금 처리될 수 있었다. 이제 두 모드 모두 목록으로 거른다.
  *
  * 목록이 없는 PG 도 거른다(fail closed). 통보를 흉내 내 보는 로컬 시험에서만
- * SHOP_PG_NOTIFY_SKIP_IP_CHECK 로 명시해서 끈다 — 그것도 이 설치본 주소(G5_URL)가 로컬 · 사설망일 때만
- * 듣는다. 운영 도메인에서 잘못 켜 두어도 IP 검사는 그대로 돈다.
+ * SHOP_PG_NOTIFY_SKIP_IP_CHECK 로 명시해서 끈다 — 그것도 G5_DOMAIN 이 로컬 · 사설망이고 통보가 이 컴퓨터 · 사설망에서
+ * 왔을 때만 듣는다(pg_notify_skip_ip_check_permitted). 운영 도메인에서 잘못 켜 두어도 IP 검사는 그대로 돈다.
  */
 function pg_notify_ip_allowed(string $provider): bool {
     if ((getenv('SHOP_PG_NOTIFY_SKIP_IP_CHECK') ?: '') !== '' && pg_notify_skip_ip_check_permitted()) {
         return true;
     }
 
-    $remote = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+    // 앞단 프록시(G5_TRUSTED_PROXY_REMOTE_ADDRS)를 지정했으면 그 뒤의 실제 발신 주소로 본다.
+    $remote = function_exists('api_client_ip') ? api_client_ip() : (string) ($_SERVER['REMOTE_ADDR'] ?? '');
     $allowed = pg_notify_allowed_ips($provider);
 
     if ($allowed === [] || !in_array($remote, $allowed, true)) {
@@ -316,13 +317,20 @@ function pg_notify_ip_allowed(string $provider): bool {
     return true;
 }
 
-/** IP 검사 끄기를 들어줄 설치본인가 — CLI(시험) 이거나 G5_URL 이 로컬 · 사설망 주소일 때만. */
+/**
+ * IP 검사 끄기를 들어줄 설치본인가 — CLI(시험)이거나, config.php 의 G5_DOMAIN 이 로컬 · 사설망 주소이고 통보도 이 컴퓨터 ·
+ * 사설망에서 왔을 때만. G5_URL 은 보지 않는다 — G5_DOMAIN 이 비면 코어가 요청의 Host 헤더로 만들어, 바깥에서
+ * "Host: 10.evil.com" 같은 값을 보내 로컬로 보이게 할 수 있다. G5_DOMAIN 이 비어 있으면 웹 요청에서는 끄지 않는다.
+ */
 function pg_notify_skip_ip_check_permitted(): bool {
     if (PHP_SAPI === 'cli') {
         return true;
     }
-    $url = defined('G5_URL') ? (string) G5_URL : '';
-    return $url !== '' && pg_is_local_origin($url);
+    $domain = defined('G5_DOMAIN') ? (string) G5_DOMAIN : '';
+    $remote = trim((string) ($_SERVER['REMOTE_ADDR'] ?? ''), '[]');
+    $remoteIsLocal = $remote !== '' && filter_var($remote, FILTER_VALIDATE_IP) !== false
+        && filter_var($remote, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
+    return $domain !== '' && pg_is_local_origin($domain) && $remoteIsLocal;
 }
 
 function pg_text_response(string $text, int $status = 200, string $contentType = 'text/plain; charset=utf-8'): void {
@@ -606,12 +614,17 @@ function pg_legacy_transaction_query(string $sql): void {
     }
 }
 
+/**
+ * 주소의 호스트가 localhost 이거나 루프백 · 사설망 IP 그 자체인가. 접두사로 보지 않는다 — "127.0.0.1.evil.com" ·
+ * "10.evil.com" 같은 이름이 로컬로 읽히지 않게 IP 형식 전체를 본다.
+ */
 function pg_is_local_origin(string $origin): bool {
-    $host = strtolower((string) (parse_url($origin, PHP_URL_HOST) ?: ''));
-    if ($host === 'localhost' || $host === '::1' || preg_match('/^127\./', $host) === 1) {
+    $host = strtolower(trim((string) (parse_url($origin, PHP_URL_HOST) ?: ''), '[]'));
+    if ($host === 'localhost') {
         return true;
     }
-    return preg_match('/^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/', $host) === 1;
+    return filter_var($host, FILTER_VALIDATE_IP) !== false
+        && filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
 }
 
 function pg_easy_pay_services(array $cfg): array {

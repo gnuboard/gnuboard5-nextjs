@@ -72,9 +72,9 @@ export function shouldBypassImageOptimization(src: string | null | undefined): b
 
   try {
     const url = new URL(src);
-    // 127.x 대역은 dev 환경 — 통과.
-    if (url.hostname.startsWith('127.')) return false;
-    // http 는 모두 우회 (운영은 https 만).
+    // http 는 모두 우회 (운영은 https 만). 개발용 그누보드(127.x · localhost)도 여기서 우회한다 —
+    // Next 16 의 최적화기는 사설 IP 를 거절해("resolved to private IP") 그림이 400 으로 깨지고,
+    // 우회하면 remotePatterns 에 없는 localhost 같은 주소도 "hostname is not configured" 로 멈추지 않는다.
     if (url.protocol === 'http:') return true;
     // 신뢰 호스트가 아니면 우회 — remotePatterns 에 없어도 throw 안 함.
     return !TRUSTED_HOSTS.has(url.hostname);

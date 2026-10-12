@@ -180,7 +180,7 @@ if ($seg0 === 'me' && isset($apiSegments[1]) && $apiSegments[1] === 'export' && 
     }
 
     // 비밀번호 검증 — DB 의 hash 와 비교. 로그인 · 탈퇴와 같은 실패 횟수 제한(토큰만으로 비밀번호를 대입하지 못하게).
-    $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+    $ip = api_client_ip(); // 로그인 실패 잠금 — 지어낼 수 없는 주소만(request_helpers.php)
     $lockedMsg = Throttle::checkLoginAttempt((string) $mb_id, $ip);
     if ($lockedMsg !== null) {
         Response::error($lockedMsg, 429);
@@ -441,7 +441,7 @@ if ($seg0 === 'me' && $apiMethod === 'DELETE') {
     $socialCodeVerifier = isset($input['social_code_verifier'])
         ? trim((string) $input['social_code_verifier'])
         : '';
-    $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+    $ip = api_client_ip(); // 로그인 실패 잠금 — 지어낼 수 없는 주소만(request_helpers.php)
 
     if ($password !== '') {
         $lockedMsg = Throttle::checkLoginAttempt($mb_id, $ip);

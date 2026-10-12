@@ -40,6 +40,8 @@ class Throttle
     /** 로그인 실패 한도 — IP+계정 단위. 초과 시 lock-out. */
     public const LOGIN_FAIL_THRESHOLD = 5;
     public const LOGIN_LOCKOUT_SECONDS = 15 * 60;
+    /** 주소와 상관없이 한 계정의 최근 15분 실패 합계 상한(여러 주소로 나눠 시도하는 것). */
+    public const LOGIN_ACCOUNT_FAIL_THRESHOLD = 20;
 
     /** 계정/이메일 존재 확인 같은 enum-위험 엔드포인트의 IP-기반 quota. */
     public const ENUM_PER_MINUTE = 10;
@@ -107,6 +109,18 @@ class Throttle
             "DELETE FROM `{$table}` WHERE last_attempt_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)",
             []
         );
+
+        // 계정 하나에 여러 주소에서 나눠 틀리는 시도도 묶는다 — 주소마다 5번씩이면 주소를 바꿔 가며 끝없이 시도할 수 있다.
+        // 최근 15분 실패 합계(주소 무관)가 기준을 넘으면 잠깐 막는다. 한도 기록(ip = '')은 세지 않는다.
+        $accountFails = (int) (DB::fetch(
+            "SELECT COALESCE(SUM(fail_count), 0) AS n FROM `{$table}`
+              WHERE mb_id = ? AND ip <> '' AND last_attempt_at > DATE_SUB(NOW(), INTERVAL "
+                . (int) (self::LOGIN_LOCKOUT_SECONDS / 60) . " MINUTE)",
+            [$mb_id]
+        )['n'] ?? 0);
+        if ($accountFails >= self::LOGIN_ACCOUNT_FAIL_THRESHOLD) {
+            return '이 계정에 로그인 실패가 너무 많습니다. 잠시 후 다시 시도해주세요.';
+        }
 
         $row = DB::fetch(
             "SELECT * FROM `{$table}` WHERE mb_id = ? AND ip = ? LIMIT 1",
@@ -189,13 +203,16 @@ class Throttle
         // last_attempt_at 컬럼을 enum probe 카운팅 용으로도 활용.
         // mb_id = '__enum__' prefix 로 구분.
         $key = '__enum__' . substr(hash('sha256', $ip), 0, 12);
+        // 프록시 뒤 방문자 키("프록시>방문자", api_rate_limit_ip)는 IPv6 면 ip 칸(45자)을 넘는다 — 엄격 모드에서 저장이
+        // 실패해 요청이 500 으로 끝나지 않게, 긴 키는 해시로 줄여 같은 값으로 세고 저장한다.
+        $rowIp = strlen($ip) <= 45 ? $ip : 'h' . substr(hash('sha256', $ip), 0, 44);
 
         // 이 IP 가 넣은 행(ip = 요청 IP)만 센다. 로그인 실패 기록도 같은 칸을 쓰므로, 남이 이 키를 아이디로
         // 넣어 로그인을 틀려도(그 행의 ip 는 그 사람의 IP) 이 IP 의 한도를 채울 수 없다.
         $perMin = DB::count(
             "SELECT COUNT(*) FROM `{$table}`
               WHERE mb_id = ? AND ip = ? AND last_attempt_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE)",
-            [$key, $ip]
+            [$key, $rowIp]
         );
         if ($perMin >= self::ENUM_PER_MINUTE) {
             return '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.';
@@ -204,16 +221,21 @@ class Throttle
         $perHour = DB::count(
             "SELECT COUNT(*) FROM `{$table}`
               WHERE mb_id = ? AND ip = ? AND last_attempt_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)",
-            [$key, $ip]
+            [$key, $rowIp]
         );
         if ($perHour >= self::ENUM_PER_HOUR) {
+            return '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.';
+        }
+        // 방문자 키는 X-Forwarded-For 로 지어낼 수도 있으니, 그 프록시 주소 전체로도 10배 상한을 둔다(돌려 써도 거기까지).
+        if (strpos($ip, '>') !== false
+            && self::checkMemberQuota('enumproxy', 'ip:' . strstr($ip, '>', true), self::ENUM_PER_MINUTE * 10, self::ENUM_PER_HOUR * 10) !== null) {
             return '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.';
         }
 
         DB::execute(
             "INSERT INTO `{$table}` (mb_id, ip, fail_count, last_attempt_at)
              VALUES (?, ?, 0, NOW())",
-            [$key, $ip]
+            [$key, $rowIp]
         );
         return null;
     }
@@ -272,6 +294,15 @@ class Throttle
             return $failClosed ? '지금은 이 기능을 쓸 수 없습니다. 잠시 후 다시 시도해주세요.' : null;
         }
 
+        // 한 시간 넘은 한도 기록은 셀 일이 없다 — 가끔(약 100번에 한 번) 지운다. 로그인 확인이 지우던 것만으로는
+        // 토큰으로 오래 로그인해 있는 앱 사용자의 쓰기 기록이 쌓이기만 한다. 로그인 실패 기록(ip 가 채워진 행)은 건드리지 않는다.
+        if (random_int(1, 100) === 1) {
+            DB::execute(
+                "DELETE FROM `{$table}`
+                  WHERE ip = '' AND LEFT(mb_id, 4) = '__q_' AND last_attempt_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)",
+                []
+            );
+        }
         $key = '__q_' . substr(preg_replace('/[^a-z0-9]/i', '', $bucket), 0, 16) . '_' . substr(hash('sha256', $mb_id), 0, 16);
         foreach (array(array('1 MINUTE', $perMinute), array('1 HOUR', $perHour)) as $window) {
             // ip = '' 인 행(아래에서 이 함수가 넣은 것)만 센다. 로그인 실패 기록은 ip 가 늘 채워지므로, 누가 이 키를
@@ -336,18 +367,39 @@ class Throttle
         error_log('[Throttle] login_attempt_table unavailable; using file fallback.' . $suffix);
     }
 
+    /**
+     * 표가 없을 때 쓰는 한도 파일 — 이 설치본의 data/cache 에 둔다. 서버 공용 임시 폴더는 같은 서버의 다른 계정이 이름을
+     * 짐작해 링크로 바꿔 둘 수 있어, data/cache 를 못 쓸 때만 쓴다(그때도 아래에서 링크는 거절한다).
+     */
     private static function fallbackStorePath(): string
     {
-        $scope = defined('G5_PATH') ? substr(hash('sha256', (string) G5_PATH), 0, 12) : 'default';
-        return rtrim(sys_get_temp_dir(), '/\\') . '/g5-api-throttle-fallback-' . $scope . '.json';
+        // 파일 이름에 서버 비밀을 섞어, data/cache 가 웹에서 열려도 주소를 짐작해 내려받지 못하게 한다(내용도 해시 · 시각뿐).
+        $scope = substr(hash('sha256', (defined('G5_PATH') ? (string) G5_PATH : 'default') . '|' . (defined('JWT_SECRET') ? (string) JWT_SECRET : '')), 0, 24);
+        $dir = defined('G5_DATA_PATH') ? G5_DATA_PATH . '/cache' : '';
+        if ($dir === '' || !is_dir($dir) || !is_writable($dir)) {
+            $dir = sys_get_temp_dir();
+        }
+        return rtrim($dir, '/\\') . '/g5-api-throttle-fallback-' . $scope . '.json';
     }
 
     private static function withFallbackStore(callable $callback)
     {
         $path = self::fallbackStorePath();
+        // 링크를 따라가 엉뚱한 파일을 비우고 덮어쓰지 않는다 — 열기 전에 거르고, 연 뒤에도 같은 파일인지 다시 본다.
+        if (is_link($path)) {
+            error_log('[Throttle] fallback store is a symlink, refusing: ' . $path);
+            return null;
+        }
         $fh = @fopen($path, 'c+');
         if (!$fh) {
             error_log('[Throttle] fallback store unavailable: ' . $path);
+            return null;
+        }
+        $opened = @fstat($fh);
+        $named = @lstat($path);
+        if (!$opened || !$named || is_link($path) || $opened['ino'] !== $named['ino'] || $opened['dev'] !== $named['dev']) {
+            fclose($fh);
+            error_log('[Throttle] fallback store changed while opening, refusing: ' . $path);
             return null;
         }
 

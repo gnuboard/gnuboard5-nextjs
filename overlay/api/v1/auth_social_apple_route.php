@@ -200,7 +200,7 @@ if (!function_exists('api_apple_provider_enabled')) {
 }
 
 if ($action === 'social' && isset($apiSegments[1]) && $apiSegments[1] === 'apple' && $apiMethod === 'POST') {
-    $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+    $ip = api_rate_limit_ip(); // 프록시 뒤면 손님마다 (request_helpers.php)
     $limited = Throttle::checkEnumProbe($ip);
     if ($limited !== null) {
         Response::error($limited, 429);

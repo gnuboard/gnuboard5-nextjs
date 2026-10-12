@@ -163,11 +163,14 @@ function api_qa_save_uploaded_file($file, $qaConfig, $isAdmin)
         ? replace_filename($storedBase)
         : preg_replace('/[^A-Za-z0-9._-]/', '_', $storedBase);
 
-    $chars = array_merge(range(0, 9), range('a', 'z'), range('A', 'Z'));
-    shuffle($chars);
-    $shuffle = implode('', $chars);
+    // 저장 이름의 난수는 암호용 난수(random_int)로 — 게시판 첨부(post-files.php)와 같은 방식.
+    $chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    $rand = '';
+    for ($k = 0; $k < 8; $k++) {
+        $rand .= $chars[random_int(0, strlen($chars) - 1)];
+    }
     $ipHash = md5(sha1(isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : ''));
-    $stored = $ipHash . '_' . substr($shuffle, 0, 8) . '_' . $storedBase;
+    $stored = $ipHash . '_' . $rand . '_' . $storedBase;
     $dest = G5_DATA_PATH . '/qa/' . $stored;
 
     if (!@move_uploaded_file($file['tmp_name'], $dest)) {

@@ -411,6 +411,10 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'GET') {
         return $out;
     };
 
+    // ?fields=toc — 문서 목차에 쓸 칸만(권한 · 숨김 · 정렬 · 쪽 나눔은 같다). 모르는 백엔드는 무시하고 전체 목록을 낸다.
+    $tocOnly = (string) ($_GET['fields'] ?? '') === 'toc';
+    $listColumns = api_board_list_columns($tocOnly);
+
     // Fetch notice posts separately. Include them only on the first page so
     // infinite-scroll clients do not receive duplicate notice rows.
     $noticePosts = [];
@@ -424,15 +428,13 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'GET') {
         api_add_blocked_author_condition($noticeConditions, $noticeParams, $viewer);
         $noticeWhere = "WHERE " . implode(" AND ", $noticeConditions);
 
-        $noticeSql = "SELECT wr_id, wr_num, wr_reply, wr_subject, wr_seo_title, wr_name, mb_id,
-                             wr_datetime, wr_hit, wr_good, wr_nogood, wr_comment,
-                             wr_option, ca_name, wr_link1, wr_link2, wr_ip, wr_content
+        $noticeSql = "SELECT {$listColumns}
                        FROM {$write_table}
                        {$noticeWhere}
                       ORDER BY FIELD(wr_id, {$placeholders})";
         $noticeParams = array_merge($noticeParams, array_values($noticeIds));
         $noticeRows = DB::readFetchAll($noticeSql, $noticeParams);
-        $noticePosts = $enrichPosts($noticeRows, true);
+        $noticePosts = $tocOnly ? api_board_toc_rows($noticeRows, true) : $enrichPosts($noticeRows, true);
     }
 
     // Fetch regular posts (exclude notice posts)
@@ -451,16 +453,14 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'GET') {
     $postParams[] = $offset;
     $postParams[] = $perPage;
 
-    $sql = "SELECT wr_id, wr_num, wr_reply, wr_subject, wr_seo_title, wr_name, mb_id,
-                   wr_datetime, wr_hit, wr_good, wr_nogood, wr_comment,
-                   wr_option, ca_name, wr_link1, wr_link2, wr_ip, wr_content
+    $sql = "SELECT {$listColumns}
             FROM {$write_table}
             {$where}
             ORDER BY {$sst} {$sod}
             LIMIT ?, ?";
 
     $rows  = DB::readFetchAll($sql, $postParams);
-    $regularPosts = $enrichPosts($rows, false);
+    $regularPosts = $tocOnly ? api_board_toc_rows($rows, false) : $enrichPosts($rows, false);
 
     // Combine: notices first, then regular posts
     $posts = array_merge($noticePosts, $regularPosts);

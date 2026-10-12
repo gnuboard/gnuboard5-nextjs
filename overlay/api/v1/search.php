@@ -244,14 +244,16 @@ foreach ($targetBoards as $board) {
     ];
 }
 
-// Record popular search keyword
+// Record popular search keyword — 하루 한 번, 검색 결과가 있을 때만(아무 말이나 넣어 인기 검색어를 채우지 못하게).
 $today = date('Y-m-d');
-$checkPopular = DB::fetch("SELECT pp_id FROM " . DB::table('popular_table') . "
-                           WHERE pp_word = ?
-                             AND pp_date = ?
-                           LIMIT 1", [$keyword, $today]);
+$checkPopular = $totalCount > 0
+    ? DB::fetch("SELECT pp_id FROM " . DB::table('popular_table') . "
+                 WHERE pp_word = ?
+                   AND pp_date = ?
+                 LIMIT 1", [$keyword, $today])
+    : null;
 
-if (!$checkPopular || !$checkPopular['pp_id']) {
+if ($totalCount > 0 && (!$checkPopular || !$checkPopular['pp_id'])) {
     DB::execute("INSERT INTO " . DB::table('popular_table') . "
                SET pp_word = ?,
                    pp_date = ?,

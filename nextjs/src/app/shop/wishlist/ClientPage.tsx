@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { G5Link as Link } from "@/components/ui/g5-link";
 import Image from "next/image";
+import { shouldBypassImageOptimization } from "@/lib/image";
 import { runtimeRouterPush } from "@/lib/runtime-router";
 import { g5ShortHref } from "@/lib/g5-short-url";
 import { notifyCartChanged } from "@/lib/cart-events";
@@ -391,6 +392,7 @@ export default function WishlistPage() {
                   {item.image_url ? (
                     <Image
                       src={item.image_url}
+                      unoptimized={shouldBypassImageOptimization(item.image_url)}
                       alt={item.it_name}
                       fill
                       className="object-cover transition-transform group-hover:scale-105"

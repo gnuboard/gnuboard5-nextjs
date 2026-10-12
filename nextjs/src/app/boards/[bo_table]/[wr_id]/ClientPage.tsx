@@ -411,7 +411,7 @@ export default function PostViewClient({
               className="font-medium text-foreground"
             />
             <span>{formatDate(post.wr_datetime)}</span>
-            <span>Views {formatNumber(Number(post.wr_hit))}</span>
+            <span>조회 {formatNumber(Number(post.wr_hit))}</span>
             {post.ca_name && <Badge variant="outline">{post.ca_name}</Badge>}
             <ShareButtons title={post.wr_subject} />
           </div>

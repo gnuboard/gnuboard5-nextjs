@@ -92,7 +92,8 @@ function DefaultProductCard({ product, priority = false, productRewriteMode }: P
               {formatProductPrice(product)}
             </span>
           </div>
-          <span className="block min-h-4 text-xs text-[#5f6872] line-through">
+          {/* \uC904 \uB192\uC774\uB97C \uC9C0\uD0A4\uB294 \uC790\uB9AC \u2014 \uC6D0\uAC00\uAC00 \uC5C6\uC744 \uB54C \uBE48\uCE78(&nbsp;)\uC5D0\uAE4C\uC9C0 \uCDE8\uC18C\uC120\uC744 \uADF8\uC73C\uBA74 \uAC00\uACA9 \uBC11\uC5D0 "-" \uAC00 \uBCF4\uC600\uB2E4. */}
+          <span className={`block min-h-4 text-xs text-[#5f6872]${hasDiscount && !telInquiry ? " line-through" : ""}`}>
             {hasDiscount && !telInquiry ? formatPrice(product.it_cust_price) : "\u00A0"}
           </span>
         </div>

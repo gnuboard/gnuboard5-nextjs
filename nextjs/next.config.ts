@@ -115,6 +115,25 @@ const ALLOWED_IMAGE_HOSTS = [...new Set([...DEFAULT_IMAGE_HOSTS, ...extraHosts])
 
 const isDev = process.env.NODE_ENV !== 'production';
 
+// 개발 서버는 .env.local 에 적은 그누보드 · API 주소의 호스트를 이미지 허용 목록에 저절로 넣는다 — 그누보드가
+// localhost 같은 주소면 첨부 그림이 "hostname is not configured under images" 로 막혔고, 같은 주소를
+// NEXT_IMAGE_LOCAL_HOSTS 에 또 적어야 했다. 운영 빌드의 목록은 그대로다(NEXT_IMAGE_EXTRA_HOSTS 로 정한다).
+function hostnameFromUrl(value?: string): string {
+  if (!value) return '';
+
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return '';
+  }
+}
+
+const devBackendImageHosts = isDev
+  ? [process.env.NEXT_PUBLIC_API_URL, process.env.NEXT_PUBLIC_G5_URL, process.env.G5_API_INTERNAL_URL]
+      .map(hostnameFromUrl)
+      .filter((host, index, hosts) => host !== '' && hosts.indexOf(host) === index)
+  : [];
+
 // 설치 폴더를 모르는 채로 한 번만 빌드한다. 자리표시자를 basePath 로 박아 두면 Next 가
 // 링크·라우터·청크 경로를 전부 같은 접두사로 만들고, PHP 브리지(plugin/webapp/bridge/common.php)가
 // 응답 시점에 이 값을 실제 설치 경로로 바꾼다. 페이로드 속 경로만 골라 고치다 하이드레이션이
@@ -399,6 +418,10 @@ const nextConfig: NextConfig = {
       ...(isDev || STATIC_EXPORT || process.env.NEXT_IMAGE_ALLOW_LOCAL_HOSTS === '1'
         ? localImageHosts.map((hostname) => ({ protocol: 'http' as const, hostname }))
         : []),
+      ...devBackendImageHosts.flatMap((hostname) => [
+        { protocol: 'http' as const, hostname },
+        { protocol: 'https' as const, hostname },
+      ]),
       ...ALLOWED_IMAGE_HOSTS.map((hostname) => ({
         protocol: 'https' as const,
         hostname,

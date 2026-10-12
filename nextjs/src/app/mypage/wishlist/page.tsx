@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { G5Link as Link } from "@/components/ui/g5-link";
 import Image from "next/image";
+import { shouldBypassImageOptimization } from "@/lib/image";
 import { useRouter } from "next/navigation";
 import type { ShopWishItem } from "@/lib/api";
 import type { BbsRewriteMode } from "@/lib/board-url";
@@ -178,6 +179,7 @@ export default function MyWishlistPage() {
                   {item.image_url ? (
                     <Image
                       src={item.image_url}
+                      unoptimized={shouldBypassImageOptimization(item.image_url)}
                       alt={item.it_name}
                       fill
                       className="object-cover transition-transform group-hover:scale-105"

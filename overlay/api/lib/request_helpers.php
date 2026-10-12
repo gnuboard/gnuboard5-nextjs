@@ -190,9 +190,113 @@ function api_public_request_origin(bool $allowForwardedHost = false): string
 function api_require_write_quota(string $bucket, $member, int $perMinute, int $perHour): void
 {
     $mbId = is_array($member) ? trim((string) ($member['mb_id'] ?? '')) : '';
-    $subject = $mbId !== '' ? 'mb:' . $mbId : 'ip:' . (string) ($_SERVER['REMOTE_ADDR'] ?? '');
-    $message = Throttle::checkMemberQuota($bucket, $subject, $perMinute, $perHour);
+    $subject = $mbId !== '' ? 'mb:' . $mbId : 'ip:' . api_rate_limit_ip();
+    // 프록시 뒤 방문자 키("프록시>방문자")는 지어낼 수도 있으니, 그 프록시 주소 전체로도 10배 상한을 둔다.
+    $message = strpos($subject, '>') !== false
+        ? Throttle::checkMemberQuota($bucket . 'px', strstr($subject, '>', true), $perMinute * 10, $perHour * 10)
+        : null;
+    $message = $message ?? Throttle::checkMemberQuota($bucket, $subject, $perMinute, $perHour);
     if ($message !== null) {
         Response::error($message, 429, ['code' => 'RATE_LIMITED']);
     }
+}
+
+/**
+ * 앞단 프록시로 지정한 주소(G5_TRUSTED_PROXY_REMOTE_ADDRS — 상수 또는 환경변수, 쉼표로 IP 나 CIDR).
+ * 손님 IP(X-Forwarded-For)를 믿는 데는 루프백도 저절로 넣지 않는다 — 같은 서버의 Next 서버가 바깥에 열려 있으면
+ * 받은 X-Forwarded-For 를 그대로 넘겨, 누구나 PG 입금통보 IP 검사를 통과하는 주소를 적어 보낼 수 있다.
+ */
+function api_trusted_proxy_list(): array
+{
+    $configured = defined('G5_TRUSTED_PROXY_REMOTE_ADDRS') ? (string) G5_TRUSTED_PROXY_REMOTE_ADDRS : (string) (getenv('G5_TRUSTED_PROXY_REMOTE_ADDRS') ?: '');
+    $list = [];
+    foreach (explode(',', $configured) as $value) {
+        $value = trim(trim($value), '[]');
+        if ($value !== '') {
+            $list[] = $value;
+        }
+    }
+    return $list;
+}
+
+/** $ip 가 목록(IP 또는 CIDR)에 드는가 — IPv4 · IPv6. */
+function api_ip_in_list(string $ip, array $list): bool
+{
+    $packed = @inet_pton($ip);
+    if ($packed === false) {
+        return false;
+    }
+    foreach ($list as $entry) {
+        $parts = explode('/', $entry, 2);
+        $net = @inet_pton($parts[0]);
+        if ($net === false || strlen($net) !== strlen($packed)) {
+            continue;
+        }
+        // 비트 수는 1 ~ 주소 비트 수의 숫자만 — "10.0.0.0/" · "/abc" · "/0" 같은 오타가 모든 주소를 프록시로 보게 하지 않는다.
+        if (isset($parts[1]) && preg_match('/^[0-9]{1,3}$/', $parts[1]) !== 1) {
+            continue;
+        }
+        $bits = isset($parts[1]) ? (int) $parts[1] : strlen($packed) * 8;
+        if ($bits < 1 || $bits > strlen($packed) * 8) {
+            continue;
+        }
+        $bytes = intdiv($bits, 8);
+        $rest = $bits % 8;
+        if (substr($packed, 0, $bytes) !== substr($net, 0, $bytes)) {
+            continue;
+        }
+        if ($rest === 0 || ((ord($packed[$bytes]) ^ ord($net[$bytes])) & (0xFF << (8 - $rest)) & 0xFF) === 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/** X-Forwarded-For 의 주소들(왼쪽 → 오른쪽), 형식이 맞는 것만. */
+function api_forwarded_for_chain(): array
+{
+    $chain = [];
+    foreach (explode(',', (string) ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? '')) as $value) {
+        $value = trim(trim($value), '[]');
+        if ($value !== '' && filter_var($value, FILTER_VALIDATE_IP) !== false) {
+            $chain[] = $value;
+        }
+    }
+    return $chain;
+}
+
+/**
+ * 실제 손님 IP — REMOTE_ADDR 가 지정한 프록시일 때만 X-Forwarded-For 를 오른쪽부터 보며, 지정한 프록시가 아닌 첫 주소를 쓴다
+ * (프록시가 손님 주소를 뒤에 덧붙이므로 왼쪽 값은 손님이 지어낼 수 있다). 그 밖에는 REMOTE_ADDR. PG 입금통보 IP 검사가 쓴다.
+ */
+function api_client_ip(): string
+{
+    $remote = trim((string) ($_SERVER['REMOTE_ADDR'] ?? ''), '[]');
+    $trusted = api_trusted_proxy_list();
+    if ($remote === '' || $trusted === [] || !api_ip_in_list($remote, $trusted)) {
+        return $remote;
+    }
+    foreach (array_reverse(api_forwarded_for_chain()) as $hop) {
+        if (!api_ip_in_list($hop, $trusted)) {
+            return $hop;
+        }
+    }
+    return $remote;
+}
+
+/**
+ * 횟수 한도를 셀 주소 — api_client_ip() 에, 지정하지 않았더라도 이 서버 · 사설망에서 온 요청(같은 서버의 Next 서버 ·
+ * nginx 를 거친 요청)이면 X-Forwarded-For 의 마지막 주소를 덧붙여 손님마다 따로 센다. 그러지 않으면 모든 손님이 프록시
+ * 주소 하나로 묶여 한도를 나눠 쓴다. 이 값은 지어낼 수도 있어 한도에만 쓴다(최악이어도 한도가 느슨해질 뿐이다).
+ */
+function api_rate_limit_ip(): string
+{
+    $ip = api_client_ip();
+    $remote = trim((string) ($_SERVER['REMOTE_ADDR'] ?? ''), '[]');
+    if ($ip !== $remote || $remote === '') {
+        return $ip;
+    }
+    $internal = filter_var($remote, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
+    $chain = api_forwarded_for_chain();
+    return $internal && $chain !== [] ? $remote . '>' . end($chain) : $remote;
 }

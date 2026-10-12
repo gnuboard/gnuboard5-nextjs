@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { shouldBypassImageOptimization } from "@/lib/image";
 import { G5Link as Link } from "@/components/ui/g5-link";
 import { ProductImageFallback } from "@/components/shop/ProductImageFallback";
 import type { ShopOrder } from "@/lib/api";
@@ -75,6 +76,7 @@ export function ShopOrderListCard({ order }: { order: ShopOrder }) {
         {firstItem?.image_url ? (
           <Image
             src={firstItem.image_url}
+            unoptimized={shouldBypassImageOptimization(firstItem.image_url)}
             alt={firstItem.it_name}
             fill
             className="object-cover"

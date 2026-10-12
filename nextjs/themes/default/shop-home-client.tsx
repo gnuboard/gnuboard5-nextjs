@@ -122,11 +122,11 @@ interface ShopRowProps {
 function SoluneShopRow(props: ShopRowProps) {
   const { carousels } = useCarousels();
   if (carousels) return <carousels.SoluneShopRow {...props} />;
-  const { eyebrow, title, sub, href, headingId, children } = props;
+  const { eyebrow, title, sub, href, peek, headingId, children } = props;
   return (
     <section className="solune-shop-product-section solune-shop-row" aria-labelledby={headingId}>
       <SoluneShopRowHead eyebrow={eyebrow} title={title} sub={sub} href={href} headingId={headingId} />
-      <SoluneStaticTrack className="solune-shop-swiper" wrapperClass="swiper-wrapper sct">
+      <SoluneStaticTrack className="solune-shop-swiper" wrapperClass="swiper-wrapper sct" peek={peek}>
         {Children.toArray(children)}
       </SoluneStaticTrack>
     </section>
