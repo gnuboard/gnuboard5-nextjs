@@ -21,12 +21,14 @@ Static export install notes:
    apache-rewrite.example.conf is the same set of rules for reference.
 2. Build the manuals from boards: one board group = the manual shelf, one
    board = one manual, board categories = parts, posts = chapters (the board
-   list order is the chapter order).
+   list order is the chapter order; set it on the chapter order screen below —
+   new posts land first).
 3. Open 환경설정 > 테마 화면 설정 (/adm/view.php?call=theme_settings, super
    admin only). Pick the manual board group, set the manual order, names and
-   hints, choose per screen whether the left sidebar shows on wide screens,
-   and fill in the site texts (logo, home, footer). Saved values show up on
-   the next page load; no rebuild.
+   hints, set each manual's chapter order (the 순서 link), choose per screen
+   whether the left sidebar shows on wide screens, and fill in the site texts
+   (logo, home, footer). Saved values show up on the next page load; no
+   rebuild.
 4. Menu items come from 환경설정 > 메뉴설정, as with the other themes.
 5. When developing from the source checkout, build the app with:
    cd nextjs

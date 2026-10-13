@@ -120,7 +120,7 @@ export function useDocsBooks(
   serverSource: DocsSource = docsSourceFrom(null)
 ): DocsBooksState {
   // 서버가 빠짐없이 읽었으면 책이 없어도(매뉴얼 그룹이 없거나 글이 없음) 다시 받지 않는다 — 받는 동안 "다 받기 전"으로
-  // 남아 게시판 화면의 사이드바가 그려졌다 사라지지 않게(theme-settings.ts isSidebarHidden).
+  // 남아 게시판 화면의 사이드바가 그려졌다 사라지지 않게(theme-settings.ts sidebarState).
   const skipRefresh = process.env.G5_NEXT_RUNTIME !== "static" && initialComplete;
   const [books, setBooks] = useState<DocsBook[]>(initialBooks);
   const [settled, setSettled] = useState(skipRefresh);

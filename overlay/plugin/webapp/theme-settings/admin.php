@@ -101,6 +101,21 @@ if (!function_exists('webapp_theme_settings_group_boards')) {
     }
 }
 
+if (!function_exists('webapp_theme_settings_admin_chapters')) {
+    /** 장 순서 화면에 보일 것 — 매뉴얼 그룹의 게시판일 때 그 게시판과 장 목록(목차 순서, 너무 많으면 false). */
+    function webapp_theme_settings_admin_chapters(string $bo_table, array $group_boards): ?array
+    {
+        global $g5;
+        $board = webapp_theme_settings_chapter_board($bo_table, $group_boards);
+        if ($board === null) {
+            return null;
+        }
+        $rows = webapp_theme_settings_chapter_rows($g5['write_prefix'] . $bo_table);
+        $board['rows'] = is_array($rows) ? webapp_theme_settings_chapter_toc_order($rows, $board['category_list']) : $rows;
+        return $board;
+    }
+}
+
 if (!function_exists('webapp_theme_settings_request_handler')) {
     function webapp_theme_settings_request_handler($arr_query, $token)
     {
@@ -120,6 +135,24 @@ if (!function_exists('webapp_theme_settings_request_handler')) {
 
             // common.php 가 모든 입력에 addslashes 를 걸어 두었다 — JSON 으로 저장하기 전에 되돌린다.
             $post = array_map_deep('stripslashes', $_POST);
+
+            // 장 순서 저장(chapters.php) — 매뉴얼 그룹의 게시판만. 설정 저장과 따로 보내는 폼이다.
+            if (($post['mode'] ?? '') === 'chapters' && function_exists('webapp_theme_settings_reorder_chapters')) {
+                $board = (string) ($post['chapters_board'] ?? '');
+                $current = webapp_theme_settings_load($theme)['settings'];
+                $chapter_board = webapp_theme_settings_chapter_board($board, webapp_theme_settings_group_boards($current['docs']['group']));
+                if ($chapter_board === null) {
+                    alert('매뉴얼 그룹의 게시판이 아닙니다.');
+                }
+                $orders = isset($post['chapter_order']) && is_array($post['chapter_order']) ? $post['chapter_order'] : array();
+                $error = webapp_theme_settings_reorder_chapters($board, $chapter_board['category_list'], $orders);
+                if ($error !== '') {
+                    alert($error);
+                }
+                // 변경 번호를 올려 화면의 목차 캐시(브라우저 sessionStorage 열쇠)를 버리게 한다 — 설정 값은 그대로 다시 저장.
+                webapp_theme_settings_save($theme, $current, (string) $member['mb_id']);
+                goto_url(G5_ADMIN_URL . '/view.php?call=theme_settings&chapters=' . rawurlencode($board) . '&saved=chapters#ts-chapters');
+            }
 
             // 고칠 수 있는 게시판은 저장 전 그룹(화면에 보였던 목록)의 게시판뿐 — 그룹을 바꾸는 저장에서 새 그룹 게시판을 건드리지 않게.
             $before = webapp_theme_settings_load($theme)['settings']['docs']['group'];
@@ -152,13 +185,19 @@ if (!function_exists('webapp_theme_settings_request_handler')) {
         while ($result && ($row = sql_fetch_array($result))) {
             $groups[] = $row;
         }
+        $group_boards = webapp_theme_settings_group_boards($loaded['settings']['docs']['group']);
         webapp_theme_settings_admin_state(array(
             'theme' => $theme,
             'settings' => $loaded['settings'],
             'revision' => $loaded['revision'],
             'groups' => $groups,
-            'boards' => webapp_theme_settings_group_boards($loaded['settings']['docs']['group']),
-            'saved' => isset($_GET['saved']),
+            'boards' => $group_boards,
+            'saved' => ($_GET['saved'] ?? '') === '1',
+            // 장 순서 화면(?chapters=게시판) — 매뉴얼 그룹의 게시판일 때만.
+            'chapters' => isset($_GET['chapters']) && is_string($_GET['chapters']) && function_exists('webapp_theme_settings_chapter_board')
+                ? webapp_theme_settings_admin_chapters($_GET['chapters'], $group_boards)
+                : null,
+            'chapters_saved' => ($_GET['saved'] ?? '') === 'chapters',
         ));
     }
 }
@@ -179,6 +218,10 @@ if (!function_exists('webapp_theme_settings_admin_html')) {
     /** 화면 HTML — 넣는 값은 모두 이스케이프한다. 저장 버튼은 그누보드 관리자처럼 위에 고정. */
     function webapp_theme_settings_admin_html(array $state, string $token): string
     {
+        // 장 순서는 따로 연 한 장(chapters.php) — 위에 고정된 설정 "저장" 단추와 섞이지 않게.
+        if (!empty($state['chapters']) && function_exists('webapp_theme_settings_chapters_html')) {
+            return webapp_theme_settings_chapters_html($state['chapters'], $token, !empty($state['chapters_saved']));
+        }
         $h = static function ($value): string {
             return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
         };
@@ -216,7 +259,8 @@ if (!function_exists('webapp_theme_settings_admin_html')) {
                 $out .= '<tr><td class="td_num"><input type="number" min="0" max="9999" name="boards[' . $h($table) . '][order]" value="' . (int) $row['bo_order'] . '" class="tbl_input" size="4"></td>'
                     . '<td><input type="text" name="boards[' . $h($table) . '][subject]" value="' . $h($row['bo_subject']) . '" class="tbl_input full_input" maxlength="255"> <span class="frm_info">' . $h($table) . '</span></td>'
                     . '<td><input type="text" name="docs[hints][' . $h($table) . ']" value="' . $h($hints[$table] ?? '') . '" class="tbl_input full_input" maxlength="100" placeholder="비우면 제목의 &quot;안내 · 이름&quot;에서"></td>'
-                    . '<td class="td_num">' . (int) $row['bo_count_write'] . '</td></tr>';
+                    . '<td class="td_num">' . (int) $row['bo_count_write']
+                    . ' <a href="' . $h(G5_ADMIN_URL . '/view.php?call=theme_settings&chapters=' . rawurlencode($table)) . '#ts-chapters">순서</a></td></tr>';
             }
             $out .= '</tbody></table></div>';
         }

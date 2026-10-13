@@ -45,6 +45,7 @@ theme in `g5_theme_setting` (created by the API add-on, `plugin/webapp/theme-set
 | --- | --- |
 | Manual board group | which boards are manuals; book order and names edit the boards' `bo_order` / `bo_subject` directly |
 | Hint per manual | the small text above the book name |
+| Chapter order (the 순서 link per manual) | numbers per chapter; saving reassigns the board posts' existing `wr_num` values in that order (replies and comments follow their post), so the board list order changes too. New posts still land first — place them here after writing |
 | Left sidebar per screen (home · manual · board · other) | `hidden` drops the left column at 1280px and wider; the phone menu drawer stays |
 | Site texts | logo text, footer, customer-centre lines, home hero title / lead — empty fields keep `theme.config.ts` |
 

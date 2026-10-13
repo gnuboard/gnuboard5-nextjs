@@ -48,8 +48,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * 글자 단위(코드 포인트)로 자른다 — PHP 의 mb_substr 와 같은 셈이라, 정적 빌드에서 브리지가 HTML 에 미리 넣은 글자와
+ * 하이드레이션 때 그리는 글자가 같다(settings-html.php handbook_settings_html_text).
+ */
 function cleanText(value: unknown): string {
-  return typeof value === "string" ? value.trim().slice(0, MAX_TEXT_LENGTH) : "";
+  return typeof value === "string" ? Array.from(value.trim()).slice(0, MAX_TEXT_LENGTH).join("") : "";
 }
 
 /** 게시판 이름 → 안내 문구. 빈 문구와 게시판 이름 모양이 아닌 열쇠는 뺀다(PHP 는 빈 맵을 [] 로 보내기도 한다). */
@@ -143,20 +147,27 @@ export function sidebarScreen(path: string, where: { inBook: boolean }): Sidebar
   return isBoardPath(stripped) ? "board" : "other";
 }
 
+/** 사이드바를 숨기는지 — 아직 정할 수 없으면 unknown(그동안은 브리지가 정한 값 · 예전 모양을 둔다). */
+export type SidebarState = "hidden" | "shown" | "unknown";
+
 /**
  * 이 화면에서 왼쪽 사이드바를 숨기는가(넓은 화면의 왼쪽 열 — 좁은 화면의 메뉴 서랍은 그대로 둔다).
  *
- * 정할 수 없을 때는 보인다(예전 모양): 설정이 없을 때, 정적 빌드가 아직 주소를 모를 때(하이드레이션 중, pathReady),
- * 목차를 다 받기 전이라 게시판 주소가 매뉴얼인지 모르는데 두 화면의 설정이 다를 때(booksSettled).
+ * unknown: 정적 빌드가 아직 주소를 모를 때(하이드레이션 중, pathReady), 목차를 다 받기 전이라 게시판 주소가 매뉴얼인지
+ * 모르는데 두 화면의 설정이 다를 때(booksSettled). 그동안은 브리지가 요청 때 정해 둔 값(<html data-doc-sidebar>)이 쓰인다
+ * (theme/handbook/bridge/settings-html.php · theme.shell.css). 설정이 없으면 늘 보인다.
  */
-export function isSidebarHidden(
+export function sidebarState(
   settings: HandbookThemeSettings | null,
   state: { path: string; pathReady: boolean; booksSettled: boolean; inBook: boolean }
-): boolean {
-  if (!settings || !state.pathReady) return false;
+): SidebarState {
+  // 주소를 모르면 설정과 상관없이 unknown — 정적 빌드는 빌드 때(설정 없음)와 하이드레이션 때(설정 있음) 모두 주소를 몰라
+  // 같은 속성(data-sidebar 없음)으로 그려야 한다. 그래야 브리지의 <html data-doc-sidebar> 가 첫 그림에 쓰인다.
+  if (!state.pathReady) return "unknown";
+  if (!settings) return "shown";
   const screen = sidebarScreen(state.path, state);
-  if (screen === "board" && !state.booksSettled && settings.sidebar.board !== settings.sidebar.docs) return false;
-  return settings.sidebar[screen] === "hidden";
+  if (screen === "board" && !state.booksSettled && settings.sidebar.board !== settings.sidebar.docs) return "unknown";
+  return settings.sidebar[screen] === "hidden" ? "hidden" : "shown";
 }
 
 let clientSettingsCache: { raw: unknown; value: HandbookThemeSettings | null } | null = null;

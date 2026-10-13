@@ -25,10 +25,9 @@ import { LegacyRouteBridge } from "@/components/legacy-route-bridge";
 import { RuntimeNavigationBridge } from "@/components/runtime-navigation-bridge";
 import { themeComponents, themeConfig } from "@/lib/theme";
 import { runtimeSeoConfig, serverSeoSettings } from "@/lib/seo-config";
-import { serverSiteName } from "@/lib/site-name";
+import { serverDocumentSiteTexts, serverSiteName } from "@/lib/site-name";
 import type { ServerUser } from "@/lib/auth-server";
 
-const SITE_DESC = themeConfig.site.description;
 const ICON_192_URL = rootPublicAssetUrl('/icon-192.png');
 const ICON_512_URL = rootPublicAssetUrl('/icon-512.png');
 const OG_DEFAULT_URL = rootPublicAssetUrl('/og-default.png');
@@ -65,7 +64,8 @@ async function getInitialUserForLayout(): Promise<ServerUser | null> {
 
 /** 사이트 이름은 설치본마다 다르다(cf_title) — site-name.ts 참고. */
 export async function generateMetadata(): Promise<Metadata> {
-  const SITE_NAME = await serverSiteName();
+  // 사이트 설명 — 테마 기본값, 서버 실행이면 관리자 › 테마 화면 설정에 저장한 문구가 먼저(site-name.ts).
+  const [SITE_NAME, { description: SITE_DESC }] = await Promise.all([serverSiteName(), serverDocumentSiteTexts()]);
 
   return {
   metadataBase: new URL(APP_BASE_URL),

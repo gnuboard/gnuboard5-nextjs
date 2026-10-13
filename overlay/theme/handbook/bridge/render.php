@@ -15,9 +15,9 @@ function handbook_runtime_config()
         // 설치본의 사이트 제목(cf_title) — 브라우저 JS 가 화면을 옮길 때 제목 뒤에 붙이는 사이트 이름(site-name.php).
         'siteName' => handbook_site_name(),
         // 관리자 › 테마 설정의 공개 값(왼쪽 메뉴 · 사이트 문구) — 정적 빌드는 이 값을 화면에 붙자마자 읽는다(요청을 더하지 않는다).
-        'themeSettings' => function_exists('webapp_theme_settings_public')
-            ? webapp_theme_settings_public(webapp_theme_settings_active_theme())
-            : null,
+        'themeSettings' => function_exists('handbook_theme_settings_public') ? handbook_theme_settings_public() : null,
+        // 이 HTML 의 data-ts 글자를 위 설정으로 이미 바꿨는가 — 화면이 하이드레이션부터 설정을 쓸지 정한다(settings-html.php).
+        'themeSettingsApplied' => function_exists('handbook_settings_html_applied') ? handbook_settings_html_applied() : false,
     );
 }
 
@@ -159,6 +159,8 @@ function handbook_render_app_shell()
     $html = handbook_rewrite_runtime_metadata_urls($html, $index_path);
     // 탭 제목 · 메타 · 구조화 데이터의 테마 기본 이름("매뉴얼")을 설치본의 사이트 제목으로.
     $html = handbook_apply_site_name($html);
+    // 관리자 › 테마 화면 설정 문구(data-ts)와 이 주소의 사이드바 — 첫 그림부터 저장한 값으로(settings-html.php).
+    $html = handbook_apply_theme_settings_html($html);
     $html = handbook_inject_runtime_config($html);
     $html = handbook_add_script_nonce($html);
 

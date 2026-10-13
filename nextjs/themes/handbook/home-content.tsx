@@ -43,10 +43,13 @@ function Hero({
         <BookOpen size={13} aria-hidden />
         매뉴얼
       </span>
-      <h1 id="hero-heading" className="doc-hero-title">
+      {/* data-ts — 정적 빌드는 브리지가 관리자 문구로 바꿔 내보낸다(layout-shell.tsx ShellFooter 설명). */}
+      <h1 id="hero-heading" className="doc-hero-title" data-ts="homeTitle">
         {name}
       </h1>
-      <p className="doc-hero-lead">{description}</p>
+      <p className="doc-hero-lead" data-ts="homeDescription">
+        {description}
+      </p>
       <div className="doc-hero-actions">
         {first ? (
           <Link href={first.href} className="btn btn-primary gap-1.5 rounded-lg">
@@ -110,6 +113,26 @@ function BookSection({ books }: { books: DocsBook[] }) {
   );
 }
 
+/** 목차를 받는 동안 보이는 빈 카드 수 — 넓은 화면 두 줄. */
+const PLACEHOLDER_CARDS = 6;
+
+/**
+ * 목차를 받는 동안의 자리. 정적 빌드는 빌드 때 목차를 싣지 않아 화면에 붙은 뒤 받는데, 자리를 비워 두면 책 목록이 들어오며
+ * 바닥글이 밀렸다(레이아웃 이동). 카드 모양으로 화면 높이만큼 자리를 잡아 바닥글을 처음부터 화면 아래에 둔다.
+ * 서버 실행은 서버가 목차를 넘겨 이 자리를 그리지 않는다.
+ */
+function BooksPlaceholder() {
+  return (
+    <section className="doc-section doc-books-placeholder" aria-busy="true" aria-label="매뉴얼 목록을 불러오는 중">
+      <div className="doc-feature-grid" aria-hidden>
+        {Array.from({ length: PLACEHOLDER_CARDS }, (_, index) => (
+          <div key={index} className="doc-placeholder-card" />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function RecentSection({ books }: { books: DocsBook[] }) {
   const recent = recentlyAdded(books);
   if (recent.length === 0) return null;
@@ -166,7 +189,7 @@ export function HandbookHomeContent({ name, description }: { name: string; descr
         indexPath={docsIndexPath(books)}
       />
       {books.length === 0 ? (
-        settled ? <p className="doc-empty">아직 등록된 문서가 없습니다.</p> : null
+        settled ? <p className="doc-empty">아직 등록된 문서가 없습니다.</p> : <BooksPlaceholder />
       ) : (
         <>
           <BookSection books={books} />

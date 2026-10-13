@@ -8,7 +8,7 @@ import { currentPathForRuntime } from "@/lib/config";
 import { g5ShortHref } from "@/lib/g5-short-url";
 import { useRuntimeMenus } from "@/hooks/useRuntimeMenus";
 import { useAuthStore } from "@/store/auth";
-import { docsIndexPath, docsSourceFrom, type DocsBook } from "./docs-nav";
+import { DOCS_GROUP, docsIndexPath, docsSourceFrom, type DocsBook } from "./docs-nav";
 import { useDocsBooks } from "./use-docs-chapters";
 import { useNavScrollMemory } from "./use-nav-scroll";
 import { HandbookPageToc } from "./page-toc";
@@ -21,7 +21,7 @@ import { BookSelector, ChapterList } from "./book-selector";
 import { BookBrowseList, SidebarMenuGroup } from "./sidebar-sections";
 import { ChapterPager } from "./chapter-pager";
 import { HandbookDocsProvider, HandbookHomeTextsProvider } from "./docs-context";
-import { handbookHomeTexts, isSidebarHidden, withSiteTexts, type HandbookThemeSettings } from "./theme-settings";
+import { handbookHomeTexts, sidebarState, withSiteTexts, type HandbookThemeSettings } from "./theme-settings";
 import { useHandbookThemeSettings } from "./use-theme-settings";
 import type {
   G5ThemeConfig,
@@ -50,6 +50,11 @@ function useHighlightPath(pathname: string): string {
 }
 
 
+/**
+ * data-ts="키" — 정적 빌드에서 테마 브리지가 요청 때 그 요소의 글자를 관리자 › 테마 화면 설정의 문구로 바꿔 내보낸다
+ * (theme/handbook/bridge/settings-html.php). 화면도 하이드레이션 때 같은 설정으로 그려 글자가 맞는다 — 기본 문구가 잠깐
+ * 보였다 바뀌지 않게. 요소 안에는 그 글자만 둔다.
+ */
 function ShellFooter({ config, indexPath }: { config: G5ThemeConfig; indexPath: string }) {
   return (
     <footer className="doc-footer">
@@ -60,15 +65,15 @@ function ShellFooter({ config, indexPath }: { config: G5ThemeConfig; indexPath: 
               <span className="doc-brand-mark" aria-hidden>
                 {config.site.logoMark}
               </span>
-              <span className="text-base font-black text-[color:var(--doc-ink)]">
+              <span className="text-base font-black text-[color:var(--doc-ink)]" data-ts="name">
                 {config.site.name}
               </span>
             </div>
-            <p>{config.site.footerDescription}</p>
+            <p data-ts="footerDescription">{config.site.footerDescription}</p>
           </div>
           <div>
-            <h2>{config.site.customerCenterTitle}</h2>
-            <ul className="space-y-1">
+            <h2 data-ts="customerCenterTitle">{config.site.customerCenterTitle}</h2>
+            <ul className="space-y-1" data-ts="customerCenterLines">
               {/* 관리자가 같은 줄을 두 번 적을 수 있다 — 열쇠에 순서를 넣는다. */}
               {config.site.customerCenterLines.map((line, index) => (
                 <li key={`${index}:${line}`}>{line}</li>
@@ -91,7 +96,7 @@ function ShellFooter({ config, indexPath }: { config: G5ThemeConfig; indexPath: 
           </div>
         </div>
         <div className="doc-footer-bottom">
-          © {config.site.copyrightName} · daisyUI 기반 문서형 테마
+          © <span data-ts="copyrightName">{config.site.copyrightName}</span> · daisyUI 기반 문서형 테마
         </div>
       </div>
     </footer>
@@ -194,10 +199,11 @@ export function HandbookLayoutShell({
   const sidebarFallback = showBookBrowse && bookGroups.length === 0 && docsSettled;
   const isChapterPage = currentBook ? chapterPositionByPath(currentBook, highlightPath) !== null : false;
   // 관리자 › 테마 화면 설정의 "숨기기" — 1280px 이상의 왼쪽 열만 뺀다(좁은 화면의 메뉴 서랍은 그대로).
-  // 정적 빌드의 하이드레이션 동안(주소를 아직 모를 때)은 예전처럼 둔다.
-  const sidebarHidden = isSidebarHidden(settings, {
+  // 정적 빌드의 하이드레이션 동안(주소를 아직 모를 때)은 정하지 않는다(unknown) — 정적 HTML 과 같은 속성으로 붙고,
+  // 그동안은 브리지가 요청 때 정한 <html data-doc-sidebar> 가 쓰인다(theme.shell.css).
+  const sidebar = sidebarState(settings, {
     path: highlightPath || pathname,
-    pathReady: highlightPath !== "" || pathname === "/",
+    pathReady: highlightPath !== "",
     booksSettled: docsSettled,
     inBook: Boolean(currentBook),
   });
@@ -234,7 +240,9 @@ export function HandbookLayoutShell({
   }, [open]);
 
   return (
-    <div className="doc-root">
+    // data-docs-group — 빌드 때 정한 매뉴얼 그룹. 관리자 설정에 그룹이 없을 때 브리지가 이 값으로 화면 종류(매뉴얼 · 게시판)를
+    // 가른다(theme/handbook/bridge/settings-html.php).
+    <div className="doc-root" data-docs-group={DOCS_GROUP || undefined}>
       {/* 저장된 라이트/다크(없으면 운영체제 설정)를 첫 페인트 전에 적용한다. */}
       <script dangerouslySetInnerHTML={{ __html: handbookThemeBootScript }} />
       {/* 서랍이 열린 동안 상단 바 · 본문 · 오른쪽 목차 · 푸터는 inert — Tab 이 서랍 뒤로 빠지지 않는다. */}
@@ -255,7 +263,9 @@ export function HandbookLayoutShell({
           <span className="doc-brand-mark" aria-hidden>
             {config.site.logoMark}
           </span>
-          <span className="doc-brand-name">{config.site.logoText}</span>
+          <span className="doc-brand-name" data-ts="logoText">
+            {config.site.logoText}
+          </span>
           <span className="doc-brand-badge">docs</span>
         </Link>
 
@@ -285,8 +295,8 @@ export function HandbookLayoutShell({
           React 가 쥔다 — 여닫을 때 포커스 이동 · Escape · 본문 inert 를 함께 다루려고. 키보드로는
           헤더의 메뉴 버튼을 쓰므로 체크박스는 탭 순서와 읽기 순서에서 뺀다. */}
       <div
-        className={sidebarHidden ? "drawer doc-drawer" : "drawer xl:drawer-open doc-drawer"}
-        data-sidebar={sidebarHidden ? "hidden" : undefined}
+        className={sidebar === "hidden" ? "drawer doc-drawer" : "drawer xl:drawer-open doc-drawer"}
+        data-sidebar={sidebar === "unknown" ? undefined : sidebar}
       >
         <input
           id="doc-drawer-toggle"

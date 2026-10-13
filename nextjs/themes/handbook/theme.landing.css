@@ -220,6 +220,31 @@
   color: var(--doc-muted);
 }
 
+/* 목차를 받는 동안의 자리(home-content.tsx BooksPlaceholder) — 바닥글을 처음부터 화면 아래에 둬 목록이 들어올 때 밀리지 않게. */
+.doc-books-placeholder {
+  min-height: 70vh;
+}
+
+.doc-placeholder-card {
+  min-height: 11rem;
+  border: 1px solid var(--doc-border);
+  border-radius: var(--doc-radius-lg);
+  background: var(--doc-surface-muted);
+  animation: doc-placeholder-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes doc-placeholder-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .doc-placeholder-card {
+    animation: none;
+  }
+}
+
 .doc-empty {
   padding: 2rem 1rem;
   text-align: center;

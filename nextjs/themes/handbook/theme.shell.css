@@ -375,6 +375,11 @@
   .doc-drawer[data-sidebar="hidden"] > .drawer-side {
     display: none;
   }
+  /* 정적 빌드의 첫 그림 — React 가 아직 정하지 않은 동안(data-sidebar 없음)은 브리지가 요청 때 이 주소를 보고 정한
+     값을 쓴다(theme/handbook/bridge/settings-html.php 의 <html data-doc-sidebar>). 붙은 뒤 열이 사라지며 본문이 밀리지 않게. */
+  html[data-doc-sidebar="hidden"] .doc-drawer:not([data-sidebar]) > .drawer-side {
+    display: none;
+  }
 }
 
 @media (min-width: 640px) and (max-width: 1023px) {

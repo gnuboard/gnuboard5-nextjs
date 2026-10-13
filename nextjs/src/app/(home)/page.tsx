@@ -1,4 +1,4 @@
-import { serverSiteName } from "@/lib/site-name";
+import { serverDocumentSiteTexts, serverSiteName } from "@/lib/site-name";
 import { G5Link as Link } from "@/components/ui/g5-link";
 import { Suspense } from "react";
 import Image from "next/image";
@@ -19,18 +19,20 @@ import type {
 } from "@/lib/theme-types";
 import type { Board, WritePost } from "@/lib/types";
 
-const HOME_TITLE = themeConfig.site.homeTitle ?? "커뮤니티";
-
-/** 사이트 이름은 설치본마다 다르다(cf_title) — site-name.ts 참고. */
+/**
+ * 사이트 이름은 설치본마다 다르다(cf_title) — site-name.ts 참고. 첫 화면 제목 · 설명은 테마 기본값, 서버 실행이면
+ * 관리자 › 테마 화면 설정에 저장한 문구가 먼저(serverDocumentSiteTexts).
+ */
 export async function generateMetadata() {
-  const siteName = await serverSiteName();
-  const title = HOME_TITLE === siteName ? HOME_TITLE : `${HOME_TITLE} — ${siteName}`;
+  const [siteName, texts] = await Promise.all([serverSiteName(), serverDocumentSiteTexts()]);
+  const homeTitle = texts.homeTitle ?? "커뮤니티";
+  const title = homeTitle === siteName ? homeTitle : `${homeTitle} — ${siteName}`;
 
   return {
     ...buildPageMetadata({
       title,
       description:
-        themeConfig.site.homeDescription
+        texts.homeDescription
         ?? `${siteName} 커뮤니티의 최신글, 인기글, 게시판 소식을 빠르게 확인하세요.`,
       path: "/",
     }),

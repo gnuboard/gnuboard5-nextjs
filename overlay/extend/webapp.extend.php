@@ -26,7 +26,7 @@ if (!defined('_GNUBOARD_')) {
 $g5_webapp_plugin_dir = (defined('G5_PATH') ? G5_PATH : dirname(__DIR__)) . '/plugin/webapp';
 
 if (is_dir($g5_webapp_plugin_dir)) {
-    foreach (array('notify/tables.php', 'bridge/api_session.php', 'bridge/runtime.php', 'bridge/social.php', 'bridge/legacy_guard.php', 'notify/events.php', 'notify/admin.php', 'notify/admin_order_push.php', 'theme-settings/settings.php', 'theme-settings/admin.php') as $g5_webapp_plugin_file) {
+    foreach (array('notify/tables.php', 'bridge/api_session.php', 'bridge/runtime.php', 'bridge/social.php', 'bridge/legacy_guard.php', 'notify/events.php', 'notify/admin.php', 'notify/admin_order_push.php', 'theme-settings/settings.php', 'theme-settings/chapters.php', 'theme-settings/admin.php') as $g5_webapp_plugin_file) {
         if (is_file($g5_webapp_plugin_dir . '/' . $g5_webapp_plugin_file)) {
             require_once $g5_webapp_plugin_dir . '/' . $g5_webapp_plugin_file;
         }

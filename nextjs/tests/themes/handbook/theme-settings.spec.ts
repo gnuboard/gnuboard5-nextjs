@@ -5,7 +5,7 @@ import { booksFromBoards, DOCS_GROUP, docsSourceFrom } from '../../../themes/han
 import {
   handbookHomeTexts,
   hintForTable,
-  isSidebarHidden,
+  sidebarState,
   parseHandbookThemeSettings,
   sidebarScreen,
   withSiteTexts,
@@ -86,6 +86,9 @@ test.describe('handbook theme settings', () => {
     expect(parsed({ docs: { group: 'manual', hints: [] } }).docs.hints).toEqual({});
     const lines = parsed({ site: { customerCenterLines: ['1', '2', '3', '4', '5', '6'] } }).site.customerCenterLines;
     expect(lines).toEqual(['1', '2', '3', '4', '5']);
+    // 글자(코드 포인트) 단위로 자른다 — PHP mb_substr 와 같다(정적 빌드에서 브리지가 HTML 에 미리 넣는 글자와 맞게).
+    const long = parsed({ site: { name: '😀'.repeat(310) } }).site.name ?? '';
+    expect(Array.from(long)).toHaveLength(300);
   });
 
   test('reads a hint only from the map itself, not from Object.prototype', () => {
@@ -151,17 +154,20 @@ test.describe('handbook theme settings', () => {
     expect(sidebarScreen('/mypage', none)).toBe('other');
   });
 
-  test('hides the sidebar only when the screen is known', () => {
+  test('decides the sidebar only when the screen is known', () => {
     const settings = parsed();
     const state = { path: '/', pathReady: true, booksSettled: true, inBook: false };
-    expect(isSidebarHidden(null, state)).toBe(false);
-    expect(isSidebarHidden(settings, state)).toBe(true);
-    // 정적 빌드의 하이드레이션 동안은 예전처럼 둔다.
-    expect(isSidebarHidden(settings, { ...state, path: '/free/1', pathReady: false })).toBe(false);
+    // 설정이 없으면 늘 보인다(브리지도 <html> 에 표시하지 않는다).
+    expect(sidebarState(null, state)).toBe('shown');
+    expect(sidebarState(settings, state)).toBe('hidden');
+    // 정적 빌드의 하이드레이션 동안은 정하지 않는다 — 정적 HTML 과 같은 속성으로 붙고 브리지가 정한 값이 쓰인다.
+    expect(sidebarState(settings, { ...state, pathReady: false })).toBe('unknown');
+    // 정적 빌드 HTML(설정 없음)도 주소를 모르면 unknown — 하이드레이션 때와 같은 속성.
+    expect(sidebarState(null, { ...state, pathReady: false })).toBe('unknown');
     // 목차를 다 받기 전에는 게시판 주소가 매뉴얼인지 모른다 — 두 화면의 설정이 다르면 기다린다.
-    expect(isSidebarHidden(settings, { ...state, path: '/free/1', booksSettled: false })).toBe(false);
-    expect(isSidebarHidden(settings, { ...state, path: '/free/1' })).toBe(true);
-    expect(isSidebarHidden(settings, { ...state, path: '/start/1', inBook: true })).toBe(false);
-    expect(isSidebarHidden(settings, { ...state, path: '/mypage' })).toBe(false);
+    expect(sidebarState(settings, { ...state, path: '/free/1', booksSettled: false })).toBe('unknown');
+    expect(sidebarState(settings, { ...state, path: '/free/1' })).toBe('hidden');
+    expect(sidebarState(settings, { ...state, path: '/start/1', inBook: true })).toBe('shown');
+    expect(sidebarState(settings, { ...state, path: '/mypage' })).toBe('shown');
   });
 });

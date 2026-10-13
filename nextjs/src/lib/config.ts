@@ -27,6 +27,11 @@ export interface G5NextRuntimeConfig {
    * 모양은 테마가 검사한다 — 여기서는 그대로 건넨다.
    */
   themeSettings?: unknown;
+  /**
+   * 테마 브리지가 이 HTML 의 글자(data-ts)를 themeSettings 로 이미 바꿔 내보냈는가. true 일 때만 화면이 하이드레이션부터
+   * 설정을 쓴다 — 아니면(예전 브리지 · 바꾸기 실패) 붙은 뒤에 바꾼다(글자가 어긋나 하이드레이션 오류가 나지 않게).
+   */
+  themeSettingsApplied?: boolean;
 }
 
 /**
@@ -53,6 +58,11 @@ export function clientSiteName(fallback: string): string {
 /** 브라우저에서 본 테마 화면 설정(런타임 설정의 themeSettings, 검사 전 값). 서버 · 런타임 설정이 없으면 undefined. */
 export function clientThemeSettings(): unknown {
   return runtimeConfig()?.themeSettings;
+}
+
+/** 브리지가 HTML 글자를 테마 화면 설정으로 이미 바꿨는가(런타임 설정의 themeSettingsApplied). 서버 · 예전 브리지는 false. */
+export function clientThemeSettingsApplied(): boolean {
+  return runtimeConfig()?.themeSettingsApplied === true;
 }
 
 /** 브라우저에서 본 검색엔진 노출 설정. 런타임 설정에 없으면 노출하지 않는 쪽(G5_NEXTJS_SEO 기본값 off). */
