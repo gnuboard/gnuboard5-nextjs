@@ -745,6 +745,28 @@ if (!function_exists('g5_nextjs_on_adm_theme_update')) {
     }
 }
 
+if (!function_exists('g5_nextjs_insert_after_head')) {
+    /**
+     * $html 의 첫 <head …> 바로 뒤에 $snippet(런타임 설정 <script>)을 넣는다. <head> 가 없으면 맨 앞에.
+     *
+     * $snippet 을 preg_replace 의 치환 문자열로 넣으면 그 안의 $1 · $0 · \ 가 치환 문법으로 읽힌다 — 관리자가 적는 값
+     * (사이트 제목 cf_title, 테마 설정 문구)에 "$1" 이 있으면 글이 바뀌고, 끝에 \ 가 있으면 JSON 문자열이 닫히지 않아
+     * 스크립트 전체가 문법 오류가 된다. 그래서 콜백으로 글자 그대로 넣는다.
+     */
+    function g5_nextjs_insert_after_head($html, $snippet)
+    {
+        $html = (string) $html;
+        $snippet = (string) $snippet;
+        $count = 0;
+        // (?=[\s>]) — <header> 는 고르지 않는다.
+        $out = preg_replace_callback('/<head(?=[\s>])[^>]*>/i', static function ($matches) use ($snippet) {
+            return $matches[0] . "\n" . $snippet;
+        }, $html, 1, $count);
+
+        return $count > 0 && is_string($out) ? $out : $snippet . "\n" . $html;
+    }
+}
+
 if (!function_exists('g5_nextjs_root_payload_shim_script')) {
     /**
      * 하위 폴더 설치에서 첫 화면의 RSC 페이로드 요청을 폴더 안으로 되돌리는 브라우저 스크립트.

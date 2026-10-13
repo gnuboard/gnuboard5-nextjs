@@ -12,10 +12,10 @@ Use one Vercel project per theme:
 
 ```text
 https://gnuboard5-nextjs-default.vercel.app/   -> nextjs/themes/default, G5_THEME_NAME=nextjs_default
-https://gnuboard5-nextjs-greenhub.vercel.app/  -> nextjs/themes/greenhub, G5_THEME_NAME=greenhub
+https://gnuboard5-nextjs-handbook.vercel.app/  -> nextjs/themes/handbook, G5_THEME_NAME=handbook
 ```
 
-Do not deploy these as `/default` and `/greenhub` subpaths under one Vercel
+Do not deploy these as `/default` and `/handbook` subpaths under one Vercel
 project. Each Vercel project should serve its selected theme from `/`.
 
 The public Vercel projects use the Next.js server runtime by default. Set
@@ -25,16 +25,15 @@ want a static export preview.
 
 Vercel preview themes are tracked in `nextjs/vercel-theme-map.json`. The
 install package map, `nextjs/theme-map.json`, is separate and currently packages
-only `nextjs_default <- default` in this public repository. Greenhub can be deployed
-to Vercel from `nextjs/themes/greenhub` without being included as a PHP install
-theme in the release ZIP. CI and Live QA derive their theme matrix from
+`nextjs_default <- default` and `handbook <- handbook` in this public repository.
+A theme can be deployed to Vercel without being included as a PHP install theme
+in the release ZIP. CI and Live QA derive their theme matrix from
 `nextjs/vercel-theme-map.json`, so add new preview projects there instead of
 hardcoding workflow matrix entries.
 
-If greenhub should later become an installable PHP theme in the release ZIP,
-add the generated `overlay/theme/greenhub` files and update
-`nextjs/theme-map.json` to include `greenhub <- greenhub`. Until both are true,
-greenhub remains a Vercel preview target only.
+To ship another installable PHP theme in the release ZIP, mark it
+`publicPackage: true` in the source theme manifest and re-sync: the sync adds
+`overlay/theme/<name>` and `nextjs/theme-map.json` together.
 
 ## Architecture
 
@@ -105,13 +104,13 @@ G5_NEXT_RUNTIME=server
 NEXT_PUBLIC_APP_URL=https://gnuboard5-nextjs-default.vercel.app
 ```
 
-Greenhub project:
+Handbook project:
 
 ```text
-G5_THEME_SOURCE=greenhub
-G5_THEME_NAME=greenhub
+G5_THEME_SOURCE=handbook
+G5_THEME_NAME=handbook
 G5_NEXT_RUNTIME=server
-NEXT_PUBLIC_APP_URL=https://gnuboard5-nextjs-greenhub.vercel.app
+NEXT_PUBLIC_APP_URL=https://gnuboard5-nextjs-handbook.vercel.app
 ```
 
 `NEXT_PUBLIC_APP_URL` must be the Vercel app URL for that project. Do not append
@@ -135,8 +134,8 @@ From the public package repository:
 cd <배포 저장소>\nextjs
 npm ci
 npm run check
-npm run build:vercel:default
-npm run build:vercel:greenhub
+npm run build:vercel -- --source default --name nextjs_default
+npm run build:vercel -- --source handbook --name handbook
 ```
 
 For a one-off build that matches Vercel, set the same environment variables as
@@ -154,15 +153,11 @@ The Gnuboard server still needs the release overlay installed:
 api/
 extend/
 theme/nextjs_default/
+theme/handbook/
 nextjs-install/
 ```
 
-When deploying the `greenhub` PHP theme as well, install its generated theme
-directory on the Gnuboard server too:
-
-```text
-theme/greenhub/
-```
+The release zip carries both PHP themes; the Gnuboard admin picks the active one.
 
 Then check that the API responds:
 
@@ -174,8 +169,8 @@ Because the Vercel static frontend calls the Gnuboard API directly from the
 browser, the Gnuboard API must allow both Vercel domains through CORS:
 
 ```text
-G5_CORS_ALLOWED_ORIGINS=https://gnuboard5-nextjs-default.vercel.app,https://gnuboard5-nextjs-greenhub.vercel.app
-G5_SOCIAL_WEB_HOSTS=gnuboard5-nextjs-default.vercel.app,gnuboard5-nextjs-greenhub.vercel.app
+G5_CORS_ALLOWED_ORIGINS=https://gnuboard5-nextjs-default.vercel.app,https://gnuboard5-nextjs-handbook.vercel.app
+G5_SOCIAL_WEB_HOSTS=gnuboard5-nextjs-default.vercel.app,gnuboard5-nextjs-handbook.vercel.app
 ```
 
 If the frontend and API are on different HTTPS origins and the browser must
@@ -237,8 +232,8 @@ matrix builds before release:
 ```text
 npm run check
 npm run print:vercel-theme-matrix
-npm run build:vercel:default
-npm run build:vercel:greenhub
+npm run build:vercel -- --source default --name nextjs_default
+npm run build:vercel -- --source handbook --name handbook
 ```
 
 For new themes, `npm run build:vercel -- --source <source> --name <theme>` is

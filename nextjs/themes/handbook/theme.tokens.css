@@ -1,0 +1,188 @@
+/* Handbook theme — design tokens (shadcn HSL + daisyUI v5 variables). */
+
+:root {
+  /* shadcn tokens — documentation indigo on slate */
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 243 75% 59%;
+  --primary-accessible: 244 55% 52%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 42%;
+  --accent: 226 100% 97%;
+  --accent-foreground: 244 55% 42%;
+  --destructive: 0 72% 45%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 243 75% 59%;
+  --radius: 0.5rem;
+
+  /* legacy accent tokens some inner pages reference — remapped to indigo */
+  --naver-green: #4f46e5;
+  --naver-green-hover: #4338ca;
+  --green-text: #4338ca;
+  --naver-link: #4338ca;
+  --naver-caption: #64748b;
+  --naver-fill: #f5f6ff;
+  --container-width: 1180px;
+  --surface-border: #e2e8f0;
+  --surface-hover: #f5f7ff;
+  --text-strong: #0f172a;
+  --text-body: #334155;
+  --text-soft: #64748b;
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 2px 8px rgba(15, 23, 42, 0.05);
+  --shadow-card-hover: 0 12px 30px rgba(79, 70, 229, 0.1), 0 4px 10px rgba(15, 23, 42, 0.06);
+  --accent-bar: linear-gradient(180deg, #6366f1 0%, #4338ca 100%);
+
+  /* documentation layout tokens */
+  --doc-sidebar-width: 17rem;
+  --doc-toc-width: 15rem;
+  --doc-content-max: 60rem;
+  --doc-topbar-height: 3.75rem;
+
+  /* radius scale — one ramp reused across every surface */
+  --doc-radius-sm: 0.5rem;
+  --doc-radius-md: 0.65rem;
+  --doc-radius-lg: 0.85rem;
+  --doc-radius-xl: 1.1rem;
+  --doc-radius-pill: 999px;
+  --doc-page-bg: #f8fafc;
+  --doc-surface: #ffffff;
+  --doc-surface-muted: #f1f5f9;
+  --doc-border: #e2e8f0;
+  --doc-border-strong: #cbd5e1;
+  --doc-ink: #0f172a;
+  --doc-body: #334155;
+  /* 연한 바탕(--doc-surface-muted · --doc-accent-soft) 위에서도 4.5:1 이상(slate-500 은 4.3:1 이었다). */
+  --doc-muted: #5b6b80;
+  --doc-accent: #4f46e5;
+  --doc-accent-strong: #4338ca;
+  --doc-accent-soft: #eef2ff;
+  /* 강조색 바탕 위 글씨. */
+  --doc-on-accent: #ffffff;
+  --doc-code-bg: #0f172a;
+  --doc-code-ink: #e2e8f0;
+}
+
+/* 다크. 앱 전역 next-themes 는 라이트로 고정돼 `.dark` 가 붙지 않으므로, 상단 바의 전환 버튼
+   (theme-swap.tsx)이 <html> 에 다는 data-handbook-theme="dark" 에서도 켠다. 변수를 바꾸는 것이라
+   shadcn · daisyUI 컴포넌트와 이 테마의 doc-* 화면이 함께 따라온다. */
+:root.dark,
+:root[data-handbook-theme="dark"] {
+  color-scheme: dark;
+  --background: 222 47% 8%;
+  --foreground: 210 40% 96%;
+  --card: 222 40% 11%;
+  --card-foreground: 210 40% 96%;
+  --popover: 222 40% 11%;
+  --popover-foreground: 210 40% 96%;
+  --primary: 243 85% 72%;
+  --primary-accessible: 243 85% 74%;
+  --primary-foreground: 222 47% 11%;
+  --secondary: 222 30% 18%;
+  --secondary-foreground: 210 40% 96%;
+  --muted: 222 30% 18%;
+  --muted-foreground: 215 20% 72%;
+  --accent: 243 45% 22%;
+  --accent-foreground: 226 100% 90%;
+  --destructive: 0 72% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 222 25% 24%;
+  --input: 222 25% 24%;
+  --ring: 243 85% 72%;
+
+  --doc-page-bg: #0b1120;
+  --doc-surface: #111827;
+  --doc-surface-muted: #1e293b;
+  --doc-border: #24324a;
+  --doc-border-strong: #334155;
+  --doc-ink: #f1f5f9;
+  --doc-body: #cbd5e1;
+  --doc-muted: #94a3b8;
+  /* 밝은 남색(#4f46e5)은 어두운 바탕에서 대비가 모자라 한 단계 밝힌다. */
+  --doc-accent: #818cf8;
+  --doc-accent-strong: #a5b4fc;
+  --doc-accent-soft: #1e1b4b;
+  /* 밝힌 강조색 위의 흰 글씨는 3:1 이 안 돼 어두운 글씨로(6.3:1). */
+  --doc-on-accent: #0b1120;
+  --doc-code-bg: #020617;
+
+  /* 안쪽 화면(게시판 · 글 보기 등)이 쓰는 옛 이름의 토큰. */
+  --naver-green: #818cf8;
+  --naver-green-hover: #a5b4fc;
+  --green-text: #a5b4fc;
+  --naver-link: #a5b4fc;
+  --naver-caption: #94a3b8;
+  --naver-fill: #1e1b4b;
+  --surface-border: #24324a;
+  --surface-hover: #1e293b;
+  --text-strong: #f1f5f9;
+  --text-body: #cbd5e1;
+  --text-soft: #94a3b8;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-card-hover: 0 12px 30px rgba(0, 0, 0, 0.4), 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* daisyUI v5 theme variables — recolor daisyUI components to the docs palette.
+   Scoped to the themed body so it reliably wins over daisyUI's default theme.
+
+   IMPORTANT: --color-secondary, --color-accent and --border are deliberately
+   NOT overridden here. Those names are shared with globals.css:
+   - @theme maps --color-secondary/--color-accent to shadcn's bg-secondary /
+     hover:bg-accent, so overriding them app-wide would repaint shadcn neutrals
+     on every inner page (dropdowns, ghost buttons) with poor hover contrast.
+   - shadcn consumes --border as an HSL color triple (`* { border-color:
+     hsl(var(--border)) }`), whereas daisyUI uses --border as a border-WIDTH.
+     Overriding it on <body> turns hsl(var(--border)) into hsl(1px) and breaks
+     every themed border color. daisyUI's 1px width is scoped to daisyUI
+     components in the rule below instead. */
+body[data-g5-theme-source="handbook"] {
+  --color-base-100: #ffffff;
+  --color-base-200: #f8fafc;
+  --color-base-300: #eef2f6;
+  --color-base-content: #1e293b;
+  --color-primary: #4f46e5;
+  --color-primary-content: #ffffff;
+  --color-neutral: #1e293b;
+  --color-neutral-content: #e2e8f0;
+  --color-info: #0284c7;
+  --color-info-content: #ffffff;
+  --color-success: #16a34a;
+  --color-success-content: #ffffff;
+  --color-warning: #d97706;
+  --color-warning-content: #ffffff;
+  --color-error: #dc2626;
+  --color-error-content: #ffffff;
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.85rem;
+
+  background-color: var(--doc-page-bg);
+  color: var(--doc-body);
+}
+
+:root.dark body[data-g5-theme-source="handbook"],
+:root[data-handbook-theme="dark"] body[data-g5-theme-source="handbook"] {
+  --color-base-100: #111827;
+  --color-base-200: #0b1120;
+  --color-base-300: #24324a;
+  --color-base-content: #e2e8f0;
+  --color-primary: #818cf8;
+  --color-primary-content: #0b1120;
+  --color-neutral: #e2e8f0;
+  --color-neutral-content: #0b1120;
+}
+
+/* daisyUI uses --border as a border-WIDTH token; keep it 1px for daisyUI
+   components only so it never collides with shadcn's hsl(var(--border)) color. */
+body[data-g5-theme-source="handbook"]
+  :is(.btn, .badge, .tab, .tabs, .steps, .step, .menu, .card, .input, .kbd, .mockup-code) {
+  --border: 1px;
+}

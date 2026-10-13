@@ -56,9 +56,9 @@ jobs:
         working-directory: nextjs
         run: npm run check:code
 
-      - name: Build static export
-        working-directory: nextjs
-        run: npm run build
+      # 공개 테마마다 정적 화면을 빌드해 .release-build/<테마> 에 둔다 — 설치 zip 의 theme/<테마>/app.
+      - name: Build static exports for every public theme
+        run: node scripts/build-release-themes.mjs
 
       - name: Assemble release package
         run: node scripts/package-release.mjs "$RELEASE_VERSION"

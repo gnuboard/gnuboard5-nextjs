@@ -21,15 +21,16 @@ $g5['member_legal_consent_table'] = G5_TABLE_PREFIX.'member_legal_consent'; // �
 $g5['web_ticket_table']           = G5_TABLE_PREFIX.'web_ticket';           // 앱 → 레거시 웹 페이지 1회용 입장권 (POST /auth/web-ticket)
 $g5['social_apple_token_table']   = G5_TABLE_PREFIX.'social_apple_token';   // Sign in with Apple refresh_token(암호화) — 탈퇴 시 revoke (SC-11)
 $g5['member_public_key_table']    = G5_TABLE_PREFIX.'member_public_key';    // 회원 공개 키 — 주소에 아이디 대신 쓰는 무작위 값 (api/lib/member_key_helpers.php)
+$g5['theme_setting_table']        = G5_TABLE_PREFIX.'theme_setting';        // 테마 설정 — 왼쪽 메뉴 · 사이트 문구 (plugin/webapp/theme-settings/settings.php)
 
 // ---------------------------------------------------------------------------
 // 모바일 앱 버전 정책 — /v1/settings 에서 노출되어 클라이언트가 강제 업데이트 판정.
 // 보안 패치 후 G5_APP_MIN_VERSION 을 올리면 옛 버전 사용자는 다음 부팅 시 차단됨.
-// 운영서버는 별도 sites/<host>/extend/ 같은 곳에서 override 가능 (define 이미 됐으면 skip).
+// 공유 기본값은 "정책 없음"(0.0.0, 빈 주소)이다 — 여기에 특정 앱의 버전을 두면 같은 코드를 쓰는 다른 사이트의 앱까지
+// 업데이트 안내를 띄운다. 앱을 내는 사이트는 extend/ 나 제품 플러그인에서 먼저 define 한다(디데이 앱: plugin/dday/dday.php).
 // ---------------------------------------------------------------------------
-if (!defined('G5_APP_MIN_VERSION'))          define('G5_APP_MIN_VERSION', '1.0.0');
-// 스토어에 새 버전을 올릴 때마다 여기도 같이 올린다 — 값이 뒤처지면 앱이 업데이트 안내를 띄우지 않는다.
-if (!defined('G5_APP_LATEST_VERSION'))       define('G5_APP_LATEST_VERSION', '1.6.0');
+if (!defined('G5_APP_MIN_VERSION'))          define('G5_APP_MIN_VERSION', '0.0.0');
+if (!defined('G5_APP_LATEST_VERSION'))       define('G5_APP_LATEST_VERSION', '0.0.0');
 if (!defined('G5_APP_STORE_URL_ANDROID'))    define('G5_APP_STORE_URL_ANDROID', '');
 if (!defined('G5_APP_STORE_URL_IOS'))        define('G5_APP_STORE_URL_IOS', '');
 if (!defined('G5_APP_FORCE_UPDATE_MESSAGE')) define('G5_APP_FORCE_UPDATE_MESSAGE', '');
@@ -109,6 +110,27 @@ if (!function_exists('webapp_column_is_nullable')) {
                             AND COLUMN_NAME = '" . addslashes($column) . "'
                           LIMIT 1");
         return !empty($row) && strtoupper($row['IS_NULLABLE']) === 'YES';
+    }
+}
+
+if (!function_exists('webapp_index_build_allowed')) {
+    /**
+     * 이미 있는 표에 보조 인덱스를 지금 더해도 되는지. 이 설치기는 API 자가 점검(api/lib/Schema.php)이 손님 요청 안에서도
+     * 부르므로, 큰 표에서 인덱스를 만드는 동안 그 요청과 뒤에 줄 선 API 요청이 기다리지 않게 작은 표만 바로 더한다.
+     * 큰 표는 관리자 DB 업그레이드(/adm/dbupgrade.php — G5_IS_ADMIN)나 CLI 에서 더한다.
+     */
+    function webapp_index_build_allowed(int $estimatedRows, bool $isCli, bool $isAdmin): bool
+    {
+        return $isCli || $isAdmin || $estimatedRows < 200000;
+    }
+}
+
+if (!function_exists('webapp_index_build_allowed_now')) {
+    function webapp_index_build_allowed_now(string $table): bool
+    {
+        $row = sql_fetch("SELECT TABLE_ROWS AS n FROM INFORMATION_SCHEMA.TABLES
+                          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" . addslashes($table) . "' LIMIT 1", false);
+        return webapp_index_build_allowed((int) ($row['n'] ?? 0), PHP_SAPI === 'cli', defined('G5_IS_ADMIN') && G5_IS_ADMIN);
     }
 }
 
@@ -207,8 +229,16 @@ if (!function_exists('webapp_admin_dbupgrade')) {
                 `platform` ENUM('android','ios','web') NOT NULL DEFAULT 'android',
                 `last_used_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE KEY `uniq_token` (`push_token`),
-                INDEX `idx_mb_id` (`mb_id`)
+                INDEX `idx_mb_id` (`mb_id`),
+                INDEX `idx_last_used` (`last_used_at`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci", false);
+            $changed = true;
+        }
+
+        // 표 정리(api/lib/TableCleanup.php)가 오래 안 쓴 토큰을 last_used_at 으로 찾는다 — 표 전체를 훑지 않게.
+        if (webapp_table_exists($push_token) && !webapp_index_exists($push_token, 'idx_last_used')
+            && webapp_index_build_allowed_now($push_token)) {
+            sql_query("ALTER TABLE `{$push_token}` ADD KEY `idx_last_used` (`last_used_at`)", false);
             $changed = true;
         }
 
@@ -246,7 +276,8 @@ if (!function_exists('webapp_admin_dbupgrade')) {
                 KEY `idx_mb_sent` (`mb_id`, `nt_sent_at`),
                 KEY `idx_mb_read` (`mb_id`, `nt_read_at`),
                 KEY `idx_mb_event_sent` (`mb_id`, `nt_event`, `nt_sent_at`),
-                KEY `idx_device_sent` (`device_id`, `nt_sent_at`)
+                KEY `idx_device_sent` (`device_id`, `nt_sent_at`),
+                KEY `idx_read_sent` (`nt_read_at`, `nt_sent_at`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci", false);
             $changed = true;
         } else {
@@ -300,6 +331,15 @@ if (!function_exists('webapp_admin_dbupgrade')) {
         if (webapp_table_exists($notification_log) && !webapp_index_exists($notification_log, 'idx_mb_event_sent')) {
             sql_query("ALTER TABLE `{$notification_log}`
                        ADD KEY `idx_mb_event_sent` (`mb_id`, `nt_event`, `nt_sent_at`)", false);
+            $changed = true;
+        }
+        // 3.1.1) 표 정리(api/lib/TableCleanup.php)가 읽은 알림은 nt_read_at, 안 읽은 알림은 nt_read_at IS NULL + nt_sent_at 으로
+        //        지운다. 이 인덱스가 없으면 정리할 때마다 표 전체를 훑으며 그동안 새 알림 저장이 기다린다.
+        //        큰 표는 손님 요청(API 자가 점검) 안에서 만들지 않는다 — 관리자 DB 업그레이드 · CLI 에서(webapp_index_build_allowed).
+        if (webapp_table_exists($notification_log) && !webapp_index_exists($notification_log, 'idx_read_sent')
+            && webapp_index_build_allowed_now($notification_log)) {
+            sql_query("ALTER TABLE `{$notification_log}`
+                       ADD KEY `idx_read_sent` (`nt_read_at`, `nt_sent_at`)", false);
             $changed = true;
         }
         // 3.2) 제품 고유 참조(dday_id)는 공통 표의 컬럼이 아니라 nt_data 안에 산다.
@@ -721,6 +761,23 @@ if (!function_exists('webapp_admin_dbupgrade')) {
                 `created_at` DATETIME NOT NULL,
                 PRIMARY KEY (`mb_id`),
                 UNIQUE KEY `uniq_mk_key` (`mk_key`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci", false);
+            $changed = true;
+        }
+
+        // =====================================================================
+        // 4.5) g5_theme_setting — 테마 설정(plugin/webapp/theme-settings/settings.php).
+        //      관리자 화면에서 정하는 왼쪽 메뉴 · 사이트 문구를 테마마다 한 줄(JSON)로. 저장할 때마다 변경 번호가 오른다.
+        // =====================================================================
+        $theme_setting = isset($g5['theme_setting_table']) ? $g5['theme_setting_table'] : '';
+        if ($theme_setting !== '' && !webapp_table_exists($theme_setting)) {
+            sql_query("CREATE TABLE `{$theme_setting}` (
+                `ts_theme`      VARCHAR(40) NOT NULL,
+                `ts_value`      MEDIUMTEXT NOT NULL,
+                `ts_revision`   INT UNSIGNED NOT NULL DEFAULT 0,
+                `ts_updated_at` DATETIME NULL DEFAULT NULL,
+                `ts_updated_by` VARCHAR(20) NOT NULL DEFAULT '',
+                PRIMARY KEY (`ts_theme`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci", false);
             $changed = true;
         }

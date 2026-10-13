@@ -68,7 +68,7 @@ if (!$bo_table && $apiMethod === 'GET') {
                    a.bo_download_point, a.bo_use_category, a.bo_category_list,
                    a.bo_write_min, a.bo_write_max, a.bo_comment_min, a.bo_comment_max,
                    a.bo_notice, a.bo_upload_count, a.bo_upload_size,
-                   a.bo_count_write, a.bo_count_comment
+                   a.bo_count_write, a.bo_count_comment, a.bo_order
             FROM " . DB::table('board_table') . " a
             {$where}
             ORDER BY a.gr_id, a.bo_table";

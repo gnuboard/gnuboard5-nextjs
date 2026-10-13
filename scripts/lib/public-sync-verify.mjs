@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { assertPublicPackageThemeMaps, publicInstallThemeName } from './public-theme-manifest.mjs';
+import { assertPublicPackageThemeMaps, publicPrimaryThemeName } from './public-theme-manifest.mjs';
 
 function readJson(path, label = path) {
   try {
@@ -37,7 +37,8 @@ export function verifySyncedPublicNextjsTree(repoRoot) {
   const nextPackageJson = readJson(join(nextjsRoot, 'package.json'), 'nextjs/package.json');
 
   assertPublicPackageThemeMaps(themeManifest, themeMap);
-  const publicTheme = publicInstallThemeName(themeManifest);
+  // 파일 크기 검사는 기본 테마의 브리지만 본다(원본 source-file-size.mjs 와 같다).
+  const publicTheme = publicPrimaryThemeName(themeManifest);
 
   // 기본 테마는 overlay/ 에 있어 theme/ 으로 넣지 않는다. --if-present 는 create-theme 로 만든 내 테마(theme/<이름>)가
   // 있을 때만 그 app/ 에 넣으므로 기본 테마 꾸러미는 그대로 안전하다.

@@ -140,7 +140,11 @@ if (!function_exists('api_member_public_key')) {
 }
 
 if (!function_exists('api_member_id_from_key')) {
-    /** 공개 키 → 회원 아이디. 없거나 예전 회원의 키(같은 아이디로 새로 가입)면 ''. */
+    /**
+     * 공개 키 → 회원 아이디. 없거나 예전 회원의 키(같은 아이디로 새로 가입)면 ''.
+     * 탈퇴 · 차단 회원의 키도 '' — 키를 만들 때와 같은 조건이다. 탈퇴 정리(member_purge)를 거치지 않은 예전 탈퇴
+     * (그누보드 원래 탈퇴 · 관리자 삭제)의 키가 남아 있어도 그 아이디를 찾아내지 못하게.
+     */
     function api_member_id_from_key(string $key): string
     {
         $table = api_member_key_table();
@@ -152,7 +156,7 @@ if (!function_exists('api_member_id_from_key')) {
             return DB::fetch(
                 "SELECT k.mb_id, k.mk_key, k.created_at, m.mb_datetime
                    FROM {$table} k JOIN {$memberTable} m ON m.mb_id = k.mb_id
-                  WHERE k.mk_key = ? LIMIT 1",
+                  WHERE k.mk_key = ? AND m.mb_leave_date = '' AND m.mb_intercept_date = '' LIMIT 1",
                 [$key]
             );
         });

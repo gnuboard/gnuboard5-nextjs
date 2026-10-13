@@ -1,0 +1,563 @@
+/* Handbook theme — documentation shell (topbar + sidebar + footer). */
+
+.doc-root {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.doc-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  height: var(--doc-topbar-height);
+  padding-inline: clamp(0.75rem, 2vw, 1.5rem);
+  border-bottom: 1px solid var(--doc-border);
+  background: var(--doc-surface);
+  background: color-mix(in srgb, var(--doc-surface) 88%, transparent);
+  backdrop-filter: saturate(180%) blur(8px);
+}
+
+.doc-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 800;
+  color: var(--doc-ink);
+  letter-spacing: -0.01em;
+}
+
+.doc-brand:hover {
+  color: var(--doc-accent-strong);
+}
+
+.doc-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.6rem;
+  background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 900;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+}
+
+.doc-brand-name {
+  font-size: 1.05rem;
+}
+
+.doc-brand-badge {
+  margin-left: 0.1rem;
+  border-radius: 999px;
+  border: 1px solid var(--doc-border-strong);
+  padding: 0.05rem 0.45rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--doc-muted);
+}
+
+/* 상단 바 검색칸 모양의 단추 — 누르면 검색 창(doc-search.tsx, theme.search.css)이 열린다. */
+.doc-search {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  max-width: 20rem;
+  height: 2.25rem;
+  margin-left: auto;
+  padding-inline: 0.75rem;
+  border: 1px solid var(--doc-border);
+  border-radius: 0.5rem;
+  background: var(--doc-surface-muted);
+  color: var(--doc-muted);
+  font-size: 0.82rem;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.doc-search:hover {
+  border-color: var(--doc-border-strong);
+  background: var(--doc-surface);
+}
+
+.doc-search:focus-visible {
+  outline: 2px solid var(--doc-accent);
+  outline-offset: 2px;
+}
+
+.doc-search-placeholder {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.doc-search .doc-kbd {
+  flex-shrink: 0;
+}
+
+/* 좁은 화면(640px 미만)에서는 검색칸 대신 아이콘 단추. 뒤에 오는 .doc-icon-btn(inline-grid)을
+   이기도록 상단 바를 붙여 무겁게 쓴다. */
+.doc-topbar .doc-search-icon {
+  display: none;
+}
+
+.doc-topnav {
+  display: none;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.doc-topnav-link {
+  padding: 0.35rem 0.7rem;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--doc-body);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.doc-topnav-link:hover {
+  background: var(--doc-accent-soft);
+  color: var(--doc-accent-strong);
+}
+
+.doc-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  border: 1px solid var(--doc-border);
+  border-radius: 0.5rem;
+  background: var(--doc-surface);
+  color: var(--doc-body);
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.doc-icon-btn:hover {
+  background: var(--doc-surface-muted);
+  color: var(--doc-accent-strong);
+  border-color: var(--doc-border-strong);
+}
+
+.doc-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* 왼쪽 사이드바 = daisyUI Drawer(`drawer xl:drawer-open`). 1280px(xl) 아래에서는 왼쪽에서 밀려
+   나오는 서랍, xl 이상에서는 늘 보이는 열이다. 여닫기 · 밀려 나오는 움직임 · 닫혔을 때
+   탭 순서에서 빠지는 것은 daisyUI 가 맡고, 여기서는 상단 바와의 겹침과 테마 색만 정한다.
+   daisyUI 규칙은 @layer 안에 있어 아래 규칙이 그대로 이긴다. */
+.doc-drawer > .drawer-side {
+  /* 서랍은 상단 바(z-index 40) 위를 덮는다. */
+  z-index: 60;
+}
+
+/* daisyUI 는 서랍의 visibility 도 천천히 바꿔, 연 직후에는 아직 hidden 이라 닫기 버튼으로
+   옮기는 포커스가 들어가지 않는다. 열 때는 visibility 를 곧바로 바꾸고 흐려지는 움직임만
+   남긴다(닫을 때의 사라지는 움직임은 daisyUI 그대로). */
+.doc-drawer > .drawer-toggle:checked ~ .drawer-side {
+  transition: opacity 0.2s ease-out;
+}
+
+.doc-drawer > .drawer-side > .drawer-overlay {
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(1px);
+}
+
+.doc-sidebar {
+  width: min(85vw, var(--doc-sidebar-width));
+  height: 100%;
+  border-right: 1px solid var(--doc-border);
+  background: var(--doc-surface);
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
+}
+
+.doc-sidebar-inner {
+  height: 100%;
+  max-height: 100vh;
+  /* 휴대폰은 주소창 · 도구 막대가 화면을 가려 100vh 면 서랍 아래쪽이 잘린다 — 보이는 높이(dvh)로. */
+  max-height: 100dvh;
+  overflow-y: auto;
+  /* 목록 끝에서 더 밀어도 뒤의 본문이 따라 스크롤되지 않게. */
+  overscroll-behavior: contain;
+  width: 100%;
+  padding: 1.25rem 1rem 3rem;
+  /* 얇은 스크롤바 · 투명 트랙. daisyUI 가 서랍에 준 scrollbar-color(트랙 = 검정 40%)가
+     물려 내려와 서랍 오른쪽에 짙은 회색 띠가 생기던 것을 테마 색으로 바꾼다. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--doc-border-strong) transparent;
+}
+
+.doc-sidebar-inner:hover,
+.doc-sidebar-inner:focus-within {
+  scrollbar-color: var(--doc-muted) transparent;
+}
+
+.doc-sidebar-mobilehead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.doc-nav-section + .doc-nav-section {
+  margin-top: 1.35rem;
+}
+
+.doc-nav-label {
+  padding-inline: 0.6rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--doc-muted);
+}
+
+.doc-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.42rem 0.6rem;
+  border-radius: 0.55rem;
+  border-left: 2px solid transparent;
+  color: var(--doc-body);
+  font-size: 0.86rem;
+  line-height: 1.3;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.doc-nav-link:hover {
+  background: var(--doc-surface-muted);
+  color: var(--doc-ink);
+}
+
+.doc-nav-link.is-active {
+  background: var(--doc-accent-soft);
+  border-left-color: var(--doc-accent);
+  color: var(--doc-accent-strong);
+  font-weight: 700;
+}
+
+.doc-nav-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--doc-border-strong);
+}
+
+.doc-nav-link.is-active .doc-nav-dot {
+  background: var(--doc-accent);
+}
+
+.doc-nav-children {
+  margin: 0.2rem 0 0.3rem 0.75rem;
+  padding-left: 0.55rem;
+  border-left: 1px solid var(--doc-border);
+}
+
+.doc-nav-link.is-child {
+  padding-block: 0.36rem;
+  font-size: 0.8rem;
+}
+
+.doc-nav-link.is-child .doc-nav-dot {
+  width: 0.3rem;
+  height: 0.3rem;
+}
+
+.doc-main {
+  min-width: 0;
+  background: var(--doc-page-bg);
+}
+
+.doc-content {
+  width: 100%;
+  max-width: var(--doc-content-max);
+  margin-inline: auto;
+  padding: clamp(1.25rem, 3vw, 2.75rem) clamp(1rem, 3vw, 2.5rem) 4rem;
+}
+
+.doc-footer {
+  border-top: 1px solid var(--doc-border);
+  background: var(--doc-surface);
+}
+
+.doc-footer-inner {
+  max-width: var(--doc-content-max);
+  margin-inline: auto;
+  padding: 2rem clamp(1rem, 3vw, 2.5rem);
+  display: grid;
+  gap: 1.5rem;
+}
+
+.doc-footer-cols {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.doc-footer h2 {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--doc-ink);
+  margin-bottom: 0.6rem;
+}
+
+.doc-footer p,
+.doc-footer li {
+  font-size: 0.82rem;
+  color: var(--doc-muted);
+  line-height: 1.6;
+}
+
+.doc-footer a:hover {
+  color: var(--doc-accent-strong);
+}
+
+.doc-footer-bottom {
+  border-top: 1px solid var(--doc-border);
+  padding-top: 1.25rem;
+  font-size: 0.78rem;
+  color: var(--doc-muted);
+}
+
+.doc-footer {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 1024px) {
+  .doc-body {
+    /* 본문 행 + 푸터 행. */
+    grid-template-rows: 1fr auto;
+  }
+  .doc-topnav {
+    display: flex;
+  }
+  .doc-footer-cols {
+    grid-template-columns: 2fr 1fr 1fr;
+  }
+}
+
+/* xl 이상(xl:drawer-open): 사이드바는 상단 바 바로 아래에 붙는 sticky 열. 푸터까지 서랍
+   안에 있어 페이지 끝까지 제자리를 지킨다. 목록은 안쪽(.doc-sidebar-inner)이 스크롤한다.
+   그보다 좁으면 메뉴 단추로 여는 서랍이다(상단 메인메뉴도 1280px 부터 — theme.mainnav.css). */
+@media (min-width: 1280px) {
+  .doc-drawer > .drawer-side {
+    top: var(--doc-topbar-height);
+    z-index: 1;
+    height: calc(100vh - var(--doc-topbar-height));
+    height: calc(100dvh - var(--doc-topbar-height));
+    overflow: hidden;
+  }
+  .doc-drawer > .drawer-side > .drawer-overlay {
+    display: none;
+  }
+  .doc-sidebar {
+    width: var(--doc-sidebar-width);
+    box-shadow: none;
+  }
+  .doc-sidebar-inner {
+    max-height: 100%;
+  }
+  .doc-sidebar-mobilehead,
+  .doc-hamburger {
+    display: none;
+  }
+  /* 관리자 › 테마 화면 설정에서 이 화면의 사이드바를 숨겼다(layout-shell.tsx 의 data-sidebar, 이때는 xl:drawer-open 도
+     빠진다) — 본문이 왼쪽 열 자리까지 쓴다. 좁은 화면의 메뉴 서랍은 그대로다. */
+  .doc-drawer[data-sidebar="hidden"] > .drawer-side {
+    display: none;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .doc-footer-cols {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Top-bar search hides on phones. Controlled here (not via Tailwind `hidden`)
+   because the unlayered .doc-search display rule outranks layered utilities. */
+@media (max-width: 639px) {
+  .doc-topbar .doc-search {
+    display: none;
+  }
+  /* 검색칸(ml-auto) 대신 검색 아이콘이 오른쪽 끝 묶음(검색 · 라이트/다크)을 연다. */
+  .doc-topbar .doc-search-icon {
+    display: inline-grid;
+    margin-left: auto;
+  }
+}
+
+/* Respect users who prefer reduced motion — no slides, hovers, or lifts. */
+@media (prefers-reduced-motion: reduce) {
+  .doc-root *,
+  .doc-root *::before,
+  .doc-root *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+  .doc-feature-card:hover,
+  .doc-guide-row:hover {
+    transform: none;
+  }
+}
+
+/* --- 오른쪽 문서 목차 (scrollspy) -----------------------------------------
+   넓은 화면에서만 본문 옆에 선다. 좁은 화면에서는 왼쪽 목차와 본문만으로 충분해
+   숨긴다. 제목이 둘 미만인 글에서는 컴포넌트가 아예 그려지지 않는다. */
+.doc-toc {
+  display: none;
+}
+
+.doc-toc-title {
+  margin: 0 0 0.625rem;
+  color: var(--doc-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.doc-toc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-left: 1px solid var(--doc-border);
+}
+
+.doc-toc-item.is-h3 .doc-toc-link {
+  padding-left: 1.5rem;
+  font-size: 0.78rem;
+}
+
+.doc-toc-link {
+  display: block;
+  margin-left: -1px;
+  border-left: 2px solid transparent;
+  padding: 0.3rem 0.5rem 0.3rem 0.75rem;
+  color: var(--doc-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-decoration: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.doc-toc-link:hover,
+.doc-toc-link:focus-visible {
+  color: var(--doc-ink);
+}
+
+.doc-toc-link.is-active {
+  border-left-color: var(--doc-accent);
+  color: var(--doc-accent-strong);
+  font-weight: 600;
+}
+
+/* 앵커로 이동했을 때 제목이 상단 바 밑에 숨지 않게. */
+#main-content .prose :is(h2, h3) {
+  scroll-margin-top: calc(var(--doc-topbar-height) + 1rem);
+}
+
+@media (min-width: 1280px) {
+  .doc-body {
+    grid-template-columns: minmax(0, 1fr) var(--doc-toc-width);
+  }
+  .doc-toc {
+    display: block;
+    position: sticky;
+    top: var(--doc-topbar-height);
+    align-self: start;
+    max-height: calc(100vh - var(--doc-topbar-height));
+    max-height: calc(100dvh - var(--doc-topbar-height));
+    overflow-y: auto;
+    padding: 1.5rem 1rem 3rem 0.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .doc-toc-link {
+    transition: none;
+  }
+}
+
+/* 헤더 계정 영역 — 문서 사이트라 이름과 로그아웃만 조용히 둔다. */
+.doc-account {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* --- 글 본문 크기 ---------------------------------------------------------
+   앱은 본문을 prose-sm(14px)으로 그린다. 목록·카드에는 맞지만 길게 읽는 문서에는
+   작다. 컨테이너의 글자 크기만 키우면 제목·인용·목록이 em 기준이라 함께 커진다.
+   코드와 표는 그렇게 하면 과해져서 따로 눌러 준다. */
+#main-content .prose {
+  font-size: 1.0625rem;
+  line-height: 1.78;
+}
+
+#main-content .prose :is(p, li) {
+  line-height: 1.78;
+}
+
+/* 문단 사이를 조금 벌려 덩어리가 구분되게 한다. */
+#main-content .prose > :is(p, ul, ol, table, pre, blockquote, .doc-try) {
+  margin-block: 1.1em;
+}
+
+/* "직접 확인해 보기" 상자. 안내서 글이 <div class="doc-try"> 로 감싼다. */
+#main-content .prose .doc-try {
+  border: 1px solid var(--color-base-300);
+  border-left: 4px solid var(--color-primary);
+  border-radius: 0.6rem;
+  padding: 0.9rem 1.1rem;
+  background: color-mix(in oklab, var(--color-primary) 6%, var(--color-base-100));
+}
+#main-content .prose .doc-try > :first-child { margin-top: 0; }
+#main-content .prose .doc-try > :last-child { margin-bottom: 0; }
+
+#main-content .prose :is(h2, h3, h4) {
+  line-height: 1.35;
+}
+
+#main-content .prose h2 {
+  margin-top: 2.2em;
+}
+
+/* 코드는 본문보다 조금 작게 — 등폭 글꼴은 같은 크기에서 더 커 보인다. */
+#main-content .prose :is(code, kbd, samp) {
+  font-size: 0.92em;
+}
+
+#main-content .prose pre {
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
+#main-content .prose pre code {
+  font-size: inherit;
+}
+
+/* 표는 칸이 많아 본문 크기 그대로면 넘치기 쉽다. */
+#main-content .prose table {
+  font-size: 0.94rem;
+}
+
+@media (max-width: 640px) {
+  #main-content .prose {
+    font-size: 1rem;
+  }
+  #main-content .prose pre {
+    font-size: 0.84rem;
+  }
+}

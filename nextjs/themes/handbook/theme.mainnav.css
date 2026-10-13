@@ -1,0 +1,200 @@
+/* Handbook theme — 상단 바 메인메뉴(main-nav.tsx). theme.shell.css 가 650줄을 넘지 않게 나눠 둔다. */
+
+/* 상단 바 메인메뉴(main-nav.tsx) — 관리자 > 메뉴설정의 메뉴. 기본 테마 메인메뉴처럼 하위 메뉴는
+   :hover · :focus-within 으로 펼쳐진다. 1280px 이상에서만 보인다(아래 @media). */
+.doc-mainnav {
+  display: none;
+  align-self: stretch;
+  min-width: 0;
+}
+
+.doc-mainnav-list {
+  display: flex;
+  align-items: stretch;
+  gap: 0.1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doc-mainnav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.doc-mainnav-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.5rem;
+  color: var(--doc-body);
+  font-size: 0.875rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.doc-mainnav-item:hover > .doc-mainnav-trigger,
+.doc-mainnav-item:focus-within > .doc-mainnav-trigger {
+  background: var(--doc-accent-soft);
+  color: var(--doc-accent-strong);
+}
+
+.doc-mainnav-trigger:focus-visible,
+.doc-mainnav-link:focus-visible {
+  outline: 2px solid var(--doc-accent);
+  outline-offset: 2px;
+}
+
+.doc-mainnav-caret {
+  flex-shrink: 0;
+  transition: transform 160ms ease;
+}
+
+.doc-mainnav-item:hover > .doc-mainnav-trigger .doc-mainnav-caret,
+.doc-mainnav-item:focus-within > .doc-mainnav-trigger .doc-mainnav-caret {
+  transform: rotate(180deg);
+}
+
+/* 패널은 칸(상단 바 높이 전체)의 바로 아래에 붙어, 메뉴에서 패널로 포인터를 내려도 끊기지 않는다. */
+.doc-mainnav-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 50;
+  min-width: 12rem;
+  max-width: min(34rem, calc(100vw - 2rem));
+  width: max-content;
+  padding: 0.6rem;
+  border: 1px solid var(--doc-border);
+  border-radius: 0.75rem;
+  background: var(--doc-surface);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12);
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 150ms ease, transform 150ms ease, visibility 0s linear 150ms;
+}
+
+.doc-mainnav-item:hover > .doc-mainnav-panel,
+.doc-mainnav-item:focus-within > .doc-mainnav-panel {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition: opacity 150ms ease, transform 150ms ease, visibility 0s;
+}
+
+/* 메뉴를 눌러 이동하면 포인터가 칸을 벗어날 때까지 닫아 둔다(main-nav.tsx 의 is-dismissed). */
+.doc-mainnav-item.is-dismissed > .doc-mainnav-panel {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.doc-mainnav-item.is-dismissed > .doc-mainnav-trigger .doc-mainnav-caret {
+  transform: none;
+}
+
+.doc-mainnav-links {
+  display: grid;
+  gap: 0.1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doc-mainnav-link {
+  display: block;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.5rem;
+  color: var(--doc-body);
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.doc-mainnav-link:hover {
+  background: var(--doc-surface-muted);
+  color: var(--doc-accent-strong);
+}
+
+/* "더보기" — 한 줄에 다 들어가지 않는 메뉴를 하위 메뉴와 함께 모은다(main-nav.tsx). 상단 바 오른쪽 끝에 가까우니
+   패널은 칸의 오른쪽에 맞춰 연다. */
+.doc-mainnav-more > .doc-mainnav-panel {
+  left: auto;
+  right: 0;
+}
+
+.doc-mainnav-more-panel {
+  display: grid;
+  gap: 0.5rem;
+  max-height: min(70vh, 32rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.doc-mainnav-more-group + .doc-mainnav-more-group {
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--doc-border);
+}
+
+.doc-mainnav-more-title {
+  color: var(--doc-ink);
+  font-weight: 800;
+}
+
+.doc-mainnav-more-group .doc-mainnav-links {
+  padding-left: 0.5rem;
+}
+
+/* 측정 줄 — 칸마다 한 줄 너비만 잰다. 0×0 상자에 가둬(overflow: hidden) 자리도 가로 스크롤도 만들지 않고,
+   칸은 줄어들지 않게 해 제 너비를 잰다. */
+.doc-mainnav-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.doc-mainnav-measure > .doc-mainnav-item {
+  flex-shrink: 0;
+}
+
+@media (min-width: 1280px) {
+  /* 메인메뉴는 xl 부터 상단 바에 편다 — lg(1024px)에서는 로고 · 메뉴 · 검색 · 목차 링크가 다
+     들어가지 않아 검색창이 찌그러진다. 그 아래에서는 서랍의 "메뉴" 묶음이 같은 메뉴를 보여 준다.
+     로고 칸은 사이드바 폭에 맞춰, 메인메뉴가 본문 열의 시작선에서 출발하게 한다. */
+  /* 메뉴는 로고와 검색칸 사이의 남은 너비를 쓰고, 넘치면 "더보기"로 모은다. 검색칸은 일정 너비 아래로 줄지 않는다
+     — 메뉴가 많을 때 검색칸이 찌그러지거나 메뉴와 겹치던 것을 막는다. */
+  .doc-mainnav {
+    position: relative;
+    display: flex;
+    flex: 1 1 0;
+  }
+  .doc-topbar .doc-search {
+    flex: 0 1 20rem;
+    min-width: 12rem;
+  }
+  .doc-topnav {
+    flex-shrink: 0;
+  }
+  .doc-topnav-link {
+    white-space: nowrap;
+  }
+  /* 서랍 맨 위 메뉴는 상단 메뉴와 같은 것이라 숨긴다 — 사이드바에 달리 보일 것이 없을 때(.is-persistent)만 둔다. */
+  .doc-nav-section.is-site-menu:not(.is-persistent) {
+    display: none;
+  }
+  .doc-brand {
+    min-width: calc(var(--doc-sidebar-width) - clamp(0.75rem, 2vw, 1.5rem) - 0.75rem);
+  }
+}

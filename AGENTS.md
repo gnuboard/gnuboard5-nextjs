@@ -1,7 +1,7 @@
 # Agent Instructions
 
 This repository is the public release repository for **gnuboard5-nextjs**, a
-Gnuboard5/YoungCart5 add-on (Next.js theme `nextjs_default`, REST API, bridge core).
+Gnuboard5/YoungCart5 add-on (Next.js themes `nextjs_default` and `handbook`, REST API, bridge core).
 
 ## Generated directories
 
@@ -16,8 +16,9 @@ script when it is specific to the public package.
 - Only themes marked `publicPackage: true` in the source theme manifest are
   published. The sync fails if any other theme name, a local filesystem path or
   a local virtual-host address appears in the output (`scripts/lib/public-leak-check.mjs`).
-- Ship the GitHub Release zip (`npm run package -- vX.Y.Z`), never the
-  generated source archive.
+- Ship the GitHub Release zip (`npm run build:themes` then `npm run package -- vX.Y.Z`),
+  never the generated source archive. The zip carries every public theme under
+  `theme/<name>/`.
 - Do not commit `.env*.local`, build output (`nextjs/out`, `dist/`) or release zips.
 
 ## Checks

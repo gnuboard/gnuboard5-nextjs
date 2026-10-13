@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS `g5_push_token` (
     `platform` ENUM('android','ios','web') NOT NULL DEFAULT 'android',
     `last_used_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY `uniq_token` (`push_token`),
-    INDEX `idx_mb_id` (`mb_id`)
+    INDEX `idx_mb_id` (`mb_id`),
+    INDEX `idx_last_used` (`last_used_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `g5_notification_log` (
@@ -32,7 +33,8 @@ CREATE TABLE IF NOT EXISTS `g5_notification_log` (
     KEY `idx_mb_sent` (`mb_id`, `nt_sent_at`),
     KEY `idx_mb_read` (`mb_id`, `nt_read_at`),
     KEY `idx_mb_event_sent` (`mb_id`, `nt_event`, `nt_sent_at`),
-    KEY `idx_device_sent` (`device_id`, `nt_sent_at`)
+    KEY `idx_device_sent` (`device_id`, `nt_sent_at`),
+    KEY `idx_read_sent` (`nt_read_at`, `nt_sent_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `g5_device` (
@@ -227,4 +229,13 @@ CREATE TABLE IF NOT EXISTS `g5_member_public_key` (
     `created_at` DATETIME NOT NULL,
     PRIMARY KEY (`mb_id`),
     UNIQUE KEY `uniq_mk_key` (`mk_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `g5_theme_setting` (
+    `ts_theme`      VARCHAR(40) NOT NULL,
+    `ts_value`      MEDIUMTEXT NOT NULL,
+    `ts_revision`   INT UNSIGNED NOT NULL DEFAULT 0,
+    `ts_updated_at` DATETIME NULL DEFAULT NULL,
+    `ts_updated_by` VARCHAR(20) NOT NULL DEFAULT '',
+    PRIMARY KEY (`ts_theme`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -15,7 +15,8 @@ import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   publicInstallThemeMap,
-  publicInstallThemeName,
+  publicInstallThemeNames,
+  publicPrimaryThemeName,
   publicThemeManifestFromSource,
   publicVercelThemeMap,
   splitThemeManifest,
@@ -272,24 +273,25 @@ function neutralizeMaintainerAppDefaults() {
   const bridgeRoot = join(repoRoot, 'overlay', 'plugin', 'webapp');
   const appLinkPath = join(bridgeRoot, 'bridge', 'app-link.php');
   const tablesPath = join(bridgeRoot, 'notify', 'tables.php');
+  // 원본도 이제 중립(빈 값)이다 — 다시 개인 앱 값이 들어와도 공개판에는 빈 값으로 나가게 남겨 둔다.
   replaceInFile(appLinkPath, [
+    [/define\('G5_APP_LINK_SCHEME', '[^']*'\)/, "define('G5_APP_LINK_SCHEME', '')"],
     [
       /define\('G5_APP_LINK_ANDROID_PACKAGE', '[^']*'\)/,
       "define('G5_APP_LINK_ANDROID_PACKAGE', '')",
-    ],
-    [
-      /if \(\$device === 'other'\) \{/,
-      "if ($device === 'other' || G5_APP_LINK_ANDROID_PACKAGE === '') { // 앱을 설정하지 않은 설치본은 웹으로",
     ],
   ]);
   replaceInFile(tablesPath, [
     [/define\('G5_APP_STORE_URL_ANDROID', '[^']*'\)/, "define('G5_APP_STORE_URL_ANDROID', '')"],
   ]);
 
+  // 앱을 설정하지 않은 설치본은 앱 열기 링크가 웹으로 간다(스킴이 비었거나 안드로이드 패키지가 비면).
   const appLink = readFileSync(appLinkPath, 'utf8');
   const tables = readFileSync(tablesPath, 'utf8');
   if (
+    !appLink.includes("define('G5_APP_LINK_SCHEME', '')") ||
     !appLink.includes("define('G5_APP_LINK_ANDROID_PACKAGE', '')") ||
+    !appLink.includes("G5_APP_LINK_SCHEME === ''") ||
     !appLink.includes("G5_APP_LINK_ANDROID_PACKAGE === ''") ||
     !tables.includes("define('G5_APP_STORE_URL_ANDROID', '')")
   ) {
@@ -646,9 +648,10 @@ function sanitizePublicNextjsTree() {
     join(nextjsRoot, 'README.md'),
     `# Next.js Source
 
-This directory contains the development source for the Gnuboard5
-\`${PUBLIC_THEME}\` theme. It is built as a static export and packaged into
-\`theme/${PUBLIC_THEME}/app\` by the release workflow.
+This directory contains the development source for the Gnuboard5 Next.js
+themes (${PUBLIC_THEMES.map((theme) => `\`${theme}\``).join(', ')}). Each theme is built as a static export
+and packaged into \`theme/<name>/app\` by the release workflow
+(\`node scripts/build-release-themes.mjs\` at the repository root).
 
 ## Local Development
 
@@ -670,12 +673,15 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 \`\`\`bash
 npm ci
-npm run check
-npm run build
+npm run check:code
+npm run build:${PUBLIC_THEME}
 \`\`\`
 
-The repository-level package script copies \`nextjs/out\` into the release zip.
-Use the public package root \`npm run package\` command for install ZIPs. The
+\`npm run build:<theme>\` builds one theme into \`nextjs/out\`. For an install ZIP,
+run \`npm run build:themes\` and then \`npm run package -- <version>\` at the
+repository root: the first builds every public theme and keeps each export
+under \`.release-build/<theme>\`, the second copies them into
+\`theme/<theme>/app\` of the release zip. The
 \`nextjs/package:*\` commands are source-checkout commands and are guarded here so
 they fail with a clear hint instead of looking for missing \`theme/<theme>\`
 directories.
@@ -832,12 +838,14 @@ overlay repository. Publish by pushing a version tag and using GitHub Releases.`
   copyFileSync(join(templateDir, 'nextjs-env.vercel.example'), join(nextjsRoot, '.env.vercel.example'));
   copyFileSync(join(templateDir, 'nextjs-postbuild.mjs'), join(nextjsRoot, 'scripts', 'postbuild.mjs'));
 
-  replaceInFile(join(repoRoot, 'nextjs-install', 'nginx', `${PUBLIC_THEME}-theme-locations.conf`), [
-    [/nextjs\.thisgun\.net/g, 'example.com'],
-  ]);
-  replaceInFile(join(repoRoot, 'nextjs-install', 'nginx', `${PUBLIC_THEME}-security-map.conf`), [
-    [/nextjs\.thisgun\.net/g, 'example.com'],
-  ]);
+  for (const theme of PUBLIC_THEMES) {
+    replaceInFile(join(repoRoot, 'nextjs-install', 'nginx', `${theme}-theme-locations.conf`), [
+      [/nextjs\.thisgun\.net/g, 'example.com'],
+    ]);
+    replaceInFile(join(repoRoot, 'nextjs-install', 'nginx', `${theme}-security-map.conf`), [
+      [/nextjs\.thisgun\.net/g, 'example.com'],
+    ]);
+  }
   replaceInFile(join(repoRoot, 'nextjs-install', 'nginx', 'rate-limit.conf'), [
     [/nextjs\.thisgun\.net/g, 'example.com'],
   ]);
@@ -876,15 +884,20 @@ const sourceThemeManifest = readJson(
   'source nextjs/theme-manifest.json'
 );
 const { privateTokens } = splitThemeManifest(sourceThemeManifest);
-const PUBLIC_THEME = publicInstallThemeName(publicThemeManifestFromSource(sourceThemeManifest));
+// 공개 테마 전부가 설치 zip 의 theme/<이름> 으로 실린다(사이트 운영자가 관리자에서 하나를 고른다).
+const PUBLIC_THEMES = publicInstallThemeNames(publicThemeManifestFromSource(sourceThemeManifest));
+// 기본 테마(첫 공개 테마) — 한 테마를 예로 드는 곳(개발 검사 스크립트의 경로 · 안내 문서 · 기본 Apache 규칙)에 쓴다.
+const PUBLIC_THEME = publicPrimaryThemeName(publicThemeManifestFromSource(sourceThemeManifest));
 // 예전에 공개판에 실렸던 설치 테마 이름 — 남은 설치 폴더 · nginx 예시를 지운다.
-const RETIRED_THEME_NAMES = ['nextjs25', 'greenhub', 'solune'].filter((name) => name !== PUBLIC_THEME);
+const RETIRED_THEME_NAMES = ['nextjs25', 'greenhub', 'solune'].filter((name) => !PUBLIC_THEMES.includes(name));
 const privateThemePaths = privateTokens.flatMap((name) => [
   `themes/${name}`,
   `tests/themes/${name}`,
   `scripts/themes/${name}`,
 ]);
-console.log(`[sync-from-gnuboard] public theme: ${PUBLIC_THEME}; private themes: ${privateTokens.join(', ') || '(none)'}`);
+console.log(
+  `[sync-from-gnuboard] public themes: ${PUBLIC_THEMES.join(', ')} (primary ${PUBLIC_THEME}); private themes: ${privateTokens.join(', ') || '(none)'}`
+);
 
 copyDir(join(sourceRoot, 'nextjs'), join(repoRoot, 'nextjs'), {
   excludeDirs: [
@@ -924,9 +937,11 @@ copyDir(join(sourceRoot, 'api'), join(repoRoot, 'overlay', 'api'), {
 });
 stripPrivateAppFeatures();
 removePath(join(repoRoot, 'overlay', 'theme'));
-copyDir(join(sourceRoot, 'theme', PUBLIC_THEME), join(repoRoot, 'overlay', 'theme', PUBLIC_THEME), {
-  excludeDirs: ['app'],
-});
+for (const theme of PUBLIC_THEMES) {
+  copyDir(join(sourceRoot, 'theme', theme), join(repoRoot, 'overlay', 'theme', theme), {
+    excludeDirs: ['app'],
+  });
+}
 copyDir(join(sourceRoot, 'docs', 'nginx'), join(repoRoot, 'nextjs-install', 'nginx'));
 const droppedThemePrefixes = [...privateTokens, ...RETIRED_THEME_NAMES].map((name) => `${name}-`);
 for (const file of readdirSync(join(repoRoot, 'nextjs-install', 'nginx'))) {
@@ -950,10 +965,18 @@ copyFileSync(
   join(sourceRoot, 'extend', 'webapp.extend.php'),
   join(repoRoot, 'overlay', 'extend', 'webapp.extend.php')
 );
-copyFileSync(
-  join(sourceRoot, 'theme', PUBLIC_THEME, 'apache-rewrite.example.conf'),
-  join(repoRoot, 'nextjs-install', 'apache-htaccess-rules.txt')
-);
+// 수동 Apache 설정용 규칙 — 기본 테마는 apache-htaccess-rules.txt, 다른 공개 테마는 apache-htaccess-rules-<이름>.txt.
+// (관리자에서 테마를 적용하면 .htaccess 는 저절로 바뀐다 — 이 파일들은 손으로 넣는 곳을 위한 사본이다.)
+for (const theme of PUBLIC_THEMES) {
+  copyFileSync(
+    join(sourceRoot, 'theme', theme, 'apache-rewrite.example.conf'),
+    join(
+      repoRoot,
+      'nextjs-install',
+      theme === PUBLIC_THEME ? 'apache-htaccess-rules.txt' : `apache-htaccess-rules-${theme}.txt`
+    )
+  );
+}
 
 replaceInFile(join(repoRoot, 'overlay', 'api', 'index.php'), [
   [
@@ -970,7 +993,9 @@ replaceInFile(join(repoRoot, 'nextjs', 'package.json'), [
 ]);
 
 sanitizePublicNextjsTree();
-applyPublisherBranding(repoRoot, PUBLIC_THEME);
+for (const theme of PUBLIC_THEMES) {
+  applyPublisherBranding(repoRoot, theme);
+}
 
 // API 설정 예시: 공개판에 없는 테마의 Vercel 주소(쉼표 목록의 항목)와 그 테마를 설명하는 주석 줄을 뺀다.
 {

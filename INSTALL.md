@@ -20,7 +20,13 @@ gnuboard5-nextjs-vX.Y.Z.zip
    최고관리자로 `/adm/dbupgrade.php`를 실행하고, 그래도 안 되면
    `nextjs-install/tables.sql`을 수동 실행합니다(테이블 prefix가 `g5_`가 아니면
    SQL 안의 prefix를 먼저 바꿔주세요).
-4. 관리자 > 환경설정 > 테마설정에서 `Next.js Default`(nextjs_default) 테마를 적용합니다.
+4. 관리자 > 환경설정 > 테마설정에서 테마 하나를 적용합니다.
+   - `Next.js Default`(nextjs_default) — 커뮤니티 · 쇼핑몰 사이트
+   - `Next.js Handbook`(handbook) — 매뉴얼 · 문서 사이트. 적용하면 관리자 > 환경설정 >
+     **테마 화면 설정**(`/adm/view.php?call=theme_settings`) 메뉴가 생깁니다. 매뉴얼로 쓸
+     게시판 그룹을 고르고(그룹의 게시판 = 매뉴얼 한 권, 게시판 분류 = 부, 글 = 장), 매뉴얼
+     순서 · 이름 · 안내 문구, 화면별 왼쪽 사이드바, 사이트 문구를 정합니다. 저장하면 다시
+     빌드하지 않고 바로 화면에 반영됩니다.
 5. 웹서버 규칙
    - Apache/LiteSpeed: 테마를 적용하는 순간 루트 `.htaccess`의 Gnuboard rewrite 블록이
      새 테마에 맞게 자동으로 바뀝니다(블록 밖의 줄은 그대로). `.htaccess`를 쓸 수
@@ -47,7 +53,8 @@ gnuboard5-nextjs-vX.Y.Z.zip
 1. 기존 Gnuboard 파일과 DB를 백업합니다.
 2. 새 release zip을 같은 Gnuboard 루트에 덮어 풉니다. `api/.env`, `config.php`, `data/`는 zip에 없어
    그대로 남습니다.
-3. Apache/LiteSpeed는 관리자 > 환경설정 > 테마설정에서 `Next.js Default` 테마를 **한 번 다시 적용**합니다.
+3. Apache/LiteSpeed는 관리자 > 환경설정 > 테마설정에서 쓰고 있는 테마(`Next.js Default` 나
+   `Next.js Handbook`)를 **한 번 다시 적용**합니다.
    새 버전이 루트 `.htaccess`의 rewrite 블록에 규칙을 더했을 때(예: v0.1.12의 홈 규칙) 이렇게 해야 반영됩니다.
    nginx는 짧은 주소 설정의 "Nginx 설정 코드"와 `nextjs-install/nginx/`의 예시를 다시 확인합니다.
 4. `/api/v1/status`에서 `schema.ok`가 `true`인지 확인합니다. 바뀐 테이블은 API가 스스로 고칩니다.
@@ -59,7 +66,8 @@ Release zip은 Gnuboard 루트에 바로 덮어쓸 수 있는 구조입니다.
 ```text
 api/
 plugin/webapp/          정문 route.php · 연장통 · 부팅 · 소셜 다리 · 표 등록 · 알림 · 크론
-theme/nextjs_default/
+theme/nextjs_default/   커뮤니티 · 쇼핑몰 테마
+theme/handbook/         매뉴얼 · 문서 테마
 extend/webapp.extend.php   그누보드가 매 요청 자동 실행하는 유일한 훅(plugin/webapp 로더)
 nextjs-install/
 INSTALL.md
@@ -81,10 +89,11 @@ MANIFEST.json
   `NEXT_PUBLIC_APP_URL`을 적어야 이 메일이 나갑니다.
 - 새 화면은 설치 직후 검색엔진에 노출되지 않습니다. 공개할 때 `api/.env`에
   `G5_NEXTJS_SEO=on`(필요하면 `G5_NEXTJS_SEO_SITEMAP=on`)을 적으세요.
-- `nextjs-install/apache-htaccess-rules.txt`는 테마 적용 때 들어가는 rewrite 규칙의
-  참고본입니다. 자동 반영이 되는 환경에서는 따로 넣을 필요가 없습니다.
+- `nextjs-install/apache-htaccess-rules.txt`(Next.js Default)와
+  `nextjs-install/apache-htaccess-rules-handbook.txt`(Next.js Handbook)는 테마 적용 때 들어가는
+  rewrite 규칙의 참고본입니다. 자동 반영이 되는 환경에서는 따로 넣을 필요가 없습니다.
 - Apache에서 정적 자산 캐시/압축을 사용하려면 `mod_headers`, `mod_mime`,
-  `mod_deflate`를 활성화하고 `theme/nextjs_default/app` 경로에 `.htaccess`
+  `mod_deflate`를 활성화하고 `theme/<테마>/app` 경로에 `.htaccess`
   `FileInfo` override가 허용되어야 합니다.
 - nginx에서는 `/_next/static/`을 `alias`나 `try_files`로 테마 폴더에서 직접
   내보내지 마세요. 브리지를 거쳐야 설치 폴더에 맞는 주소로 바뀝니다.

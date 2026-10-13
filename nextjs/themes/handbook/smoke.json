@@ -1,0 +1,4 @@
+{
+  "communityShell": [".doc-topbar", ".doc-sidebar"],
+  "shopShell": [".doc-topbar", ".doc-footer"]
+}

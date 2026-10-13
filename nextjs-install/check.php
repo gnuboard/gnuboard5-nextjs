@@ -243,19 +243,25 @@ nextjs25_relative_exists($checks, $root, 'plugin/webapp/bridge/route.php', 'Next
 nextjs25_relative_exists($checks, $root, 'plugin/webapp/bridge/runtime.php', '런타임 부팅(주소·rewrite 훅)');
 nextjs25_relative_exists($checks, $root, 'plugin/webapp/notify/tables.php', '표 등록/마이그레이션');
 nextjs25_relative_exists($checks, $root, 'extend/webapp.extend.php', '그누보드 extend 로더');
-nextjs25_relative_exists($checks, $root, 'theme/nextjs_default/route.php', '테마 라우트 브리지');
-nextjs25_relative_exists($checks, $root, 'theme/nextjs_default/bridge/app-shell.php', '앱 셸 브리지');
-nextjs25_relative_exists($checks, $root, 'theme/nextjs_default/bridge/asset-responses.php', 'asset response bridge');
-nextjs25_relative_exists($checks, $root, 'theme/nextjs_default/bridge/legacy-routes.php', 'legacy route bridge');
-nextjs25_relative_exists($checks, $root, 'theme/nextjs_default/bridge/metadata.php', 'metadata bridge');
-nextjs25_relative_exists($checks, $root, 'theme/nextjs_default/bridge/public-assets.php', 'public asset bridge');
-nextjs25_relative_exists($checks, $root, 'theme/nextjs_default/bridge/render.php', 'render bridge');
-nextjs25_relative_exists($checks, $root, 'theme/nextjs_default/bridge/security-headers.php', 'security header bridge');
-nextjs25_relative_exists($checks, $root, 'theme/nextjs_default/bridge/static-paths.php', 'static app path bridge');
-nextjs25_relative_exists($checks, $root, 'theme/nextjs_default/app/index.html', '정적 export index');
-nextjs25_relative_exists($checks, $root, 'theme/nextjs_default/app/_next/static', 'Next.js 정적 청크', 'dir');
-nextjs25_relative_exists($checks, $root, 'theme/nextjs_default/app/.htaccess', 'Apache 앱 캐시 헤더', 'file', 'warning');
-nextjs25_relative_exists($checks, $root, 'theme/nextjs_default/app/_next/static/.htaccess', 'Apache 청크 캐시 헤더', 'file', 'warning');
+// 이 패키지의 Next.js 테마 — 지금 적용한 테마가 그중 하나면 그 테마를, 아니면 기본 테마(nextjs_default)의 파일을 본다.
+$nextjs25_themes = array('nextjs_default', 'handbook');
+$nextjs25_active_theme = ($common_loaded && isset($config['cf_theme'])) ? (string) $config['cf_theme'] : '';
+$nextjs25_check_theme = in_array($nextjs25_active_theme, $nextjs25_themes, true) ? $nextjs25_active_theme : 'nextjs_default';
+$nextjs25_theme_dir = 'theme/' . $nextjs25_check_theme;
+nextjs25_add_check($checks, '파일', '점검하는 테마', true, $nextjs25_check_theme, 'warning');
+nextjs25_relative_exists($checks, $root, $nextjs25_theme_dir . '/route.php', '테마 라우트 브리지');
+nextjs25_relative_exists($checks, $root, $nextjs25_theme_dir . '/bridge/app-shell.php', '앱 셸 브리지');
+nextjs25_relative_exists($checks, $root, $nextjs25_theme_dir . '/bridge/asset-responses.php', 'asset response bridge');
+nextjs25_relative_exists($checks, $root, $nextjs25_theme_dir . '/bridge/legacy-routes.php', 'legacy route bridge');
+nextjs25_relative_exists($checks, $root, $nextjs25_theme_dir . '/bridge/metadata.php', 'metadata bridge');
+nextjs25_relative_exists($checks, $root, $nextjs25_theme_dir . '/bridge/public-assets.php', 'public asset bridge');
+nextjs25_relative_exists($checks, $root, $nextjs25_theme_dir . '/bridge/render.php', 'render bridge');
+nextjs25_relative_exists($checks, $root, $nextjs25_theme_dir . '/bridge/security-headers.php', 'security header bridge');
+nextjs25_relative_exists($checks, $root, $nextjs25_theme_dir . '/bridge/static-paths.php', 'static app path bridge');
+nextjs25_relative_exists($checks, $root, $nextjs25_theme_dir . '/app/index.html', '정적 export index');
+nextjs25_relative_exists($checks, $root, $nextjs25_theme_dir . '/app/_next/static', 'Next.js 정적 청크', 'dir');
+nextjs25_relative_exists($checks, $root, $nextjs25_theme_dir . '/app/.htaccess', 'Apache 앱 캐시 헤더', 'file', 'warning');
+nextjs25_relative_exists($checks, $root, $nextjs25_theme_dir . '/app/_next/static/.htaccess', 'Apache 청크 캐시 헤더', 'file', 'warning');
 
 $root_htaccess = $root . '/.htaccess';
 if (is_file($root_htaccess)) {
@@ -263,9 +269,9 @@ if (is_file($root_htaccess)) {
     nextjs25_add_check(
         $checks,
         '웹서버',
-        'nextjs_default rewrite 규칙',
-        strpos($root_htaccess_text, 'theme/nextjs_default/route.php') !== false && strpos($root_htaccess_text, '_next/') !== false,
-        '.htaccess에 nextjs_default rewrite 블록이 보이는지 확인합니다.',
+        $nextjs25_check_theme . ' rewrite 규칙',
+        strpos($root_htaccess_text, $nextjs25_theme_dir . '/route.php') !== false && strpos($root_htaccess_text, '_next/') !== false,
+        '.htaccess에 ' . $nextjs25_check_theme . ' rewrite 블록이 보이는지 확인합니다. 테마를 바꿨다면 관리자에서 한 번 다시 적용하세요.',
         'warning'
     );
 } else {
@@ -278,8 +284,8 @@ if ($common_loaded && isset($config) && is_array($config)) {
         $checks,
         '그누보드',
         '활성 테마',
-        $active_theme === 'nextjs_default',
-        $active_theme !== '' ? '현재 테마: ' . $active_theme : '테마 설정을 읽지 못했습니다.',
+        in_array($active_theme, $nextjs25_themes, true),
+        $active_theme !== '' ? '현재 테마: ' . $active_theme . ' (Next.js 테마: ' . implode(', ', $nextjs25_themes) . ')' : '테마 설정을 읽지 못했습니다.',
         'warning'
     );
 }
@@ -423,7 +429,7 @@ $manual_links = array();
 if (defined('G5_URL') && G5_URL) {
     $base_url = rtrim(G5_URL, '/');
     $manual_links[] = $base_url . '/api/v1/settings';
-    $manual_links[] = $base_url . '/theme/nextjs_default/app/index.html';
+    $manual_links[] = $base_url . '/' . $nextjs25_theme_dir . '/app/index.html';
     $manual_links[] = $base_url . '/';
     $manual_links[] = $base_url . '/boards';
     $manual_links[] = $base_url . '/shop';

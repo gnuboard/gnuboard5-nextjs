@@ -1,0 +1,24 @@
+/* =====================================================================
+   Handbook theme — a documentation / manual-site look built on daisyUI v5.
+
+   Mechanism (matches the greenhub pattern):
+   - globals.css already loads Tailwind v4 + daisyUI (`@import "tailwindcss";
+     @plugin "daisyui";`). We do NOT re-import them here.
+   - theme.tokens.css overrides the shadcn HSL tokens (--primary, ...) and the
+     daisyUI v5 variables (--color-*, --radius-*) so every shadcn/Radix
+     component, Tailwind color utility, and daisyUI component (navbar / drawer /
+     menu / steps / mockup-code / btn / badge / kbd / tabs) adopts the same
+     indigo-on-slate documentation palette.
+   - theme.shell.css styles the documentation chrome (topbar + sidebar + footer).
+   - theme.landing.css styles the documentation landing page.
+   ===================================================================== */
+
+@import "./theme.tokens.css";
+@import "./theme.shell.css";
+@import "./theme.mainnav.css";
+@import "./theme.booknav.css";
+@import "./theme.search.css";
+@import "./theme.landing.css";
+@import "./theme.shop.css";
+@import "./theme.pages.css";
+@import "./theme.dark.css";

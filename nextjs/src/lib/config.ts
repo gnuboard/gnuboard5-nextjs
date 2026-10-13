@@ -22,6 +22,11 @@ export interface G5NextRuntimeConfig {
   seo?: RuntimeSeoConfig;
   /** 설치본의 사이트 제목(cf_title). 테마 브리지나 Next 서버가 싣는다. 없으면 테마 기본값. */
   siteName?: string;
+  /**
+   * 관리자 › 테마 화면 설정의 공개 값(plugin/webapp/theme-settings). 그 설정을 읽는 테마의 브리지만 싣는다.
+   * 모양은 테마가 검사한다 — 여기서는 그대로 건넨다.
+   */
+  themeSettings?: unknown;
 }
 
 /**
@@ -43,6 +48,11 @@ function runtimeConfig(): G5NextRuntimeConfig | undefined {
 export function clientSiteName(fallback: string): string {
   const name = runtimeConfig()?.siteName;
   return typeof name === "string" && name.trim() ? name.trim() : fallback;
+}
+
+/** 브라우저에서 본 테마 화면 설정(런타임 설정의 themeSettings, 검사 전 값). 서버 · 런타임 설정이 없으면 undefined. */
+export function clientThemeSettings(): unknown {
+  return runtimeConfig()?.themeSettings;
 }
 
 /** 브라우저에서 본 검색엔진 노출 설정. 런타임 설정에 없으면 노출하지 않는 쪽(G5_NEXTJS_SEO 기본값 off). */

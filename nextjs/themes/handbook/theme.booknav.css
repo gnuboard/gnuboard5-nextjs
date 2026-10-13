@@ -1,0 +1,454 @@
+/* Handbook theme — 매뉴얼 선택기 · 번호 목차 · 장 위치 · 앞뒤 장(book-selector.tsx · chapter-pager.tsx ·
+   board-view-header.tsx). 색은 모두 doc 토큰이라 다크 모드(theme.tokens.css)를 그대로 따른다. */
+
+/* --- 매뉴얼 선택기 --------------------------------------------------------- */
+.doc-booksel {
+  position: relative;
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--doc-border);
+}
+
+.doc-booksel-button {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 3.5rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--doc-border-strong);
+  border-radius: var(--doc-radius-md);
+  background: var(--doc-surface);
+  color: var(--doc-ink);
+  text-align: left;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.doc-booksel-button:hover,
+.doc-booksel-button[aria-expanded="true"] {
+  border-color: var(--doc-accent);
+}
+
+.doc-booksel-button:focus-visible,
+.doc-booksel-option:focus-visible,
+.doc-booksel-index:focus-visible,
+.doc-pager-link:focus-visible {
+  outline: 2px solid var(--doc-accent);
+  outline-offset: 2px;
+}
+
+.doc-booksel-icon {
+  flex-shrink: 0;
+  color: var(--doc-accent-strong);
+}
+
+.doc-booksel-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.doc-booksel-label {
+  overflow: hidden;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-booksel-hint {
+  overflow: hidden;
+  color: var(--doc-muted);
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-booksel-caret {
+  flex-shrink: 0;
+  color: var(--doc-muted);
+}
+
+/* 펼친 목록은 목차 위로 떠서, 열어도 아래 목차가 밀리지 않는다. */
+.doc-booksel-panel {
+  position: absolute;
+  top: calc(100% - 0.5rem);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: grid;
+  gap: 0.35rem;
+  max-height: min(65vh, 32rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.4rem;
+  border: 1px solid var(--doc-border);
+  border-radius: var(--doc-radius-md);
+  background: var(--doc-surface);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.14);
+}
+
+.doc-booksel-grouplabel {
+  margin: 0.35rem 0 0.15rem;
+  padding-inline: 0.6rem;
+  color: var(--doc-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.doc-booksel-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--doc-radius-sm);
+  color: var(--doc-body);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.doc-booksel-option:hover {
+  background: var(--doc-surface-muted);
+  color: var(--doc-ink);
+}
+
+.doc-booksel-option.is-current {
+  background: var(--doc-accent-soft);
+  color: var(--doc-accent-strong);
+}
+
+.doc-booksel-option-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.doc-booksel-option-text small {
+  overflow: hidden;
+  color: var(--doc-muted);
+  font-size: 0.72rem;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-booksel-count {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--doc-muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-booksel-check {
+  flex-shrink: 0;
+}
+
+.doc-booksel-index {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--doc-radius-sm);
+  color: var(--doc-body);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.doc-booksel-index:hover {
+  background: var(--doc-surface-muted);
+  color: var(--doc-accent-strong);
+}
+
+/* --- 서랍 맨 위 메뉴(drawer-menu.tsx) — 1280px 이상에서는 .is-site-menu 로 숨는다 ---------- */
+.doc-drawer-menu {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--doc-border);
+}
+
+/* 바로 아래 목록만 — 하위 메뉴 목록(.doc-nav-children)의 들여쓰기 · 왼쪽 줄까지 지우지 않게. */
+.doc-drawer-menu > ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doc-drawer-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.doc-drawer-menu-top {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--doc-radius-sm);
+  color: var(--doc-ink);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.doc-drawer-menu-top:hover {
+  background: var(--doc-surface-muted);
+  color: var(--doc-accent-strong);
+}
+
+.doc-drawer-menu-toggle {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--doc-radius-sm);
+  color: var(--doc-muted);
+}
+
+.doc-drawer-menu-toggle:hover {
+  background: var(--doc-surface-muted);
+  color: var(--doc-ink);
+}
+
+.doc-drawer-menu-toggle svg {
+  transition: transform 150ms ease;
+}
+
+.doc-drawer-menu-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.doc-drawer-menu-top:focus-visible,
+.doc-drawer-menu-toggle:focus-visible,
+.doc-part-toggle:focus-visible {
+  outline: 2px solid var(--doc-accent);
+  outline-offset: 2px;
+}
+
+/* --- 매뉴얼이 아닌 화면의 사이드바(sidebar-sections.tsx) --------------------- */
+/* 관리자 메뉴 묶음(커뮤니티 · 고객센터 …) — 묶음 이름은 링크, 지금 화면은 .doc-nav-link.is-active 로 강조. */
+.doc-side-menu ul {
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doc-side-menu-title {
+  display: block;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--doc-radius-sm);
+  color: var(--doc-ink);
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.doc-side-menu-title:hover,
+.doc-side-menu-title.is-active {
+  background: var(--doc-accent-soft);
+  color: var(--doc-accent-strong);
+}
+
+.doc-side-menu-title:focus-visible,
+.doc-book-browse-link:focus-visible {
+  outline: 2px solid var(--doc-accent);
+  outline-offset: 2px;
+}
+
+.doc-side-browse {
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--doc-border);
+  border-radius: 0;
+  padding-top: 0.75rem;
+}
+
+/* 매뉴얼 목록 — 첫 화면과 메뉴 묶음에 들지 않는 화면. 선택기의 펼친 목록과 같은 모양을 늘 펼쳐 둔다. */
+.doc-book-browse {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--doc-border);
+}
+
+.doc-book-browse ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* --- 번호 목차 ------------------------------------------------------------ */
+.doc-part-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+/* 부 머리는 접고 펴는 단추. 접힌 부끼리는 붙여 두어 목차 전체가 한눈에 들어오게 한다. */
+.doc-part-toggle {
+  width: 100%;
+  padding-block: 0.3rem;
+  border-radius: var(--doc-radius-sm);
+  cursor: pointer;
+}
+
+.doc-part-toggle:hover {
+  color: var(--doc-ink);
+}
+
+.doc-part-caret {
+  flex-shrink: 0;
+  transition: transform 150ms ease;
+}
+
+.doc-part-toggle[aria-expanded="false"] .doc-part-caret {
+  transform: rotate(-90deg);
+}
+
+.doc-part-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.doc-chapters .doc-nav-section + .doc-nav-section {
+  margin-top: 0.35rem;
+}
+
+.doc-part-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.doc-chapter-no {
+  flex-shrink: 0;
+  min-width: 1.4rem;
+  color: var(--doc-muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-chapter-link.is-active .doc-chapter-no {
+  color: var(--doc-accent-strong);
+}
+
+/* --- 글 보기 머리의 장 위치 ----------------------------------------------- */
+.doc-chapter-position {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  color: var(--doc-muted);
+  font-size: 0.78rem;
+}
+
+.doc-chapter-position a {
+  color: var(--doc-accent-strong);
+  font-weight: 600;
+}
+
+.doc-chapter-position a:hover {
+  text-decoration: underline;
+}
+
+.doc-chapter-position-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- 앞뒤 장 --------------------------------------------------------------- */
+/* 매뉴얼의 장에서는 앱의 다음글/이전글(게시판 글 순서)을 숨긴다 — 매뉴얼 목차 순서와 어긋날 수
+   있어 두 가지가 함께 있으면 헷갈린다. 다른 게시판(커뮤니티 등)에서는 그대로 보인다. */
+.doc-main[data-doc-chapter] .board-view-siblings {
+  display: none;
+}
+
+.doc-pager {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding-bottom: 2.5rem;
+}
+
+.doc-pager-link {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--doc-border);
+  border-radius: var(--doc-radius-md);
+  background: var(--doc-surface);
+  transition: border-color 150ms ease;
+}
+
+.doc-pager-link:hover {
+  border-color: var(--doc-accent);
+}
+
+.doc-pager-link.is-next {
+  grid-column: 2;
+  text-align: right;
+}
+
+.doc-pager-dir {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--doc-muted);
+  font-size: 0.76rem;
+}
+
+.doc-pager-link.is-next .doc-pager-dir {
+  justify-content: flex-end;
+}
+
+.doc-pager-title {
+  overflow: hidden;
+  color: var(--doc-ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 639px) {
+  .doc-pager {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .doc-pager-link.is-next {
+    grid-column: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .doc-booksel-button,
+  .doc-booksel-option,
+  .doc-pager-link {
+    transition: none;
+  }
+}
+
+/* --- 고대비(강제 색) 모드 ---------------------------------------------------------------------- */
+/* 강제 색 모드는 배경색을 지워, 배경으로만 보이던 "지금 장 · 지금 메뉴 · 고른 매뉴얼"이 다른 항목과 똑같아진다.
+   시스템 강조색(Highlight) 테두리선으로 다시 드러낸다. */
+@media (forced-colors: active) {
+  .doc-nav-link.is-active,
+  .doc-toc-link.is-active,
+  .doc-booksel-option.is-current,
+  .doc-side-menu-title.is-active,
+  .doc-mainnav-link[aria-current="page"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  .doc-nav-link.is-active .doc-nav-dot {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+}

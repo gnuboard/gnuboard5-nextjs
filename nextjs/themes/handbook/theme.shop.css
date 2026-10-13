@@ -1,0 +1,255 @@
+/* Handbook theme — documentation-styled shop landing surface. */
+
+.doc-shop-links {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 1.25rem;
+}
+
+.doc-shop-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid var(--doc-border);
+  border-radius: var(--doc-radius-md);
+  background: var(--doc-surface);
+  padding: 0.85rem 1rem;
+  box-shadow: var(--shadow-card);
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.doc-shop-link:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--doc-accent) 40%, var(--doc-border));
+  box-shadow: var(--shadow-card-hover);
+}
+
+.doc-shop-link-icon {
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  flex-shrink: 0;
+  border-radius: var(--doc-radius-md);
+  background: var(--doc-accent-soft);
+  color: var(--doc-accent-strong);
+}
+
+.doc-shop-link-body {
+  min-width: 0;
+  /* 한글은 낱말(띄어쓰기) 단위로 꺾는다. */
+  word-break: keep-all;
+}
+
+.doc-shop-link-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--doc-ink);
+}
+
+.doc-shop-link-desc {
+  font-size: 0.78rem;
+  color: var(--doc-muted);
+}
+
+.doc-product-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.doc-product-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--doc-border);
+  border-radius: var(--doc-radius-lg);
+  background: var(--doc-surface);
+  box-shadow: var(--shadow-card);
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.doc-product-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--doc-accent) 40%, var(--doc-border));
+  box-shadow: var(--shadow-card-hover);
+}
+
+.doc-product-thumb {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--doc-surface-muted) 0%, var(--doc-accent-soft) 100%);
+}
+
+.doc-product-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 240ms ease;
+}
+
+.doc-product-card:hover .doc-product-thumb img {
+  transform: scale(1.04);
+}
+
+.doc-product-thumb-fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--doc-accent-strong);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.doc-product-badge {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.55rem;
+  border-radius: var(--doc-radius-pill);
+  padding: 0.15rem 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.4;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+}
+
+.doc-product-badge-soldout {
+  background: #64748b;
+}
+
+.doc-product-badge-new {
+  background: var(--doc-accent);
+  color: var(--doc-on-accent);
+}
+
+.doc-product-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.85rem 0.9rem 1rem;
+}
+
+.doc-product-cat {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--doc-muted);
+}
+
+.doc-product-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--doc-ink);
+}
+
+.doc-product-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.35rem;
+}
+
+.doc-product-price {
+  font-size: 1.02rem;
+  font-weight: 900;
+  color: var(--doc-accent-strong);
+}
+
+/* 사진 · 이름이 각각 링크가 되었다(카드 안에 "담기" 단추를 두려고). 모양은 전과 같다. */
+a.doc-product-thumb {
+  display: block;
+}
+
+a.doc-product-name:hover,
+a.doc-product-name:focus-visible {
+  color: var(--doc-accent-strong);
+}
+
+/* 좁은 카드(폰 2열)에서는 가격 · 별점 · 담기가 한 줄에 다 안 들어간다. 글자를 쪼개지 말고
+   오른쪽 묶음(별점 · 담기)을 통째로 다음 줄 오른쪽으로 내린다. */
+.doc-product-foot {
+  flex-wrap: wrap;
+  row-gap: 0.4rem;
+}
+
+.doc-product-price {
+  white-space: nowrap;
+}
+
+.doc-product-foot-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+
+/* 담기(앱 ProductQuickAdd). 옵션 없는 상품은 바로 담고, 옵션 상품은 옵션 고르기 창을 연다. */
+.doc-product-add {
+  border: 0;
+  border-radius: var(--doc-radius-pill);
+  padding: 0.28rem 0.7rem;
+  background: var(--doc-accent-soft);
+  color: var(--doc-accent-strong);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.doc-product-add:not(:disabled):is(:hover, :focus-visible) {
+  background: var(--doc-accent);
+  color: var(--doc-on-accent);
+}
+
+.doc-product-add:focus-visible {
+  outline: 2px solid var(--doc-accent);
+  outline-offset: 2px;
+}
+
+/* 품절: 누를 수 없는 단추 — 흐리게 하지 않고 옅은 바탕 + 옅은 글자로 대비를 지킨다. */
+.doc-product-add:disabled {
+  background: var(--doc-surface-muted);
+  color: var(--doc-muted);
+  cursor: not-allowed;
+}
+
+.doc-product-review {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--doc-muted);
+}
+
+@media (min-width: 640px) {
+  /* 칸 수를 화면 폭이 아니라 남은 너비로 — 사이드바 옆 히어로 안에서 네 칸을 고정하면 칸이 140px 남짓이 되어
+     "전체 상 / 품"처럼 낱말 가운데서 꺾였다. 한 칸이 13rem 보다 좁아지면 줄을 바꾼다(사이드바 옆에서는 2×2). */
+  .doc-shop-links {
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  }
+  .doc-product-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .doc-product-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

@@ -1,0 +1,395 @@
+/* Handbook theme — 앱의 안쪽 화면 가운데 모양을 테마에 맡기는 것(src/app/* 의 손잡이 클래스).
+   기본 테마는 theme.internal.pages.css 에서 정한다. handbook 은 그 짜임을 문서 토큰(--doc-*)으로 다시 둔다 —
+   맡기는 화면을 handbook 이 정하지 않으면 표가 맨 HTML 표로 나온다(새글 2026-10-10). */
+
+/* --- 새글(/recent, src/app/recent/RecentList.tsx) -------------------------------------------------
+   도구 줄 · 표 · 페이지 넘김을 한 테두리에 담은 카드. 표는 그리드로 세워 머리와 줄이 같은 눈금
+   (선택 · 그룹 · 게시판 · 제목 · 이름 · 일시)을 쓰고, 카드가 680px 보다 좁으면 같은 마크업을 카드 목록
+   (게시판 / 제목 / 이름 · 일시)으로 다시 앉힌다. */
+.doc-root .recent-card {
+  --recent-cols: 84px 116px minmax(0, 1fr) 136px 56px;
+  --recent-amber: #7a5c00;
+  --recent-amber-bg: #fff4d1;
+  container: recent / inline-size;
+  border-color: var(--doc-border);
+  border-radius: var(--doc-radius-lg);
+  background: var(--doc-surface);
+}
+
+:root[data-handbook-theme="dark"] .doc-root .recent-card {
+  --recent-amber: #f0d089;
+  --recent-amber-bg: #3a2f12;
+}
+
+.doc-root .recent-card.has-tools {
+  --recent-cols: 28px 84px 116px minmax(0, 1fr) 136px 56px;
+}
+
+.doc-root .recent-tools {
+  padding: 0.75rem 1.25rem;
+  border-color: var(--doc-border);
+}
+
+.doc-root .recent-checkall {
+  color: var(--doc-muted);
+  font-size: 0.8rem;
+}
+
+.doc-root .recent-chk {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--doc-accent);
+  cursor: pointer;
+}
+
+/* 표 머리 글자색 — daisyUI 기본(본문 글자 60% 투명)은 밝은 배경에서 대비 3.97:1 로 WCAG AA(4.5:1)에 모자랐다
+   (장바구니 · 주문서 표, a11y 검사). 본문 글자색을 그대로 쓴다. 자기 th 색을 정한 표(.recent-table 등)는 그쪽이 이긴다. */
+.doc-root :where(thead, tfoot) {
+  color: inherit;
+}
+
+.doc-root .recent-table {
+  display: block;
+  border-collapse: collapse;
+}
+
+.doc-root .recent-table :is(thead, tbody) {
+  display: block;
+}
+
+.doc-root .recent-table tr {
+  display: grid;
+  grid-template-columns: var(--recent-cols);
+  gap: 1rem;
+  align-items: center;
+}
+
+.doc-root .recent-table thead tr {
+  padding: 0.65rem 1.25rem;
+  border-bottom: 1px solid var(--doc-border);
+  background: var(--doc-surface-muted);
+}
+
+.doc-root .recent-table th {
+  padding: 0;
+  color: var(--doc-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.doc-root .recent-table .recent-th-date {
+  text-align: right;
+}
+
+.doc-root .recent-table tbody tr {
+  padding: 0.8rem 1.25rem;
+  border-bottom: 1px solid var(--doc-border);
+}
+
+.doc-root .recent-table tbody tr:last-child {
+  border-bottom: 0;
+}
+
+.doc-root .recent-table tbody tr:hover {
+  background: var(--doc-surface-muted);
+}
+
+.doc-root .recent-table tbody tr:has(.recent-empty) {
+  display: block;
+  padding: 0;
+}
+
+.doc-root .recent-table tbody tr:has(.recent-empty):hover {
+  background: none;
+}
+
+.doc-root .recent-table td {
+  min-width: 0;
+  padding: 0;
+  line-height: 1.45;
+}
+
+.doc-root .recent-table .recent-empty {
+  display: block;
+  padding: 3.5rem 0;
+  color: var(--doc-muted);
+}
+
+.doc-root .recent-td-chk {
+  display: flex;
+  align-items: center;
+}
+
+.doc-root :is(.recent-td-group, .recent-td-board) {
+  overflow: hidden;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-root .recent-td-group a {
+  color: var(--doc-muted);
+}
+
+.doc-root .recent-td-group a:hover {
+  color: var(--doc-ink);
+}
+
+.doc-root .recent-td-board a {
+  color: var(--doc-accent-strong);
+  font-weight: 600;
+}
+
+.doc-root .recent-td-board a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.doc-root .recent-td-subject {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.doc-root .recent-title {
+  overflow: hidden;
+  color: var(--doc-ink);
+  font-size: 0.92rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-root .recent-title:hover {
+  color: var(--doc-accent-strong);
+}
+
+.doc-root .recent-tag {
+  flex: none;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.doc-root .recent-tag-comment {
+  background: var(--recent-amber-bg);
+  color: var(--recent-amber);
+}
+
+.doc-root .recent-tag-mine {
+  border: 1px solid color-mix(in srgb, var(--doc-accent) 30%, var(--doc-surface));
+  background: var(--doc-accent-soft);
+  color: var(--doc-accent-strong);
+}
+
+.doc-root .recent-td-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--doc-body);
+  font-size: 0.8rem;
+}
+
+.doc-root .recent-writer {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.45rem;
+  color: inherit;
+}
+
+.doc-root button.recent-writer:hover {
+  color: var(--doc-accent-strong);
+}
+
+.doc-root .recent-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 이름 앞의 동그란 첫 글자 — 맨 HTML 에서는 이름 앞에 글자 하나가 그대로 붙어 "최 최고관리자"로 보였다. */
+.doc-root .recent-initial {
+  display: flex;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--doc-surface-muted);
+  color: var(--doc-muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.doc-root .recent-td-date {
+  color: var(--doc-muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.doc-root .recent-pagination {
+  border-color: var(--doc-border);
+}
+
+/* 카드가 680px 보다 좁으면(여섯 칸이 제목에 자리를 못 남긴다) 카드 목록으로 — 게시판 · 댓글 · 내 글 한 줄,
+   제목 한 줄, 이름과 일시 한 줄. 그룹은 뺀다. 휴대폰에서 칸마다 글자가 한 자씩 꺾이던 것. */
+@container recent (max-width: 680px) {
+  .doc-root .recent-tools {
+    padding: 0.75rem 0.9rem;
+  }
+
+  .doc-root .recent-table thead {
+    display: none;
+  }
+
+  .doc-root .recent-table tbody tr {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "chk board board"
+      "chk title title"
+      "chk name date";
+    gap: 0.35rem 0.6rem;
+    align-items: start;
+    padding: 0.9rem;
+  }
+
+  .doc-root .recent-card:not(.has-tools) .recent-table tbody tr {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "board board"
+      "title title"
+      "name date";
+  }
+
+  .doc-root .recent-td-chk {
+    grid-area: chk;
+    align-self: start;
+    padding-top: 3px;
+  }
+
+  .doc-root .recent-td-group {
+    display: none;
+  }
+
+  .doc-root .recent-td-board {
+    grid-area: board;
+  }
+
+  .doc-root .recent-td-board a {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.25rem;
+    background: var(--doc-accent-soft);
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+
+  .doc-root .recent-td-board a:hover {
+    text-decoration: none;
+  }
+
+  .doc-root .recent-td-subject {
+    grid-area: title;
+    align-items: flex-start;
+  }
+
+  .doc-root .recent-title {
+    overflow: visible;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: normal;
+  }
+
+  .doc-root .recent-td-name {
+    grid-area: name;
+    font-size: 0.75rem;
+  }
+
+  .doc-root .recent-initial {
+    width: 18px;
+    height: 18px;
+    font-size: 0.6rem;
+  }
+
+  .doc-root .recent-td-date {
+    grid-area: date;
+    align-self: center;
+    font-size: 0.75rem;
+  }
+}
+
+/* --- 게시판 목록(src/app/boards/[bo_table]/ClientPage.tsx) -------------------------------------
+   분류 칩은 줄어들지 않고 한 줄로 서되, 넘치면 다음 줄에 왼쪽부터 — 칩이 좁아지며 "디 버 깅"처럼 한 자씩 꺾였고,
+   앱 공통 도구 줄(.surface-toolbar)의 양끝 맞춤 때문에 둘째 줄 칩이 오른쪽 끝으로 밀렸다.
+   글쓴이 칸은 넓혀 닉네임이 두 줄로 꺾이지 않게 하고, 길면 말줄임. */
+.doc-root .board-list-categories {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 0.4rem;
+}
+
+.doc-root .board-list-categories .filter-chip {
+  flex: none;
+  white-space: nowrap;
+}
+
+.doc-root .board-list-table th.board-col-author {
+  width: 8rem;
+}
+
+.doc-root .board-list-table td.board-col-author {
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 검색 칸 — 안의 검색 폼이 아래 여백(mb-6)을 그대로 달고 있어 테두리 안 아래쪽이 비어 보였다. */
+.doc-root .board-list-search form {
+  margin-bottom: 0;
+}
+
+/* --- 쇼핑몰 화면(layout-shell.tsx HandbookShopLayoutShell) ----------------------------------------
+   앱의 쇼핑 화면은 바깥 셸이 여백을 준다고 본다 — 문서 본문과 같은 여백 · 너비를 둔다. 쇼핑몰 첫 화면(shop-home.tsx)은
+   스스로 .doc-content 여백을 두므로 겹치지 않게 비운다. */
+.doc-root .doc-shop-page {
+  width: 100%;
+  max-width: var(--doc-content-max);
+  margin-inline: auto;
+  padding: clamp(1.25rem, 3vw, 2rem) clamp(1rem, 3vw, 2.5rem) 4rem;
+}
+
+.doc-root .doc-shop-page:has(> .doc-content) {
+  max-width: none;
+  padding: 0;
+}
+
+/* --- 마이페이지 쿠폰함(src/app/mypage/coupons/page.tsx) -------------------------------------------
+   왼쪽 금액 칸이 고정 폭(w-28)이라 큰 금액이 칸을 넘어 쿠폰 이름을 덮었다 — 금액만큼 넓히되 절반을 넘지 않게
+   하고, 글자는 화면 폭에 맞춰 줄인다(기본 테마 theme.mypage.css 와 같은 짜임). */
+.doc-root .mypage-coupon-stub {
+  width: auto;
+  min-width: 7rem;
+  max-width: 45%;
+  padding-inline: 1.1rem;
+}
+
+.doc-root .mypage-coupon-amount {
+  font-size: clamp(1.05rem, 2.2vw, 1.5rem);
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}

@@ -231,11 +231,11 @@ class PushQueue
 
     /**
      * 처리 끝난 큐 행 정리. sent 는 곧 쓸모가 없고 failed 는 원인 조사용으로 조금 더 둔다.
-     * plugin/webapp/cron/cleanup_push_tokens.php 가 매일 부른다.
+     * api/lib/TableCleanup.php(정리 크론 · 유지보수 신호)가 부른다. $limit > 0 이면 상태마다 한 번에 그만큼만.
      *
      * @return array{sent:int, failed:int} 지운 건수
      */
-    public static function gc(int $keepSentDays = 30, int $keepFailedDays = 90): array
+    public static function gc(int $keepSentDays = 30, int $keepFailedDays = 90, int $limit = 0): array
     {
         $table = DB::table('push_queue_table');
         $out = ['sent' => 0, 'failed' => 0];
@@ -245,7 +245,8 @@ class PushQueue
             }
             $cutoff = date('Y-m-d H:i:s', time() - ($days * 86400));
             $out[$status] = (int) DB::execute(
-                "DELETE FROM `{$table}` WHERE status = ? AND processed_at IS NOT NULL AND processed_at < ?",
+                "DELETE FROM `{$table}` WHERE status = ? AND processed_at IS NOT NULL AND processed_at < ?"
+                    . ($limit > 0 ? " LIMIT {$limit}" : ''),
                 [$status, $cutoff]
             );
         }

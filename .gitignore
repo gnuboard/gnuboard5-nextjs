@@ -34,3 +34,6 @@ nextjs/themes/.active
 # Written by `next dev` (Next.js 16 agent rules) - not the repository AGENTS.md at the top.
 nextjs/AGENTS.md
 nextjs/CLAUDE.md
+
+# 테마마다 빌드한 정적 화면(scripts/build-release-themes.mjs) — 설치 zip 을 만들 때만 쓴다.
+.release-build/

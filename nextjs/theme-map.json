@@ -4,6 +4,9 @@
   "themes": {
     "nextjs_default": {
       "source": "default"
+    },
+    "handbook": {
+      "source": "handbook"
     }
   }
 }

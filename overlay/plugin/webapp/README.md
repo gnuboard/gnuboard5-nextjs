@@ -34,14 +34,18 @@ API 쪽(`api/v1/comments.php`, `qas.php`, `memos.php`)과 그누보드 화면 �
 | `nt_dedup_key` | 같은 알림을 하루 두 번 안 만들기 위한 UNIQUE 키 (크론·앱 재전송) |
 | `nt_read_at` | NULL 이면 안 읽음 — 배지 개수 |
 
-보존: `cron/cleanup_push_tokens.php`(매일)가 읽은 알림 180일 · 안 읽은 알림 365일 지난 행을 지운다 (`WEBAPP_NOTIFICATION_KEEP_*_DAYS`).
+보존: 표 정리(`api/lib/TableCleanup.php` — `cron/cleanup_push_tokens.php` 와, 크론이 없으면 유지보수 신호
+`POST /v1/maintenance/tick` 이 하루 한 번)가 읽은 알림 180일 · 안 읽은 알림 365일 지난 행을 지운다 (`WEBAPP_NOTIFICATION_KEEP_*_DAYS`).
+같은 정리가 푸시 토큰 · 푸시 큐 · 만료된 로그인 토큰 · 소셜 가입 입장권 · 오래된 기기의 IP 도 맡는다(보존 일수는 `WEBAPP_*_KEEP_DAYS`).
+2000행씩 나눠 지우고, 유지보수 신호에서는 8초 안에서만 돈다(다 못 끝내면 5분 뒤 이어서). 크론으로 정리하는 사이트는
+`define('WEBAPP_TICK_CLEANUP', false)` 로 신호 쪽 정리를 끌 수 있다.
 
 ## cron/
 
 | 스크립트 | 주기 |
 |----------|------|
 | `process_push_queue.php` | 1~5분 |
-| `cleanup_push_tokens.php` | 하루 1회 |
+| `cleanup_push_tokens.php` | 매주(매일도 됨). 크론이 없으면 유지보수 신호가 하루 한 번 같은 정리를 한다 |
 | `purge_withdrawn_members.php` | 하루 1회 (`--dry-run` 으로 먼저 확인) |
 | `send_stocksms.php` | 5~10분 (영카트 재입고 SMS) |
 | `install-windows-task.ps1` | Windows 작업 스케줄러 등록 |

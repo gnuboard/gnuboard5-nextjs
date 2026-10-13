@@ -78,28 +78,39 @@ export function publicVercelThemeMap(publicManifest) {
 }
 
 /**
- * 설치 zip 에 들어가는 테마 이름(theme/<이름>). 설치 안내 · zip 검사가 한 테마를 전제하므로 하나여야 한다.
- * 공개 테마를 둘 이상 싣게 되면 package-release · verify-release-package 를 여러 테마용으로 넓힌다.
+ * 설치 zip 에 들어가는 테마 이름들(theme/<이름>) — 매니페스트 순서 그대로. zip 하나에 공개 테마가 모두 들고,
+ * 사이트 운영자가 관리자 › 테마설정에서 하나를 고른다. 하나도 없으면 설치판이 아니다.
  */
-export function publicInstallThemeName(themeManifest) {
+export function publicInstallThemeNames(themeManifest) {
   const installable = manifestEntries(themeManifest).filter(
     (entry) => entry.publicPackage !== false && entry.installable !== false
   );
-  if (installable.length !== 1) {
-    throw new Error(
-      `public package must install exactly one theme; found ${installable.length}: ${installable.map((entry) => entry.theme).join(', ') || '(none)'}`
-    );
+  if (installable.length === 0) {
+    throw new Error('public package must install at least one theme; found none');
   }
-  return installable[0].theme;
+  return installable.map((entry) => entry.theme);
+}
+
+/**
+ * 기본 테마 — 설치 안내가 먼저 권하는 테마이자, 한 테마의 파일을 예로 보는 개발 검사(파일 크기 · 브리지 경로)가
+ * 쓰는 테마. 매니페스트의 첫 공개 테마다.
+ */
+export function publicPrimaryThemeName(themeManifest) {
+  return publicInstallThemeNames(themeManifest)[0];
 }
 
 export function assertPublicPackageThemeMaps(themeManifest, themeMap) {
-  const themeName = publicInstallThemeName(themeManifest);
-  const entry = manifestEntries(themeManifest).find((item) => item.theme === themeName);
-  if (themeMap.themes?.[themeName]?.source !== entry.source) {
-    throw new Error(`nextjs/theme-map.json must package ${themeName} from the ${entry.source} theme source`);
+  const themeNames = publicInstallThemeNames(themeManifest);
+  for (const themeName of themeNames) {
+    const entry = manifestEntries(themeManifest).find((item) => item.theme === themeName);
+    if (themeMap.themes?.[themeName]?.source !== entry.source) {
+      throw new Error(`nextjs/theme-map.json must package ${themeName} from the ${entry.source} theme source`);
+    }
   }
-  if (Object.keys(themeMap.themes || {}).length !== 1) {
-    throw new Error('nextjs/theme-map.json must not claim installable themes that are not in the public package');
+  const extra = Object.keys(themeMap.themes || {}).filter((name) => !themeNames.includes(name));
+  if (extra.length > 0) {
+    throw new Error(
+      `nextjs/theme-map.json must not claim installable themes that are not in the public package: ${extra.join(', ')}`
+    );
   }
 }

@@ -13,15 +13,17 @@ import {
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { publicInstallThemeName } from './lib/public-theme-manifest.mjs';
+import { publicInstallThemeNames } from './lib/public-theme-manifest.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');
 const distRoot = join(repoRoot, 'dist');
-// 설치 zip 에 넣는 테마 이름(theme/<이름>) — 공개판 매니페스트에서 읽는다(원본의 publicPackage 테마).
-const PUBLIC_THEME = publicInstallThemeName(
+// 설치 zip 에 넣는 테마 이름들(theme/<이름>) — 공개판 매니페스트에서 읽는다(원본의 publicPackage 테마).
+const PUBLIC_THEMES = publicInstallThemeNames(
   JSON.parse(readFileSync(join(repoRoot, 'nextjs', 'theme-manifest.json'), 'utf8'))
 );
+// 테마마다 빌드한 정적 화면 — scripts/build-release-themes.mjs 가 만든다.
+const releaseBuildRoot = join(repoRoot, '.release-build');
 
 const version =
   process.argv.slice(2).find((arg) => !arg.startsWith('-')) ||
@@ -75,8 +77,13 @@ function tryCreateZipWith(command, args, options) {
 const required = [
   ['overlay/api/index.php', 'API router'],
   ['overlay/api/.htaccess', 'API rewrite rules'],
-  [`overlay/theme/${PUBLIC_THEME}/route.php`, 'theme route bridge'],
-  [`overlay/theme/${PUBLIC_THEME}/apache-rewrite.example.conf`, 'Apache rewrite rules'],
+  ...PUBLIC_THEMES.flatMap((theme) => [
+    [`overlay/theme/${theme}/route.php`, `${theme} theme route bridge`],
+    [`overlay/theme/${theme}/apache-rewrite.example.conf`, `${theme} Apache rewrite rules`],
+    [`.release-build/${theme}/index.html`, `${theme} static export (node scripts/build-release-themes.mjs)`],
+    [`.release-build/${theme}/.htaccess`, `${theme} Apache app cache rules`],
+    [`.release-build/${theme}/_next/static/.htaccess`, `${theme} Apache static chunk cache rules`],
+  ]),
   ['overlay/plugin/webapp/bridge/common.php', 'theme-neutral runtime helpers'],
   ['overlay/plugin/webapp/bridge/route.php', 'theme-neutral route front controller'],
   ['overlay/plugin/webapp/bridge/runtime.php', 'runtime bootstrap (URL, rewrite hooks, .htaccess sync)'],
@@ -84,9 +91,6 @@ const required = [
   ['overlay/plugin/webapp/notify/tables.php', 'table registration and admin dbupgrade migrations'],
   ['overlay/plugin/webapp/notify/Notify.php', 'notification door'],
   ['overlay/extend/webapp.extend.php', 'the one Gnuboard extend loader'],
-  ['nextjs/out/index.html', 'Next.js static export'],
-  ['nextjs/out/.htaccess', 'Apache app cache rules'],
-  ['nextjs/out/_next/static/.htaccess', 'Apache static chunk cache rules'],
   ['nextjs-install/check.php', 'install diagnostic'],
   ['nextjs-install/tables.sql', 'runtime table SQL'],
   ['nextjs-install/apache-htaccess-rules.txt', 'Apache install rules'],
@@ -98,19 +102,20 @@ for (const [path, label] of required) {
   assertPath(join(repoRoot, path), label);
 }
 
-// nextjs/out 이 설치 zip 의 테마(공개 테마의 소스)로 빌드한 화면인가. create-theme 로 만든 내 테마를 마지막에
-// 빌드했다면(.env.local 이 내 테마를 가리키면 그냥 npm run build 도 그렇다) 그 화면이 theme/<공개 테마>/app 에
-// 들어가 버린다. 빌드한 화면의 <body data-g5-theme-source="…"> 로 확인한다(속성이 없는 예전 빌드는 넘어간다).
+// 테마마다 빌드한 화면이 그 테마의 것인가. create-theme 로 만든 내 테마를 빌드한 화면이 섞이면 theme/<공개 테마>/app 에
+// 엉뚱한 화면이 들어간다. 빌드한 화면의 <body data-g5-theme-source="…"> 로 확인한다(속성이 없는 예전 빌드는 넘어간다).
 {
   const manifest = JSON.parse(readFileSync(join(repoRoot, 'nextjs', 'theme-manifest.json'), 'utf8'));
-  const expectedSource = (manifest.themes || []).find((entry) => entry.theme === PUBLIC_THEME)?.source || '';
-  const builtSource =
-    readFileSync(join(repoRoot, 'nextjs', 'out', 'index.html'), 'utf8').match(/data-g5-theme-source="([^"]+)"/)?.[1] || '';
-  if (expectedSource && builtSource && builtSource !== expectedSource) {
-    fail(
-      `nextjs/out was built from theme source "${builtSource}", but the install zip ships theme/${PUBLIC_THEME} ` +
-        `(source "${expectedSource}"). Build it first: cd nextjs && npm run build:${PUBLIC_THEME}`
-    );
+  for (const theme of PUBLIC_THEMES) {
+    const expectedSource = (manifest.themes || []).find((entry) => entry.theme === theme)?.source || '';
+    const builtSource =
+      readFileSync(join(releaseBuildRoot, theme, 'index.html'), 'utf8').match(/data-g5-theme-source="([^"]+)"/)?.[1] || '';
+    if (expectedSource && builtSource && builtSource !== expectedSource) {
+      fail(
+        `.release-build/${theme} was built from theme source "${builtSource}", but the install zip ships theme/${theme} ` +
+          `(source "${expectedSource}"). Rebuild it: node scripts/build-release-themes.mjs ${theme}`
+      );
+    }
   }
 }
 
@@ -118,9 +123,11 @@ rmSync(distRoot, { recursive: true, force: true });
 mkdirSync(distRoot, { recursive: true });
 
 cpSync(join(repoRoot, 'overlay'), distRoot, { recursive: true });
-cpSync(join(repoRoot, 'nextjs', 'out'), join(distRoot, 'theme', PUBLIC_THEME, 'app'), {
-  recursive: true,
-});
+for (const theme of PUBLIC_THEMES) {
+  cpSync(join(releaseBuildRoot, theme), join(distRoot, 'theme', theme, 'app'), {
+    recursive: true,
+  });
+}
 cpSync(join(repoRoot, 'nextjs-install'), join(distRoot, 'nextjs-install'), {
   recursive: true,
 });

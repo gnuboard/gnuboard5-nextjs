@@ -305,4 +305,9 @@ $publicSettings['member_media'] = [
     ],
 ];
 
+// 테마 설정(관리자 › 테마 설정) — 지금 적용한 테마의 공개 값(왼쪽 메뉴 · 사이트 문구). 서버 실행 화면이 읽는다.
+if (function_exists('webapp_theme_settings_public')) {
+    $publicSettings['theme_settings'] = webapp_theme_settings_public(webapp_theme_settings_active_theme());
+}
+
 Response::success($publicSettings);

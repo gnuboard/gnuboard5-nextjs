@@ -4,9 +4,9 @@
  *
  * 카카오톡·문자·웹에 붙는 링크는 https 주소여야 한다(커스텀 스킴은 못 붙는 곳이 많다).
  * 그 주소를 받아 기기에 맞게 앱으로 넘긴다:
- *   Android : intent://<path>#Intent;scheme=dday-app;package=…;S.browser_fallback_url=<플레이스토어>;end
+ *   Android : intent://<path>#Intent;scheme=<스킴>;package=…;S.browser_fallback_url=<플레이스토어>;end
  *             (카카오톡 웹뷰도 intent:// 는 처리. 앱이 없으면 스토어)
- *   iOS     : dday-app://<path> 를 시도하고 안 열리면 App Store(정해져 있으면) 아니면 웹 글
+ *   iOS     : <스킴>://<path> 를 시도하고 안 열리면 App Store(정해져 있으면) 아니면 웹 글
  *   그 외    : 해당 웹 페이지로 302
  *
  * 경로 규칙은 앱 linkingConfig 와 같다:
@@ -18,11 +18,14 @@
  */
 if (!defined('_GNUBOARD_')) exit;
 
-if (!defined('G5_APP_LINK_SCHEME'))          define('G5_APP_LINK_SCHEME', 'dday-app');
+// 공유 기본값은 "앱 없음"이다 — 여기에 특정 앱을 두면 같은 코드를 쓰는 다른 사이트가 그 앱 이름 · 스킴을 물려받는다.
+// 앱을 내는 사이트는 extend/ 나 제품 플러그인에서 먼저 define 한다(디데이 앱: plugin/dday/dday.php).
+if (!defined('G5_APP_LINK_SCHEME'))          define('G5_APP_LINK_SCHEME', '');
 if (!defined('G5_APP_LINK_ANDROID_PACKAGE')) define('G5_APP_LINK_ANDROID_PACKAGE', '');
-if (!defined('G5_APP_LINK_ANDROID_STORE'))   define('G5_APP_LINK_ANDROID_STORE', 'https://play.google.com/store/apps/details?id=' . G5_APP_LINK_ANDROID_PACKAGE);
+if (!defined('G5_APP_LINK_ANDROID_STORE'))   define('G5_APP_LINK_ANDROID_STORE', G5_APP_LINK_ANDROID_PACKAGE !== ''
+    ? 'https://play.google.com/store/apps/details?id=' . G5_APP_LINK_ANDROID_PACKAGE : '');
 if (!defined('G5_APP_LINK_IOS_STORE'))       define('G5_APP_LINK_IOS_STORE', ''); // 출시 후 App Store 주소
-if (!defined('G5_APP_LINK_APP_NAME'))        define('G5_APP_LINK_APP_NAME', '디데이');
+if (!defined('G5_APP_LINK_APP_NAME'))        define('G5_APP_LINK_APP_NAME', '');
 
 if (!function_exists('g5_webapp_app_link_parse')) {
     /**
@@ -110,7 +113,8 @@ if (!function_exists('g5_webapp_app_link_maybe_serve')) {
         header('Cache-Control: no-store');
         header('X-Robots-Tag: noindex');
 
-        if ($device === 'other' || G5_APP_LINK_ANDROID_PACKAGE === '') { // 앱을 설정하지 않은 설치본은 웹으로
+        // PC, 그리고 앱을 설정하지 않은 설치본(스킴이 비었거나, 안드로이드에서 패키지가 빔)은 해당 웹 페이지로.
+        if ($device === 'other' || G5_APP_LINK_SCHEME === '' || ($device === 'android' && G5_APP_LINK_ANDROID_PACKAGE === '')) {
             header('Location: ' . $webUrl, true, 302);
             exit;
         }
@@ -120,17 +124,18 @@ if (!function_exists('g5_webapp_app_link_maybe_serve')) {
         $iosFallback = G5_APP_LINK_IOS_STORE !== '' ? G5_APP_LINK_IOS_STORE : $webUrl;
         $primary = $device === 'android' ? $intentUrl : $schemeUrl;
         $fallback = $device === 'android' ? G5_APP_LINK_ANDROID_STORE : $iosFallback;
+        $appLabel = G5_APP_LINK_APP_NAME !== '' ? G5_APP_LINK_APP_NAME . ' 앱' : '앱';
         $h = static function ($v) { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); };
         $j = static function ($v) { return json_encode((string) $v, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); };
 
         header('Content-Type: text/html; charset=utf-8');
         echo '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            . '<meta name="robots" content="noindex"><title>' . $h(G5_APP_LINK_APP_NAME) . ' 앱에서 열기</title>'
+            . '<meta name="robots" content="noindex"><title>' . $h($appLabel) . '에서 열기</title>'
             . '<style>body{margin:0;font:16px/1.5 -apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;color:#1f2937;background:#f8fafc}'
             . 'main{max-width:420px;margin:18vh auto 0;padding:0 24px;text-align:center}h1{font-size:1.25rem;margin:0 0 .5rem}p{color:#6b7280;margin:0 0 1.5rem}'
             . 'a.b{display:block;margin:.5rem 0;padding:.9rem 1rem;border-radius:12px;text-decoration:none;font-weight:600}'
             . 'a.p{background:#3b82f6;color:#fff}a.s{background:#fff;color:#374151;border:1px solid #d1d5db}</style></head><body><main>'
-            . '<h1>' . $h(G5_APP_LINK_APP_NAME) . ' 앱에서 여는 중…</h1>'
+            . '<h1>' . $h($appLabel) . '에서 여는 중…</h1>'
             . '<p>앱이 열리지 않으면 아래 버튼을 눌러 주세요.</p>'
             . '<a class="b p" href="' . $h($primary) . '">앱에서 열기</a>'
             . ($device === 'ios' && G5_APP_LINK_IOS_STORE !== '' ? '<a class="b s" href="' . $h(G5_APP_LINK_IOS_STORE) . '">App Store 에서 받기</a>' : '')

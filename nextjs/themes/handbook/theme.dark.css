@@ -1,0 +1,74 @@
+/* Handbook theme — 다크 보정. 색 변수(theme.tokens.css)만으로는 따라오지 않는 앱 공용 화면을
+   다크(data-handbook-theme="dark", 상단 바의 전환 버튼)에서만 다시 칠한다. 밝은 모드는 손대지 않는다.
+   앱 컴포넌트 · globals.css 는 밝은 색을 직접 박아 두었고(bg-white, #ffffff 등) 그 `dark:` 변형은
+   `.dark` 기준이라 이 테마에서는 켜지지 않는다 — 그래서 앱을 건드리지 않고 여기서 되돌린다. */
+
+/* 앱의 공용 컨트롤 · 배지 · 카드는 밝은 색을 유틸리티로 못박아 둔다(입력칸 bg-white · text-[#333],
+   카드 border-[#e9ebee], 로그인 제목 text-[#202124] 등). 다크에서는 흰 칸에 흰 글자가 되므로
+   앱 컴포넌트를 건드리지 않고 여기서 되돌린다 — 기본 테마의 다크와 같은 방식. */
+:root[data-handbook-theme="dark"] body[data-g5-theme-source="handbook"] :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select, [data-slot="select-trigger"], [data-slot="select-content"], [data-slot="dropdown-menu-content"], [data-slot="dropdown-menu-sub-content"]) {
+  background-color: var(--doc-surface);
+  border-color: var(--doc-border-strong);
+  color: var(--doc-ink);
+}
+:root[data-handbook-theme="dark"] body[data-g5-theme-source="handbook"] :is(input, textarea)::placeholder {
+  color: var(--doc-muted);
+}
+/* 검색 창의 검색칸은 창 바탕을 그대로 쓴다(위 입력칸 규칙보다 무거워야 이긴다). */
+:root[data-handbook-theme="dark"] body[data-g5-theme-source="handbook"] .doc-search-dialog .doc-search-field input[type="search"] {
+  background-color: transparent;
+}
+:root[data-handbook-theme="dark"] body[data-g5-theme-source="handbook"] :is([data-slot="badge"].bg-white, .bg-white, .bg-\[\#fbfcfb\]) {
+  background-color: var(--doc-surface);
+  border-color: var(--doc-border);
+}
+:root[data-handbook-theme="dark"] body[data-g5-theme-source="handbook"] :is([data-slot="card"], .card-surface) {
+  border-color: var(--doc-border);
+}
+:root[data-handbook-theme="dark"] body[data-g5-theme-source="handbook"] .text-\[\#202124\] {
+  color: var(--doc-ink);
+}
+/* daisyUI 는 글 본문(prose)의 코드 블록 바탕을 글자색(base-content)으로 잡아, 다크에서는 밝은 회색
+   블록에 검은 글자로 뒤집힌다. 다크에서도 어두운 코드 블록이 되게 테마의 코드 색으로 고정한다. */
+:root[data-handbook-theme="dark"] body[data-g5-theme-source="handbook"] .prose {
+  --tw-prose-pre-bg: var(--doc-code-bg);
+  --tw-prose-pre-code: var(--doc-code-ink);
+}
+
+/* 게시판 머리 상자 · 분류 탭 상자 · 검색 상자(globals.css 의 .page-hero · .surface-* 는 흰 바탕). */
+:root[data-handbook-theme="dark"] body[data-g5-theme-source="handbook"] :is(.page-hero, .surface-panel, .surface-toolbar) {
+  background: var(--doc-surface);
+  border-color: var(--doc-border);
+}
+
+/* 분류 칩. 고른 칩은 밝은 남색 위 흰 글자라 대비가 모자라 어두운 글자로 뒤집는다. */
+:root[data-handbook-theme="dark"] body[data-g5-theme-source="handbook"] .filter-chip {
+  background: transparent;
+  border-color: var(--doc-border-strong);
+  color: var(--doc-body);
+}
+:root[data-handbook-theme="dark"] body[data-g5-theme-source="handbook"] .filter-chip:hover {
+  background: var(--doc-surface-muted);
+  border-color: var(--doc-accent);
+  color: var(--doc-accent-strong);
+}
+:root[data-handbook-theme="dark"] body[data-g5-theme-source="handbook"] .filter-chip-active,
+:root[data-handbook-theme="dark"] body[data-g5-theme-source="handbook"] .filter-chip-active:hover {
+  background: var(--doc-accent-strong);
+  border-color: var(--doc-accent-strong);
+  color: var(--doc-page-bg);
+}
+
+/* 보조 버튼(ui/button.tsx secondary: bg-[#f3f4f6] text-[#111827])과 보조 배지(ui/badge.tsx: bg-[#f5f6f7]). */
+:root[data-handbook-theme="dark"] body[data-g5-theme-source="handbook"] .bg-\[\#f3f4f6\] {
+  background-color: var(--doc-surface-muted);
+  border-color: var(--doc-border-strong);
+  color: var(--doc-ink);
+}
+:root[data-handbook-theme="dark"] body[data-g5-theme-source="handbook"] .bg-\[\#f3f4f6\]:hover {
+  background-color: var(--doc-border);
+}
+:root[data-handbook-theme="dark"] body[data-g5-theme-source="handbook"] .bg-\[\#f5f6f7\] {
+  background-color: var(--doc-surface-muted);
+  color: var(--doc-ink);
+}

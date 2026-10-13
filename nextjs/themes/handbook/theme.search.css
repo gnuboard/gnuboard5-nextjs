@@ -1,0 +1,136 @@
+/* Handbook theme — 문서 검색 창(doc-search.tsx). 상단 바의 검색 단추나 Ctrl+K 로 여는 <dialog>.
+   색은 doc 토큰이라 다크 모드를 그대로 따른다. */
+
+.doc-search-dialog {
+  width: min(42rem, calc(100vw - 2rem));
+  max-height: min(80vh, 40rem);
+  margin: 10vh auto auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--doc-border);
+  border-radius: var(--doc-radius-lg);
+  background: var(--doc-surface);
+  color: var(--doc-body);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+}
+
+.doc-search-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.doc-search-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(80vh, 40rem);
+}
+
+.doc-search-field {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--doc-border);
+  color: var(--doc-muted);
+}
+
+.doc-search-field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--doc-ink);
+  font-size: 1rem;
+  outline: none;
+}
+
+/* 검색칸 자체는 테두리를 없앴으니, 키보드로 들어오면 칸 줄 전체에 초점 표시를 둔다. */
+.doc-search-field:has(input:focus-visible) {
+  outline: 2px solid var(--doc-accent);
+  outline-offset: -2px;
+}
+
+.doc-search-field input::placeholder {
+  color: var(--doc-muted);
+  opacity: 1;
+}
+
+.doc-search-esc {
+  cursor: pointer;
+}
+
+.doc-search-summary {
+  margin: 0;
+  padding: 0.6rem 1rem 0.2rem;
+  color: var(--doc-muted);
+  font-size: 0.74rem;
+}
+
+.doc-search-results {
+  flex: 1;
+  margin: 0;
+  padding: 0.3rem 0.5rem 0.6rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+
+.doc-search-hit {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--doc-radius-sm);
+  color: var(--doc-ink);
+}
+
+.doc-search-hit:hover,
+.doc-search-hit:focus-visible {
+  background: var(--doc-accent-soft);
+  color: var(--doc-accent-strong);
+  outline: none;
+}
+
+/* 테두리선(outline)으로 — 고대비(강제 색) 모드는 box-shadow 를 지워 초점이 사라진다. */
+.doc-search-hit:focus-visible {
+  outline: 2px solid var(--doc-accent);
+  outline-offset: -2px;
+}
+
+.doc-search-hit-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.doc-search-hit-meta {
+  color: var(--doc-muted);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-search-empty {
+  margin: 0;
+  padding: 1.5rem 1rem;
+  color: var(--doc-muted);
+  font-size: 0.86rem;
+  text-align: center;
+}
+
+.doc-search-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  border-top: 1px solid var(--doc-border);
+  color: var(--doc-muted);
+  font-size: 0.76rem;
+}
+
+.doc-search-full {
+  color: var(--doc-accent-strong);
+  font-weight: 600;
+}
+
+.doc-search-full:hover {
+  text-decoration: underline;
+}

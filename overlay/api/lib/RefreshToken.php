@@ -402,14 +402,16 @@ class RefreshToken
     }
 
     /**
-     * 만료 후 30 일 지난 row 정리.
+     * 만료 후 30 일 지난 row 정리. $limit > 0 이면 한 번에 그만큼만(TableCleanup 이 나눠 부른다).
      */
-    public static function gc(int $keepDays = 30): int
+    public static function gc(int $keepDays = 30, int $limit = 0): int
     {
+        // 0 이하면 기준 시각이 지금이나 미래가 되어 살아 있는 세션까지 지운다 — PushQueue::gc 처럼 건너뛴다.
+        if ($keepDays <= 0) return 0;
         $table = DB::table('refresh_token_table');
         $cutoff = date('Y-m-d H:i:s', time() - ($keepDays * 86400));
         return DB::execute(
-            "DELETE FROM `{$table}` WHERE expires_at < ?",
+            "DELETE FROM `{$table}` WHERE expires_at < ?" . ($limit > 0 ? " LIMIT {$limit}" : ''),
             [$cutoff]
         );
     }

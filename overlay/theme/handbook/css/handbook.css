@@ -1,0 +1,128 @@
+body {
+    margin: 0;
+    background: #f7f8fb;
+    color: #181c25;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+a {
+    color: inherit;
+}
+
+.handbook-shell {
+    min-height: 100vh;
+}
+
+.handbook-header,
+.handbook-footer {
+    background: #fff;
+    border-color: #d9dee8;
+    border-style: solid;
+    border-width: 0 0 1px;
+}
+
+.handbook-header-inner,
+.handbook-footer-inner,
+.handbook-main {
+    width: min(1120px, calc(100% - 32px));
+    margin: 0 auto;
+}
+
+.handbook-header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 64px;
+}
+
+.handbook-brand {
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.handbook-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    color: #647084;
+    font-size: 14px;
+}
+
+.handbook-main {
+    padding: 40px 0;
+}
+
+.handbook-panel {
+    background: #fff;
+    border: 1px solid #d9dee8;
+    border-radius: 8px;
+    padding: 24px;
+}
+
+.handbook-eyebrow {
+    color: #0f8f7f;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.handbook-title {
+    margin: 8px 0 0;
+    font-size: 32px;
+    line-height: 1.25;
+}
+
+.handbook-copy {
+    max-width: 720px;
+    color: #647084;
+    font-size: 16px;
+    line-height: 1.7;
+}
+
+.handbook-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.handbook-button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    border-radius: 6px;
+    padding: 0 14px;
+    background: #1769aa;
+    color: #fff;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.handbook-button.secondary {
+    background: #eef3f8;
+    color: #1769aa;
+}
+
+.handbook-meta {
+    display: grid;
+    gap: 10px;
+    margin-top: 24px;
+    color: #647084;
+    font-size: 14px;
+}
+
+.handbook-meta code {
+    color: #181c25;
+}
+
+.handbook-footer {
+    border-width: 1px 0 0;
+}
+
+.handbook-footer-inner {
+    padding: 20px 0;
+    color: #647084;
+    font-size: 13px;
+}

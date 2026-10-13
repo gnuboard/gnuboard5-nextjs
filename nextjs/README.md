@@ -1,8 +1,9 @@
 # Next.js Source
 
-This directory contains the development source for the Gnuboard5
-`nextjs_default` theme. It is built as a static export and packaged into
-`theme/nextjs_default/app` by the release workflow.
+This directory contains the development source for the Gnuboard5 Next.js
+themes (`nextjs_default`, `handbook`). Each theme is built as a static export
+and packaged into `theme/<name>/app` by the release workflow
+(`node scripts/build-release-themes.mjs` at the repository root).
 
 ## Local Development
 
@@ -24,12 +25,15 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 ```bash
 npm ci
-npm run check
-npm run build
+npm run check:code
+npm run build:nextjs_default
 ```
 
-The repository-level package script copies `nextjs/out` into the release zip.
-Use the public package root `npm run package` command for install ZIPs. The
+`npm run build:<theme>` builds one theme into `nextjs/out`. For an install ZIP,
+run `npm run build:themes` and then `npm run package -- <version>` at the
+repository root: the first builds every public theme and keeps each export
+under `.release-build/<theme>`, the second copies them into
+`theme/<theme>/app` of the release zip. The
 `nextjs/package:*` commands are source-checkout commands and are guarded here so
 they fail with a clear hint instead of looking for missing `theme/<theme>`
 directories.

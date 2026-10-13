@@ -10,6 +10,17 @@
         "devPort": 3001,
         "appUrl": "https://gnuboard5-nextjs-default.vercel.app"
       }
+    },
+    {
+      "source": "handbook",
+      "theme": "handbook",
+      "installable": true,
+      "publicPackage": true,
+      "uiSmoke": false,
+      "vercel": {
+        "devPort": 3003,
+        "appUrl": "https://gnuboard5-nextjs-handbook.vercel.app"
+      }
     }
   ]
 }

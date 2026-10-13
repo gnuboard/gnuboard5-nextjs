@@ -2,13 +2,13 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { publicInstallThemeName } from './lib/public-theme-manifest.mjs';
+import { publicInstallThemeNames } from './lib/public-theme-manifest.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');
 const distRoot = join(repoRoot, 'dist');
-// 설치 zip 에 넣는 테마 이름(theme/<이름>) — 공개판 매니페스트에서 읽는다(원본의 publicPackage 테마).
-const PUBLIC_THEME = publicInstallThemeName(
+// 설치 zip 에 넣는 테마 이름들(theme/<이름>) — 공개판 매니페스트에서 읽는다(원본의 publicPackage 테마).
+const PUBLIC_THEMES = publicInstallThemeNames(
   JSON.parse(readFileSync(join(repoRoot, 'nextjs', 'theme-manifest.json'), 'utf8'))
 );
 const version =
@@ -103,22 +103,28 @@ const requiredFiles = [
   ['plugin/webapp/bridge/social.php', 'social login bridge'],
   ['plugin/webapp/notify/tables.php', 'table registration and admin dbupgrade migrations'],
   ['extend/webapp.extend.php', 'the one Gnuboard extend loader'],
-  [`theme/${PUBLIC_THEME}/route.php`, 'theme route bridge'],
-  [`theme/${PUBLIC_THEME}/bridge/app-shell.php`, 'app shell bridge'],
-  [`theme/${PUBLIC_THEME}/bridge/asset-responses.php`, 'asset response bridge helpers'],
-  [`theme/${PUBLIC_THEME}/bridge/legacy-routes.php`, 'legacy route bridge helpers'],
-  [`theme/${PUBLIC_THEME}/bridge/metadata.php`, 'metadata bridge helpers'],
-  [`theme/${PUBLIC_THEME}/bridge/public-assets.php`, 'public asset bridge helpers'],
-  [`theme/${PUBLIC_THEME}/bridge/render.php`, 'render bridge helpers'],
-  [`theme/${PUBLIC_THEME}/bridge/security-headers.php`, 'security header bridge helpers'],
-  [`theme/${PUBLIC_THEME}/bridge/static-paths.php`, 'static app path bridge helpers'],
-  [`theme/${PUBLIC_THEME}/app/index.html`, 'static index'],
-  [`theme/${PUBLIC_THEME}/app/.htaccess`, 'Apache app cache rules'],
-  [`theme/${PUBLIC_THEME}/app/_next/static/.htaccess`, 'Apache static chunk cache rules'],
+  // 공개 테마마다 — 다리(브리지) · 관리자 테마 목록 이름 · 정적 화면 · nginx 예시.
+  ...PUBLIC_THEMES.flatMap((theme) => [
+    [`theme/${theme}/route.php`, `${theme} theme route bridge`],
+    [`theme/${theme}/readme.txt`, `${theme} name for the admin theme list`],
+    ...[
+      'app-shell',
+      'asset-responses',
+      'legacy-routes',
+      'metadata',
+      'public-assets',
+      'render',
+      'security-headers',
+      'static-paths',
+    ].map((name) => [`theme/${theme}/bridge/${name}.php`, `${theme} ${name} bridge`]),
+    [`theme/${theme}/app/index.html`, `${theme} static index`],
+    [`theme/${theme}/app/.htaccess`, `${theme} Apache app cache rules`],
+    [`theme/${theme}/app/_next/static/.htaccess`, `${theme} Apache static chunk cache rules`],
+    [`nextjs-install/nginx/${theme}-theme-locations.conf`, `${theme} nginx theme locations`],
+  ]),
   ['nextjs-install/check.php', 'install diagnostic'],
   ['nextjs-install/tables.sql', 'install SQL'],
   ['nextjs-install/apache-htaccess-rules.txt', 'Apache rewrite install guide'],
-  [`nextjs-install/nginx/${PUBLIC_THEME}-theme-locations.conf`, 'nginx theme locations'],
   ['INSTALL.md', 'install guide'],
   ['LICENSE', 'license'],
   ['LICENSE.gnuboard.txt', 'Gnuboard license notice'],
@@ -126,8 +132,10 @@ const requiredFiles = [
 ];
 
 const requiredDirs = [
-  [`theme/${PUBLIC_THEME}/app/_next/static`, 'Next.js static chunks'],
-  [`theme/${PUBLIC_THEME}/bridge`, 'theme bridge'],
+  ...PUBLIC_THEMES.flatMap((theme) => [
+    [`theme/${theme}/app/_next/static`, `${theme} Next.js static chunks`],
+    [`theme/${theme}/bridge`, `${theme} theme bridge`],
+  ]),
   ['api/v1/shop', 'shop API'],
 ];
 

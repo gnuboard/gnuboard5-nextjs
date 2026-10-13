@@ -160,24 +160,25 @@ class Notify
 
     /**
      * 알림함 정리. 읽은 알림은 $readKeepDays, 안 읽은 알림도 $unreadKeepDays 지나면 지운다.
-     * plugin/webapp/cron/cleanup_push_tokens.php 가 매일 부른다.
+     * api/lib/TableCleanup.php(정리 크론 · 유지보수 신호)가 부른다. $limit > 0 이면 갈래마다 한 번에 그만큼만.
      *
      * @return array{read:int, unread:int} 지운 건수
      */
-    public static function gc($readKeepDays = 180, $unreadKeepDays = 365)
+    public static function gc($readKeepDays = 180, $unreadKeepDays = 365, $limit = 0)
     {
         self::boot();
         $table = DB::table('notification_log_table');
+        $limitSql = (int) $limit > 0 ? ' LIMIT ' . (int) $limit : '';
         $out = array('read' => 0, 'unread' => 0);
         if ((int) $readKeepDays > 0) {
             $out['read'] = (int) DB::execute(
-                "DELETE FROM `{$table}` WHERE nt_read_at IS NOT NULL AND nt_read_at < ?",
+                "DELETE FROM `{$table}` WHERE nt_read_at IS NOT NULL AND nt_read_at < ?" . $limitSql,
                 array(date('Y-m-d H:i:s', time() - (int) $readKeepDays * 86400))
             );
         }
         if ((int) $unreadKeepDays > 0) {
             $out['unread'] = (int) DB::execute(
-                "DELETE FROM `{$table}` WHERE nt_read_at IS NULL AND nt_sent_at < ?",
+                "DELETE FROM `{$table}` WHERE nt_read_at IS NULL AND nt_sent_at < ?" . $limitSql,
                 array(date('Y-m-d H:i:s', time() - (int) $unreadKeepDays * 86400))
             );
         }

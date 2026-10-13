@@ -12,8 +12,8 @@
 cd <배포 저장소>\nextjs
 npm run check
 npm run print:vercel-theme-matrix
-npm run build:vercel:default
-npm run build:vercel:greenhub
+npm run build:vercel -- --source default --name nextjs_default
+npm run build:vercel -- --source handbook --name handbook
 cd ..
 npm run package:verify
 ```
@@ -23,12 +23,12 @@ npm run package:verify
 
 ```text
 https://gnuboard5-nextjs-default.vercel.app/
-https://gnuboard5-nextjs-greenhub.vercel.app/
+https://gnuboard5-nextjs-handbook.vercel.app/
 ```
 
 ## 2. Vercel 프로젝트 설정
 
-테마마다 Vercel 프로젝트를 하나씩 만든다. `/default`, `/greenhub` 같은 하위 경로로 나누지 않는다.
+테마마다 Vercel 프로젝트를 하나씩 만든다. `/default`, `/handbook` 같은 하위 경로로 나누지 않는다.
 
 공통 설정:
 
@@ -48,10 +48,10 @@ export preview.
 `nextjs/vercel.json`도 위 설정을 고정하므로, Vercel 대시보드 값과 다르게 두지 않는다.
 Vercel 프로젝트 목록은 `nextjs/vercel-theme-map.json`에 기록한다. 설치 ZIP에
 포함되는 PHP 테마 목록은 별도 파일인 `nextjs/theme-map.json`이 관리한다.
-현재 공개 패키지는 기본 설치 테마로 `nextjs_default <- default`만 포함하고,
-greenhub는 Vercel preview 빌드 대상으로만 둔다. CI와 Live QA는
+현재 공개 패키지는 설치 테마로 `nextjs_default <- default`와 `handbook <- handbook`을 함께
+포함한다(사이트 운영자가 관리자에서 하나를 고른다). CI와 Live QA는
 `nextjs/vercel-theme-map.json`에서 matrix를 읽으므로 새 preview 테마를 추가할 때
-workflow YAML에 default/greenhub 목록을 직접 늘리지 않는다.
+workflow YAML에 테마 목록을 직접 늘리지 않는다.
 
 default 프로젝트 환경 변수:
 
@@ -62,13 +62,15 @@ G5_NEXT_RUNTIME=server
 NEXT_PUBLIC_APP_URL=https://gnuboard5-nextjs-default.vercel.app
 ```
 
-greenhub 프로젝트 환경 변수:
+handbook 프로젝트 환경 변수:
 
 ```text
-G5_THEME_SOURCE=greenhub
-G5_THEME_NAME=greenhub
+G5_THEME_SOURCE=handbook
+G5_THEME_NAME=handbook
 G5_NEXT_RUNTIME=server
-NEXT_PUBLIC_APP_URL=https://gnuboard5-nextjs-greenhub.vercel.app
+NEXT_PUBLIC_APP_URL=https://gnuboard5-nextjs-handbook.vercel.app
+# 매뉴얼로 쓸 게시판 그룹 — 그누보드 관리자 > 테마 화면 설정에서 고르면 그 값이 먼저다.
+NEXT_PUBLIC_DOCS_GROUP=manual
 ```
 
 공통 환경 변수:
@@ -236,7 +238,7 @@ Product not found.
 
 ```text
 https://gnuboard5-nextjs-default.vercel.app/gallery/...
-https://gnuboard5-nextjs-greenhub.vercel.app/shop/...
+https://gnuboard5-nextjs-handbook.vercel.app/manual/...
 ```
 
 Vercel static export는 빌드 시점에 생성되지 않은 상세 페이지를 브라우저에서 API로 다시 불러온다. 존재하지 않는 글은 “게시글을 찾을 수 없습니다”로, API 장애는 “게시글을 불러오지 못했습니다”로 구분되어야 한다.

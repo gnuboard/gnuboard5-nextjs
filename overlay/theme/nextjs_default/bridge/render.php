@@ -103,11 +103,8 @@ function nextjs_default_inject_runtime_config($html)
         . 'window.__G5_NEXTJS_DEFAULT_CONFIG__ = window[' . $key . '];'
         . g5_nextjs_root_payload_shim_script() . '</script>';
 
-    if (preg_match('/<head([^>]*)>/i', $html)) {
-        return preg_replace('/<head([^>]*)>/i', '<head$1>' . "\n" . $config, $html, 1);
-    }
-
-    return $config . "\n" . $html;
+    // 글자 그대로 넣는다 — 관리자 문구 · 사이트 제목의 $1 · \ 를 치환 문법으로 읽지 않게(plugin/webapp/bridge/common.php).
+    return g5_nextjs_insert_after_head($html, $config);
 }
 
 function nextjs_default_render_missing_app()

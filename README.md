@@ -2,8 +2,12 @@
 
 그누보드5 · 영카트5 에 얹는 **Next.js 프론트엔드 한 벌**입니다.
 
-- **Next.js 테마** — `theme/nextjs_default` ("Next.js Default"). 커뮤니티 첫 화면 · 게시판 · 회원 ·
-  마이페이지 · 쇼핑몰(상품 · 장바구니 · 주문 · 결제)까지 정적 앱으로 빌드되어 그누보드 테마로 설치됩니다.
+- **Next.js 테마 두 개** — 정적 앱으로 빌드되어 그누보드 테마로 설치되고, 관리자에서 하나를 골라 씁니다.
+  - `theme/nextjs_default` ("Next.js Default") — 커뮤니티 첫 화면 · 게시판 · 회원 · 마이페이지 ·
+    쇼핑몰(상품 · 장바구니 · 주문 · 결제).
+  - `theme/handbook` ("Next.js Handbook") — 매뉴얼 · 문서 사이트. 게시판 그룹 하나가 매뉴얼 묶음, 게시판이 권,
+    게시판 분류가 부, 글이 장이 됩니다. 매뉴얼 그룹 · 순서 · 왼쪽 사이드바 · 사이트 문구는 관리자 >
+    환경설정 > 테마 화면 설정에서 정합니다(다시 빌드하지 않음).
 - **REST API** — `api/v1` (JWT 인증, 게시판 · 회원 · 쇼핑몰 · 결제). 모바일 앱이나 다른 프론트엔드도 쓸 수 있습니다.
 - **연결 코어** — `plugin/webapp` + `extend/webapp.extend.php`. 그누보드 원본 파일은 고치지 않습니다.
 
@@ -13,6 +17,7 @@
 
 - <https://thisgun3.mycafe24.com/> — 그누보드에 테마를 설치한 사이트
 - <https://gnuboard5-nextjs-demo.vercel.app/> — 같은 테마를 Vercel 에 띄운 데모(데이터는 위 사이트의 API)
+- <https://gnuboard5-apps-manual.vercel.app/> — handbook 테마로 만든 이 프로젝트의 설명서
 
 ## 설치
 
@@ -28,22 +33,24 @@ zip 은 그누보드 루트와 같은 모양이고, 애드온 파일만 들어 �
 api/
 plugin/webapp/
 theme/nextjs_default/
+theme/handbook/
 extend/webapp.extend.php
 nextjs-install/
 INSTALL.md
 ```
 
 설치 순서는 [INSTALL.md](INSTALL.md) 를 보세요. 요약하면: 그누보드 루트에 풀고 → `/api/v1/status` 확인 →
-관리자 > 환경설정 > 테마설정에서 **Next.js Default** 를 적용합니다.
+관리자 > 환경설정 > 테마설정에서 **Next.js Default** 나 **Next.js Handbook** 중 하나를 적용합니다.
 
 ## Repository layout
 
 ```text
-nextjs/                 Next.js source (theme source: nextjs/themes/default)
+nextjs/                 Next.js source (theme sources: nextjs/themes/default, nextjs/themes/handbook)
 overlay/                Files copied into a Gnuboard root by the release zip
   api/
   plugin/webapp/
   theme/nextjs_default/
+  theme/handbook/
   extend/webapp.extend.php
 nextjs-install/         SQL and web-server rules for manual installation
 scripts/                Sync and release packaging scripts
@@ -55,12 +62,14 @@ scripts/                Sync and release packaging scripts
 ```bash
 cd nextjs
 npm ci
-npm run build
 cd ..
+npm run build:themes
 npm run package -- v0.1.0
 ```
 
-The package script writes `dist/` and `gnuboard5-nextjs-v0.1.0.zip`.
+`npm run build:themes` builds every public theme (`nextjs` → `npm run build:<theme>`) and keeps
+each static export under `.release-build/<theme>`. The package script copies them into
+`theme/<theme>/app` and writes `dist/` and `gnuboard5-nextjs-v0.1.0.zip`.
 
 ## How this repository is updated
 
