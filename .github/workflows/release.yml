@@ -78,10 +78,17 @@ jobs:
             # v0.2.0-beta.1 처럼 하이픈이 붙은 태그는 시험판(Pre-release)으로 올린다.
             PRERELEASE=""
             case "$RELEASE_VERSION" in *-*) PRERELEASE="--prerelease" ;; esac
+            # 변경 내용은 docs/releases/<판>.md(시험판 v0.2.0-beta.1 도 v0.2.0.md)에 적어 두면 그대로 싣는다. 없으면 설치 안내 한 줄.
+            NOTES_FILE="docs/releases/${RELEASE_VERSION%%-*}.md"
+            if [ -f "$NOTES_FILE" ]; then
+              NOTES_ARGS=(--notes-file "$NOTES_FILE")
+            else
+              NOTES_ARGS=(--notes "Download the attached zip and extract it into the Gnuboard5 root. See INSTALL.md inside the zip.")
+            fi
             gh release create "$RELEASE_VERSION" \
               "gnuboard5-nextjs-${RELEASE_VERSION}.zip" \
               $PRERELEASE \
               --target "$GITHUB_SHA" \
               --title "gnuboard5-nextjs ${RELEASE_VERSION}" \
-              --notes "Download the attached zip and extract it into the Gnuboard5 root. See INSTALL.md inside the zip."
+              "${NOTES_ARGS[@]}"
           fi
