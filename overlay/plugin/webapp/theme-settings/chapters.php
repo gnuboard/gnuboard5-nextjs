@@ -3,7 +3,7 @@
  * 관리자 › 테마 화면 설정 › 장 순서 — 매뉴얼(게시판) 한 권의 장(원글) 순서를 번호로 정한다.
  *
  * 장 순서는 게시판 목록 순서(wr_num 오름차순)다. 그누보드는 새 글에 가장 작은 wr_num - 1 을 줘 새 글이 맨 앞에 와서, 손으로 쓴
- * 매뉴얼은 마지막 장부터 써야 했다. 여기서 정한 순서대로 그 게시판 원글들이 이미 가진 wr_num 값을 다시 나눠 준다 — 값의 모음은
+ * 매뉴얼은 마지막 장부터 써야 했다. 여기서 정한 순서대로 부(분류)마다 그 부의 원글들이 이미 가진 wr_num 값을 다시 나눠 준다 — 값의 모음은
  * 그대로라 새 글 번호 매기기는 예전과 같고, 답글 · 댓글은 원글과 같은 wr_num 이라 함께 옮겨진다. 게시판 목록 순서도 같이 바뀐다.
  * 그누보드 코어 파일은 고치지 않는다.
  */
@@ -67,8 +67,12 @@ if (!function_exists('webapp_theme_settings_chapter_toc_order')) {
 if (!function_exists('webapp_theme_settings_chapter_plan')) {
     /**
      * 새 순서 → 옮길 값. $rows 는 화면에 보인 차례(목차 순서), $posted 는 wr_id => 순서 번호.
-     * 번호가 없거나 숫자가 아니면 보인 자리 그대로, 같은 번호면 보인 차례대로. 그 순서로 원글들이 가진 wr_num 값(작은 것부터)을
-     * 다시 나눠 준다. 돌려주는 값은 바뀌는 것만 [예전 wr_num => 새 wr_num]. 원글끼리 wr_num 이 겹치면 null(옮기면 섞인다).
+     * 번호가 없거나 숫자가 아니면 보인 자리 그대로, 같은 번호면 보인 차례대로.
+     *
+     * 부마다 따로 나눠 준다 — 장의 부는 분류로 정해져 번호로 다른 부로 옮겨 가지 않으므로, 그 부의 원글들이 가진 wr_num 값(작은
+     * 것부터)을 그 부 안의 새 순서로 나눠 준다. 그래서 번호를 바꾸지 않고 저장하면 아무것도 바뀌지 않고, 게시판 목록에서 여러 부가
+     * 섞여 있던 차례도 그대로다(목차 순서 전체로 나눠 주면 저장만 해도 게시판 목록이 부별로 다시 섰다).
+     * 돌려주는 값은 바뀌는 것만 [예전 wr_num => 새 wr_num]. 원글끼리 wr_num 이 겹치면 null(옮기면 섞인다).
      */
     function webapp_theme_settings_chapter_plan(array $rows, array $posted): ?array
     {
@@ -76,22 +80,27 @@ if (!function_exists('webapp_theme_settings_chapter_plan')) {
         if (count(array_unique($values)) !== count($values)) {
             return null;
         }
-        sort($values);
 
-        $items = array();
+        // 부 이름을 배열 열쇠로 쓸 때 "1" 같은 이름이 숫자 열쇠가 되지 않게 앞에 글자를 붙인다(순서는 처음 나온 차례 그대로).
+        $parts = array();
         foreach (array_values($rows) as $index => $row) {
             $key = (string) $row['wr_id'];
             $order = isset($posted[$key]) && is_numeric($posted[$key]) ? (int) $posted[$key] : $index + 1;
-            $items[] = array('order' => $order, 'index' => $index, 'wr_num' => (int) $row['wr_num']);
+            $label = webapp_theme_settings_js_trim($row['ca_name'] ?? '');
+            $parts['p:' . ($label !== '' ? $label : WEBAPP_CHAPTER_UNGROUPED)][] = array('order' => $order, 'index' => $index, 'wr_num' => (int) $row['wr_num']);
         }
-        usort($items, static function ($a, $b) {
-            return ($a['order'] <=> $b['order']) ?: ($a['index'] <=> $b['index']);
-        });
 
         $plan = array();
-        foreach ($items as $position => $item) {
-            if ($item['wr_num'] !== $values[$position]) {
-                $plan[$item['wr_num']] = $values[$position];
+        foreach ($parts as $items) {
+            $part_values = array_map(static function ($item) { return $item['wr_num']; }, $items);
+            sort($part_values);
+            usort($items, static function ($a, $b) {
+                return ($a['order'] <=> $b['order']) ?: ($a['index'] <=> $b['index']);
+            });
+            foreach ($items as $position => $item) {
+                if ($item['wr_num'] !== $part_values[$position]) {
+                    $plan[$item['wr_num']] = $part_values[$position];
+                }
             }
         }
         return $plan;

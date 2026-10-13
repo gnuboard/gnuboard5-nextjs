@@ -30,6 +30,24 @@ async function isServerRuntime(page: Page): Promise<boolean> {
   return (response.headers()['x-powered-by'] ?? '').includes('Next.js');
 }
 
+type SidebarScreen = 'home' | 'docs' | 'board' | 'other';
+
+/** 관리자 › 테마 화면 설정의 화면별 사이드바(handbook 의 값을 한 번이라도 저장했을 때만). 없으면 모두 기본(보임). */
+async function sidebarModes(page: Page): Promise<Partial<Record<SidebarScreen, string>>> {
+  const response = await page.request.get(at('/api/v1/settings'));
+  if (!response.ok()) return {};
+  const settings = ((await response.json()) as {
+    data?: { theme_settings?: { theme?: string; revision?: number; sidebar?: Partial<Record<SidebarScreen, string>> } };
+  }).data?.theme_settings;
+  return settings?.theme === 'handbook' && Number(settings.revision) > 0 ? settings.sidebar ?? {} : {};
+}
+
+/** 이 스펙은 기본 배치(넓은 화면 왼쪽 열)를 검사한다 — 관리자 설정이 그 화면의 사이드바를 숨겼으면 건너뛴다. */
+async function skipIfSidebarHidden(page: Page, screen: SidebarScreen) {
+  const hidden = (await sidebarModes(page))[screen] === 'hidden';
+  test.skip(hidden, `theme screen settings hide the ${screen} sidebar on wide screens`);
+}
+
 async function apiData<T>(page: Page, path: string): Promise<T> {
   const response = await page.request.get(at(`/api/v1${path}`));
   expect(response.ok(), `GET /api/v1${path}`).toBeTruthy();
@@ -61,10 +79,13 @@ function pathOf(href: string | null): string {
   return href ? new URL(href, 'http://local.test').pathname.replace(/\/+$/, '') : '';
 }
 
-/** 첫 화면 사이드바의 매뉴얼 목록 — { 게시판, 장 수 }. 첫 화면에서 부른다. */
+/**
+ * 첫 화면 사이드바의 매뉴얼 목록 — { 게시판, 장 수 }. 첫 화면에서 부른다. 관리자 설정으로 첫 화면 사이드바를 숨겨도
+ * 목록은 문서에 있다(좁은 화면 서랍) — 보이는지가 아니라 있는지를 기다린다.
+ */
 async function selectorBooks(page: Page): Promise<Array<{ table: string; count: number }>> {
   const links = page.locator('.doc-book-browse-link');
-  await expect(links.first()).toBeVisible();
+  await expect(links.first()).toBeAttached();
   return links.evaluateAll((items) =>
     items.map((link) => ({
       table: new URL((link as HTMLAnchorElement).href).pathname.split('/').filter(Boolean).pop() ?? '',
@@ -92,6 +113,7 @@ test.describe('handbook manual navigation', () => {
   test('home sidebar lists the manuals instead of one manual table of contents', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openHandbook(page);
+    await skipIfSidebarHidden(page, 'home');
     const books = await selectorBooks(page);
     expect(books.length).toBeGreaterThan(0);
     await expect(page.locator('.doc-chapter-link')).toHaveCount(0);
@@ -119,6 +141,7 @@ test.describe('handbook manual navigation', () => {
     requireData(Boolean(target), 'a non-manual page in the admin menu');
 
     await page.goto(target!.path, { waitUntil: 'networkidle' });
+    test.skip((await page.locator('.doc-drawer').getAttribute('data-sidebar')) === 'hidden', 'theme screen settings hide this page\x27s sidebar');
     await expect(page.locator('.doc-side-menu-title')).toHaveText(target!.group);
     await expect(page.locator('.doc-side-menu [aria-current="page"]')).toHaveText(target!.label);
     await expect(page.locator('.doc-chapter-link')).toHaveCount(0);
@@ -169,6 +192,7 @@ test.describe('handbook manual navigation', () => {
   test('table of contents follows the board categories, numbers chapters and opens parts by length', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openHandbook(page);
+    await skipIfSidebarHidden(page, 'docs');
     const books = await selectorBooks(page);
     expect(books.length).toBeGreaterThan(0);
 
@@ -208,6 +232,7 @@ test.describe('handbook manual navigation', () => {
   test('chapter pager crosses part boundaries in table-of-contents order', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openHandbook(page);
+    await skipIfSidebarHidden(page, 'docs');
     const books = await selectorBooks(page);
     const book = books.find((candidate) => candidate.count > 1);
     requireData(Boolean(book), 'a manual with two or more chapters');
@@ -237,6 +262,7 @@ test.describe('handbook manual navigation', () => {
   test('Ctrl+K finds a chapter by title and opens it', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openHandbook(page);
+    await skipIfSidebarHidden(page, 'docs');
     const books = await selectorBooks(page);
     const target = books[books.length - 1];
     await page.goto(at(`/${target.table}`), { waitUntil: 'networkidle' });
@@ -338,6 +364,7 @@ test.describe('handbook manual navigation', () => {
   test('a long manual opens its first part on the manual index page', async ({ page, browser }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openHandbook(page);
+    await skipIfSidebarHidden(page, 'docs');
     const book = (await selectorBooks(page)).find((candidate) => candidate.count > 10);
     requireData(Boolean(book), 'a manual with more than 10 chapters');
 
@@ -423,6 +450,8 @@ test.describe('handbook manual navigation', () => {
   test('the table of contents is not downloaded again on the next page', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openHandbook(page);
+    // 사이드바를 보는 곳은 검색 화면 — 화면 종류는 "그 밖"(theme-settings.ts sidebarScreen).
+    await skipIfSidebarHidden(page, 'other');
     const tables = (await selectorBooks(page)).map((book) => book.table);
     // 서버 실행은 서버가 넘긴 목차를 쓰고, 정적 빌드는 이 탭에 저장해 둔 목차를 쓴다 — 다음 화면에서 다시 받지 않는다.
     // 다음 화면은 매뉴얼이 아닌 검색 화면이라, 매뉴얼 게시판의 글 목록 요청은 모두 목차를 다시 받는 것이다.
@@ -440,6 +469,7 @@ test.describe('handbook manual navigation', () => {
   test('home hero starts at the first chapter of the table of contents', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openHandbook(page);
+    await skipIfSidebarHidden(page, 'docs');
     await expect(page.locator('#recent-heading')).toHaveText('최근 추가한 장');
     const start = page.locator('.doc-hero-actions .btn-primary');
     await expect(start).toContainText('부터 읽기');
@@ -455,6 +485,7 @@ test.describe('handbook manual navigation', () => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await openHandbook(page);
+    await skipIfSidebarHidden(page, 'docs');
     const books = await selectorBooks(page);
     const longest = [...books].sort((a, b) => b.count - a.count)[0];
     await page.goto(at(`/${longest.table}`), { waitUntil: 'networkidle' });
@@ -490,6 +521,7 @@ test.describe('handbook manual navigation', () => {
   test('book selector closes when focus leaves it and Escape returns focus to its button', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openHandbook(page);
+    await skipIfSidebarHidden(page, 'docs');
     const [first] = await selectorBooks(page);
     await page.goto(at(`/${first.table}`), { waitUntil: 'networkidle' });
     const button = page.locator('.doc-booksel-button');
@@ -629,7 +661,12 @@ test.describe('handbook manual navigation', () => {
       await page.setViewportSize({ width: viewport.width, height: 900 });
       await openHandbook(page);
       const side = page.locator('.doc-drawer > .drawer-side');
-      await expect(side).toHaveCSS('position', viewport.fixedSidebar ? 'sticky' : 'fixed');
+      // 관리자 설정이 첫 화면 사이드바를 숨겼으면 넓은 화면에서 왼쪽 열이 없다(좁은 화면 서랍은 그대로).
+      if (viewport.fixedSidebar && (await sidebarModes(page)).home === 'hidden') {
+        await expect(side).toBeHidden();
+      } else {
+        await expect(side).toHaveCSS('position', viewport.fixedSidebar ? 'sticky' : 'fixed');
+      }
       await expect(page.locator('.doc-hamburger')).toBeVisible({ visible: !viewport.fixedSidebar });
       // 상단 메뉴 줄은 관리자 메뉴가 있을 때만 그린다(0개면 줄 자체가 없다).
       const hasMenus = (await apiData<ApiMenu[]>(page, '/menus')).length > 0;
@@ -642,6 +679,7 @@ test.describe('handbook manual navigation', () => {
   test('light and dark modes use the handbook tokens', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openHandbook(page);
+    await skipIfSidebarHidden(page, 'docs');
     // 선택기는 매뉴얼 화면에만 있으니 첫 매뉴얼로 옮겨서 본다.
     const [first] = await selectorBooks(page);
     await page.goto(at(`/${first.table}`), { waitUntil: 'networkidle' });
