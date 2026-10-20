@@ -22,11 +22,11 @@ html[data-shop-cats="0"] .solune-shop-cats-reserve { display: none; }
 @media (min-width: 1024px) { .solune-shop-page .solune-shop-banner { --solune-banner-gutter: 2rem; } }
 .solune-shop-page #main_bn { position: relative; margin: 0; border: 0; }
 .solune-shop-page .solune-banner-swiper { overflow: hidden; background: var(--solune-surface-soft); }
-/* 높이는 화면 폭을 따른다(시안 1920x920). 사진은 그 틀을 덮게 자른다. 뼈대(.solune-banner-stage)도 같은 높이. */
+/* 배너가 첫 화면 대부분을 차지하지 않도록 너비에 비례시켜 최대 760px로 제한한다. 사진은 틀을 덮게 자르고, 뼈대도 같은 높이를 쓴다. */
 .solune-shop-page .solune-banner-stage,
 .solune-shop-page .solune-banner-slide,
 .solune-shop-page .solune-banner-slide > a {
-  height: min(940px, 48vw);
+  height: min(760px, 40vw);
   min-height: 260px;
 }
 .solune-shop-page .solune-banner-stage { position: relative; }

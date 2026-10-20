@@ -50,7 +50,9 @@ async function snapshotForm(page: Page): Promise<FormSnapshot> {
   return page.locator(SETTINGS_FORM).first().evaluate((form) =>
     Array.from((form as HTMLFormElement).elements)
       .filter((element): element is HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement => 'name' in element && Boolean((element as HTMLInputElement).name))
-      .filter((element) => element.name !== 'token' && (element as HTMLInputElement).type !== 'submit')
+      // 숨은 칸(token · 게시판의 처음 값 orig_*)은 적지 않는다 — 되돌릴 때 페이지가 새로 낸 값 그대로 보내면 되고,
+      // 숨은 칸에 fill 하면 보일 때까지 기다리다 시간 초과로 되돌리기가 끝나지 않았다.
+      .filter((element) => !['hidden', 'submit'].includes((element as HTMLInputElement).type))
       .map((element) => ({ name: element.name, value: element.value }))
   );
 }
@@ -90,6 +92,18 @@ async function isServerRuntime(page: Page): Promise<boolean> {
   if (process.env.HANDBOOK_RUNTIME) return process.env.HANDBOOK_RUNTIME === 'server';
   const response = await page.request.get(`${BASE}/`);
   return (response.headers()['x-powered-by'] ?? '').includes('Next.js');
+}
+
+/** 화면(Next.js)에서 로그인 — 화면 편집 단추는 API 로그인(최고관리자)으로 보인다. 관리자 화면 로그인(PHP 세션)과 따로다. */
+async function frontLogin(page: Page) {
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
+  const form = page.locator('form').filter({ has: page.locator('input[name="mb_password"]') }).first();
+  await form.locator('input[name="mb_id"]').fill(ADMIN_ID);
+  await form.locator('input[name="mb_password"]').fill(ADMIN_PASSWORD);
+  await Promise.all([
+    page.waitForURL((url) => !url.pathname.replace(/\/+$/, '').endsWith('/login'), { timeout: 20_000 }),
+    form.locator('button[type="submit"]').first().click(),
+  ]);
 }
 
 test.beforeEach(async ({ page }, testInfo) => {
@@ -197,4 +211,120 @@ test('chapter order saves in the admin and shows in the table of contents', asyn
     expect(titles).toContain(second);
     expect(titles.indexOf(first)).toBeLessThan(titles.indexOf(second));
   }).toPass({ timeout: 90_000 });
+});
+
+test('the super admin edits texts and the sidebar in place from the screen editor', async ({ page, browser }) => {
+  await openSettings(page);
+  const snapshot = await snapshotForm(page);
+  restores.push((admin) => restoreForm(admin, snapshot));
+  const logo = `편집 창 로고 ${String(Date.now()).slice(-6)}`;
+
+  // 손님에게는 편집 단추가 없다.
+  const guest = await browser.newContext();
+  try {
+    const guestPage = await guest.newPage();
+    await guestPage.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+    await expect(guestPage.locator('.doc-brand-name')).toBeVisible();
+    await expect(guestPage.getByRole('button', { name: '화면 설정 열기' })).toHaveCount(0);
+    await expect(guestPage.locator('.doc-edit-pencil')).toHaveCount(0);
+  } finally {
+    await guest.close();
+  }
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await frontLogin(page);
+  await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+  await expect(page.getByRole('button', { name: '첫 화면 제목 · 소개 수정' })).toBeVisible();
+  await page.getByRole('button', { name: '화면 설정 열기' }).click();
+
+  const dialog = page.getByRole('dialog', { name: '화면 설정' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel('로고 글자').fill(logo);
+  await dialog.getByRole('tab', { name: '사이드바' }).click();
+  await dialog.getByRole('radiogroup', { name: '첫 화면 사이드바' }).getByText('숨기기').click();
+  await dialog.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(dialog).toBeHidden();
+
+  // 새로고침 없이 바로 — 로고 글자와 첫 화면 사이드바.
+  await expect(page.locator('.doc-brand-name')).toHaveText(logo);
+  await expect(page.locator('.doc-drawer')).toHaveAttribute('data-sidebar', 'hidden');
+  await expect(page.getByRole('status').filter({ hasText: '저장했습니다' })).toBeVisible();
+
+  // 새로고침해도 남는다(서버 실행은 설정 캐시 30초).
+  const server = await isServerRuntime(page);
+  await expect(async () => {
+    await page.reload({ waitUntil: 'networkidle' });
+    await expect(page.locator('.doc-brand-name')).toHaveText(logo, { timeout: 2000 });
+  }).toPass({ timeout: server ? 90_000 : 15_000 });
+
+  // 저장하지 않은 변경이 있으면 닫기 전에 묻는다.
+  await page.getByRole('button', { name: '화면 설정 열기' }).click();
+  await dialog.getByLabel('로고 글자').fill(`${logo} 고침`);
+  await page.keyboard.press('Escape');
+  await expect(dialog.getByText('저장하지 않은 변경이 있습니다')).toBeVisible();
+  await dialog.getByRole('button', { name: '버리고 닫기' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('.doc-brand-name')).toHaveText(logo);
+});
+
+test('clearing the manual group in the screen editor empties the table of contents right away', async ({ page }) => {
+  await openSettings(page);
+  const snapshot = await snapshotForm(page);
+  restores.push((admin) => restoreForm(admin, snapshot));
+  requireData(snapshot.some((field) => field.name === 'docs[group]' && field.value !== ''), 'no manual group is saved');
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await frontLogin(page);
+  await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+  await expect(page.locator('.doc-book-browse-link').first()).toBeAttached();
+  await page.getByRole('button', { name: '매뉴얼 목록 · 순서 수정' }).click();
+  const dialog = page.getByRole('dialog', { name: '화면 설정' });
+  await dialog.getByLabel('매뉴얼 게시판 그룹').selectOption('');
+  await dialog.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  // 빌드 때 정한 그룹이 없는 빌드면 매뉴얼이 하나도 없어야 한다 — 예전 목차가 남지 않는다(새로고침 없이).
+  test.skip(await page.locator('.doc-root[data-docs-group]').count() > 0, 'this build has its own manual group');
+  await expect(page.locator('.doc-book-browse-link')).toHaveCount(0);
+  await expect(page.locator('#books-heading')).toHaveCount(0);
+});
+
+test('the screen editor reorders chapters and the table of contents follows', async ({ page }) => {
+  await openSettings(page);
+  const orderLink = page.locator('a[href*="chapters="]').first();
+  requireData((await orderLink.count()) > 0, 'no manual board in the manual group');
+  const table = new URL((await orderLink.getAttribute('href')) ?? '', ADMIN_BASE).searchParams.get('chapters') ?? '';
+  await orderLink.click();
+  await page.waitForSelector('#ts-chapters');
+  const original = (await shownChapters(page)).map((chapter) => chapter.id);
+  restores.push((admin) => saveChapterOrder(admin, table, original));
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await frontLogin(page);
+  await page.goto(`${BASE}/${table}`, { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: '이 매뉴얼 장 순서' }).click();
+  const dialog = page.getByRole('dialog', { name: '화면 설정' });
+  await expect(dialog.getByRole('tab', { name: '장 순서' })).toHaveAttribute('aria-selected', 'true');
+
+  // 같은 부에서 아래로 옮길 수 있는 첫 장을 한 칸 내린다.
+  const down = dialog.getByRole('button', { name: /아래로$/ });
+  await expect(down.first()).toBeVisible();
+  const movable = await down.evaluateAll((buttons) => buttons.findIndex((button) => !(button as HTMLButtonElement).disabled));
+  requireData(movable >= 0, 'no two chapters in the same part');
+  const titles = await dialog.locator('.doc-editor-chapter-title').allTextContents();
+  const [first, second] = [titles[movable + 1], titles[movable]];
+  requireData(first !== second, 'two neighbouring chapters share a title');
+  await down.nth(movable).click();
+  await dialog.getByRole('button', { name: '장 순서 저장' }).click();
+  await expect(dialog.getByText('장 순서를 저장했습니다.')).toBeVisible();
+  await dialog.getByRole('button', { name: '닫기', exact: true }).click();
+  await expect(dialog).toBeHidden();
+
+  // 사이드바 목차가 새 차례로 다시 받아진다(새로고침 없이).
+  await expect(async () => {
+    const collapsed = page.locator('.doc-part-toggle[aria-expanded="false"]');
+    while ((await collapsed.count()) > 0) await collapsed.first().click();
+    const toc = await page.locator('.doc-chapter-link span[title]').evaluateAll((items) => items.map((item) => item.getAttribute('title') ?? ''));
+    expect(toc.indexOf(first)).toBeGreaterThanOrEqual(0);
+    expect(toc.indexOf(first)).toBeLessThan(toc.indexOf(second));
+  }).toPass({ timeout: 30_000 });
 });

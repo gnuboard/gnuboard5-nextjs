@@ -193,6 +193,7 @@ if ($apiMethod === 'GET' && $seg1 === 'seo') {
 $bo_table = api_sanitize_bo_table($seg0);
 $wr_id    = (int) $seg1;
 $action   = $seg2;
+$revisionSubAction = isset($apiSegments[3]) ? (string) $apiSegments[3] : '';
 
 if (!$bo_table || !$wr_id) {
     Response::error('Not found. Expected /v1/posts/{bo_table}/{wr_id}', 404);
@@ -206,6 +207,79 @@ if (!$board) {
 $write_table = DB::writeTable($bo_table);
 
 require_once __DIR__ . '/post_comments_helpers.php';
+
+// -------------------------------------------------------------------------
+// GET /v1/posts/{bo_table}/{wr_id}/revisions[/{rev_id|compare}] — 매뉴얼 이력.
+// 관리자 전용 별도 API 영역을 만들지 않고 게시글 하위 경로에서 게시판 권한을 다시 확인한다.
+// -------------------------------------------------------------------------
+if ($action === 'revisions' && $apiMethod === 'GET') {
+    $viewer = Auth::requireAuth();
+    $post = DB::fetch(
+        "SELECT wr_id FROM {$write_table}
+         WHERE wr_id = ? AND wr_is_comment = 0
+         LIMIT 1",
+        [$wr_id]
+    );
+    if (!$post || !webapp_post_history_is_tracked_board($board)) {
+        Response::error('Post not found.', 404);
+    }
+    if (!webapp_post_history_can_view($viewer, $bo_table, $board)) {
+        Response::error('You do not have permission to view this post history.', 403);
+    }
+    if (!webapp_post_history_table_ready()) {
+        Response::error('Post history is not installed. Run the administrator database upgrade first.', 503);
+    }
+    if (!webapp_post_history_reconcile_for_read($bo_table, $wr_id, $board)) {
+        Response::error('Post history could not be reconciled. Please retry.', 503);
+    }
+    header('Cache-Control: private, no-store');
+
+    if ($revisionSubAction === 'compare') {
+        $fromId = isset($_GET['from']) ? (int) $_GET['from'] : 0;
+        $toId = isset($_GET['to']) ? (int) $_GET['to'] : 0;
+        if ($fromId <= 0 || $toId <= 0 || $fromId === $toId) {
+            Response::error('Two different revision IDs are required.', 422);
+        }
+        $from = webapp_post_history_get($bo_table, $wr_id, $fromId);
+        $to = webapp_post_history_get($bo_table, $wr_id, $toId);
+        if (!$from || !$to) {
+            Response::error('Revision not found.', 404);
+        }
+        Response::success(array('from' => $from, 'to' => $to));
+    }
+
+    if ($revisionSubAction !== '') {
+        if (!ctype_digit($revisionSubAction) || (int) $revisionSubAction <= 0) {
+            Response::error('Revision not found.', 404);
+        }
+        $revision = webapp_post_history_get($bo_table, $wr_id, (int) $revisionSubAction);
+        if (!$revision) {
+            Response::error('Revision not found.', 404);
+        }
+        Response::success($revision);
+    }
+
+    $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 20;
+    if ($limit < 1 || $limit > 50) {
+        Response::error('Limit must be between 1 and 50.', 422);
+    }
+    $beforeId = isset($_GET['before']) ? max(0, (int) $_GET['before']) : 0;
+    $revisions = webapp_post_history_list($bo_table, $wr_id, $beforeId, $limit + 1);
+    $hasMore = count($revisions) > $limit;
+    if ($hasMore) {
+        array_pop($revisions);
+    }
+    $nextBefore = null;
+    if ($hasMore && $revisions) {
+        $lastRevision = end($revisions);
+        $nextBefore = (int) $lastRevision['rev_id'];
+    }
+    Response::success(array(
+        'revisions' => $revisions,
+        'next_before' => $nextBefore,
+        'has_more' => $hasMore,
+    ));
+}
 
 // -------------------------------------------------------------------------
 // GET /v1/posts/{bo_table}/{wr_id}/comments?page=&per_page= (SC-12) — 상세 comments[] 와 같은 항목, 페이지 단위.
@@ -422,6 +496,7 @@ if (!$action && $apiMethod === 'GET') {
     // Permission hint for the caller
     $post['admin_role']  = $viewer ? Auth::adminRole($viewer, $bo_table) : '';
     $post['can_manage']  = $viewer ? Auth::canManagePost($viewer, $bo_table, $post) : false;
+    $post['can_view_history'] = $viewer ? webapp_post_history_can_view($viewer, $bo_table, $board) : false;
     $post['bo_use_good'] = (int) ($board['bo_use_good'] ?? 0);
     $post['bo_use_nogood'] = (int) ($board['bo_use_nogood'] ?? 0);
     $post['is_scrapped'] = false;

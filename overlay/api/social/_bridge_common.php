@@ -284,6 +284,18 @@ if (!function_exists('nextjs25_social_validate_mobile_redirect')) {
             return '';
         }
 
+        $parts = parse_url($redirect);
+        $host = strtolower((string) ($parts['host'] ?? ''));
+        $path = (string) ($parts['path'] ?? '');
+        if ($host !== 'social-callback'
+            || !in_array($path, array('', '/'), true)
+            || isset($parts['user'])
+            || isset($parts['pass'])
+            || isset($parts['port'])
+            || isset($parts['fragment'])) {
+            return '';
+        }
+
         return $redirect;
     }
 }

@@ -200,7 +200,11 @@ if (!function_exists('api_settings_features')) {
 }
 
 if (!function_exists('api_settings_legal_urls')) {
-    /** 법적 페이지 URL — G5_LEGAL_<KIND>_URL 이 있으면 그것, 없으면 legal/*.php 가 실제로 있을 때만 내려보낸다. */
+    /**
+     * 법적 페이지 URL — G5_LEGAL_<KIND>_URL 이 있으면 그것(사이트가 따로 둔 문서), 없으면 앱 공통 문서
+     * plugin/webapp/legal/*.php(SC-06 — 사이트 제목 · 사업자 정보로 채운다)가 실제로 있을 때 그 주소.
+     * 환불 정책(terms.php#refund)은 쇼핑몰을 쓰는 사이트에만 있다. legal/*.php 는 디데이 앱 문서라 쓰지 않는다.
+     */
     function api_settings_legal_urls()
     {
         $pages = [
@@ -209,8 +213,8 @@ if (!function_exists('api_settings_legal_urls')) {
             'account_deletion' => ['account-deletion.php', ''],
             'refund'           => ['terms.php', '#refund'],
         ];
-        $slug = g5_api_config_value('G5_LEGAL_APP_SLUG');
-        $query = $slug !== '' ? '?app=' . rawurlencode($slug) : '';
+        $dir = '/' . (defined('G5_PLUGIN_DIR') ? G5_PLUGIN_DIR : 'plugin') . '/webapp/legal/';
+        $hasShop = defined('G5_USE_SHOP') && G5_USE_SHOP;
         $urls = [];
         foreach ($pages as $kind => $page) {
             $override = g5_api_config_value('G5_LEGAL_' . strtoupper($kind) . '_URL');
@@ -218,8 +222,11 @@ if (!function_exists('api_settings_legal_urls')) {
                 $urls[$kind] = $override;
                 continue;
             }
-            if (defined('G5_PATH') && defined('G5_URL') && is_file(G5_PATH . '/legal/' . $page[0])) {
-                $urls[$kind] = G5_URL . '/legal/' . $page[0] . $query . $page[1];
+            if ($kind === 'refund' && !$hasShop) {
+                continue;
+            }
+            if (defined('G5_PATH') && defined('G5_URL') && is_file(G5_PATH . $dir . $page[0])) {
+                $urls[$kind] = G5_URL . $dir . $page[0] . $page[1];
             }
         }
         return $urls;

@@ -11,6 +11,8 @@
  *     mb_leave_date 를 채워 로그인 경로가 거부하게 한다.
  *   - 게시글·댓글: 남기되 작성자를 비식별화(wr_name='탈퇴회원', 이메일·홈페이지·IP 비움).
  *     다른 사람의 댓글이 달린 글이 사라지지 않게 하려는 것이고, 처리방침에 명시돼 있다.
+ *   - 1:1 문의: 남기되 작성자 이름 · 이메일 · 휴대폰 · IP 를 비식별화(api_member_purge_qa — 처리방침
+ *     plugin/webapp/legal/privacy.php 와 앱 탈퇴 안내가 "문의는 탈퇴회원으로 익명화"라고 밝힌다).
  *   - 그 외 회원에 속한 행(디데이, 아기 기록, 푸시 토큰, 알림 이력, 소셜 연결, 세션,
  *     차단 목록, 스크랩, 쪽지, 포인트, 접속 기록, 소셜 티켓, 본인인증 이력, 글 임시저장,
  *     정기결제 카드, 웹 입장권, 회원 공개 키)은 삭제. 기기 기록은 남기되 이 회원과의 연결 · IP · 브라우저를 지운다.
@@ -176,6 +178,7 @@ if (!function_exists('api_member_purge_now')) {
             // 5) 쇼핑 테이블(앱 SC-20). 실패하면 탈퇴 전체를 되돌린다 — 처리방침 문구와 실제 동작이 어긋나면 안 된다.
             $shopResult = api_member_purge_shop($mb_id);
             $printResult = api_member_purge_print($mb_id);
+            $qaResult = api_member_purge_qa($mb_id);
 
             DB::commit();
         } catch (\Throwable $e) {
@@ -196,13 +199,14 @@ if (!function_exists('api_member_purge_now')) {
             'anonymized_writes' => $anonymizedWrites,
             'shop'              => $shopResult,
             'print'             => $printResult,
+            'qa'                => $qaResult,
         ];
     }
 }
 
 if (!function_exists('api_member_purge_shop_table')) {
     /**
-     * 쇼핑 표 이름 — $g5 키(없으면 G5_SHOP_TABLE_PREFIX.접미사)가 가리키는 표가 실제로 있을 때만. 없으면 ''.
+     * 쇼핑 표 이름 — $g5 키(없으면 G5_SHOP_TABLE_PREFIX.접미사, 접미사가 '' 이면 $g5 키만)가 가리키는 표가 실제로 있을 때만. 없으면 ''.
      * 설정 키는 dbconfig 에 늘 있지만 표는 설치본에 따라 없을 수 있다 — 없는 표 하나 때문에 탈퇴 전체가
      * 실패하면 안 된다(표가 있는데 문장이 실패하는 것은 그대로 던져 탈퇴를 되돌린다).
      */
@@ -210,7 +214,7 @@ if (!function_exists('api_member_purge_shop_table')) {
     {
         global $g5;
         static $exists = [];
-        $name = !empty($g5[$key]) ? (string) $g5[$key] : (defined('G5_SHOP_TABLE_PREFIX') ? G5_SHOP_TABLE_PREFIX . $suffix : '');
+        $name = !empty($g5[$key]) ? (string) $g5[$key] : ($suffix !== '' && defined('G5_SHOP_TABLE_PREFIX') ? G5_SHOP_TABLE_PREFIX . $suffix : '');
         if ($name === '' || !preg_match('/^[A-Za-z0-9_]+$/', $name)) {
             return '';
         }
@@ -310,6 +314,28 @@ if (!function_exists('api_member_purge_shop')) {
         }
 
         return $out;
+    }
+}
+
+if (!function_exists('api_member_purge_qa')) {
+    /**
+     * 1:1 문의(그누보드 qa_content) — api_member_purge_now 의 트랜잭션 안에서 부른다. 문의 · 답변 내용은 상담 기록이라
+     * 남기고, 이 회원이 쓴 행의 작성자 이름 · 이메일 · 휴대폰 · IP 만 지운다(관리자 답변 행은 mb_id 가 관리자라 그대로).
+     * 표가 없는 설치본은 건너뛰고, 표가 있는데 실패하면 던져 탈퇴를 실패로 돌린다(트랜잭션을 지원하는 표만 앞 단계까지
+     * 되돌린다 — MyISAM 은 쇼핑 단계와 같이 되돌리지 못하고, 안전망 cron 이 다시 돈다). 처리방침 문구와 동작이 어긋나면 안 된다.
+     *
+     * @return int 익명화한 행 수
+     */
+    function api_member_purge_qa(string $mb_id): int
+    {
+        $table = api_member_purge_shop_table('qa_content_table', '');
+        if ($table === '') {
+            return 0;
+        }
+        return (int) DB::execute(
+            "UPDATE `{$table}` SET qa_name = '탈퇴회원', qa_email = '', qa_hp = '', qa_ip = '' WHERE mb_id = ?",
+            [$mb_id]
+        );
     }
 }
 

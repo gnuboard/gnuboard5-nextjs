@@ -5,12 +5,45 @@
 -- Use this file only when that is not possible. Default Gnuboard installations
 -- use the `g5_` table prefix; replace it first if yours differs.
 
+CREATE TABLE IF NOT EXISTS `g5_post_revision` (
+    `rev_id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `bo_table` VARCHAR(20) NOT NULL,
+    `wr_id` INT UNSIGNED NOT NULL,
+    `history_uuid` CHAR(36) NOT NULL,
+    `rev_no` INT UNSIGNED NOT NULL,
+    `archived_at` DATETIME NULL DEFAULT NULL,
+    `archive_reason` VARCHAR(16) NOT NULL DEFAULT '',
+    `archive_target_bo_table` VARCHAR(20) NOT NULL DEFAULT '',
+    `event` VARCHAR(16) NOT NULL DEFAULT 'updated',
+    `capture_status` VARCHAR(16) NOT NULL DEFAULT 'finalized',
+    `source` VARCHAR(16) NOT NULL DEFAULT 'web',
+    `actor_mb_id` VARCHAR(20) NOT NULL DEFAULT '',
+    `actor_name` VARCHAR(255) NOT NULL DEFAULT '',
+    `actor_role` VARCHAR(16) NOT NULL DEFAULT 'system',
+    `note` VARCHAR(500) NOT NULL DEFAULT '',
+    `wr_subject` VARCHAR(255) NOT NULL DEFAULT '',
+    `wr_seo_title` VARCHAR(200) NOT NULL DEFAULT '',
+    `ca_name` VARCHAR(255) NOT NULL DEFAULT '',
+    `wr_option` VARCHAR(255) NOT NULL DEFAULT '',
+    `wr_link1` TEXT NOT NULL,
+    `wr_link2` TEXT NOT NULL,
+    `wr_content` MEDIUMTEXT NOT NULL,
+    `content_hash` CHAR(64) NOT NULL,
+    `created_at` DATETIME NOT NULL,
+    PRIMARY KEY (`rev_id`),
+    UNIQUE KEY `uniq_post_history_revision_no` (`bo_table`, `wr_id`, `history_uuid`, `rev_no`),
+    KEY `idx_post_revision_active` (`bo_table`, `wr_id`, `archived_at`, `rev_id`),
+    KEY `idx_post_revision_archive` (`archived_at`, `bo_table`, `rev_id`),
+    KEY `idx_post_revision_history` (`history_uuid`, `archived_at`, `rev_no`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `g5_push_token` (
     `token_id` INT PRIMARY KEY AUTO_INCREMENT,
     `mb_id` VARCHAR(20) NOT NULL,
     `push_token` VARCHAR(255) NOT NULL,
     `platform` ENUM('android','ios','web') NOT NULL DEFAULT 'android',
     `last_used_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `registered_at` DATETIME NULL DEFAULT NULL COMMENT '앱이 마지막으로 등록한 시각 — 발송 성공으로는 안 바뀐다',
     UNIQUE KEY `uniq_token` (`push_token`),
     INDEX `idx_mb_id` (`mb_id`),
     INDEX `idx_last_used` (`last_used_at`)
@@ -68,7 +101,10 @@ CREATE TABLE IF NOT EXISTS `g5_push_queue` (
     `next_attempt_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `processed_at` DATETIME NULL DEFAULT NULL,
+    `ticket_id`    VARCHAR(64) NULL DEFAULT NULL COMMENT 'Expo push ticket id — 나중에 receipt 로 실제 전달 결과를 확인',
+    `receipt_checked_at` DATETIME NULL DEFAULT NULL,
     KEY `idx_pending_next` (`status`, `next_attempt_at`, `queue_id`),
+    KEY `idx_receipt` (`status`, `receipt_checked_at`, `processed_at`),
     KEY `idx_claim_token` (`claim_token`),
     KEY `idx_mb_id` (`mb_id`),
     KEY `idx_nt_id` (`nt_id`),

@@ -117,7 +117,9 @@ export type DocsBooksState = { books: DocsBook[]; settled: boolean };
 export function useDocsBooks(
   initialBooks: DocsBook[] = [],
   initialComplete = false,
-  serverSource: DocsSource = docsSourceFrom(null)
+  serverSource: DocsSource = docsSourceFrom(null),
+  /** 최고관리자가 화면 편집 창에서 방금 저장한 설정 — 바뀌면(변경 번호) 목차를 그 설정으로 다시 받는다. */
+  liveSource: DocsSource | null = null
 ): DocsBooksState {
   // 서버가 빠짐없이 읽었으면 책이 없어도(매뉴얼 그룹이 없거나 글이 없음) 다시 받지 않는다 — 받는 동안 "다 받기 전"으로
   // 남아 게시판 화면의 사이드바가 그려졌다 사라지지 않게(theme-settings.ts sidebarState).
@@ -132,16 +134,20 @@ export function useDocsBooks(
     booksRef.current = books;
   }, [books]);
 
+  const liveKey = liveSource ? `${liveSource.group}:${liveSource.revision}` : "";
+
   useEffect(() => {
-    if (skipRef.current) return;
+    if (skipRef.current && !liveSource) return;
 
     const controller = new AbortController();
     let alive = true;
 
     // 정적 빌드는 브리지가 요청 때 실은 관리자 설정을, 서버 실행은 서버가 읽어 넘긴 것을 쓴다. 효과는 브라우저에서만
-    // 돌므로 런타임 설정을 바로 읽어도 하이드레이션과 어긋나지 않는다.
+    // 돌므로 런타임 설정을 바로 읽어도 하이드레이션과 어긋나지 않는다. 화면 편집 창에서 저장했으면 그 설정이 먼저다
+    // (변경 번호가 캐시 열쇠에 들어 저장 전 목차를 쓰지 않는다).
     const docs =
-      process.env.G5_NEXT_RUNTIME === "static" ? docsSourceFrom(clientHandbookThemeSettings()) : serverSourceRef.current;
+      liveSource ??
+      (process.env.G5_NEXT_RUNTIME === "static" ? docsSourceFrom(clientHandbookThemeSettings()) : serverSourceRef.current);
 
     async function refreshBooks() {
       const cached = readCachedBooks(docs);
@@ -174,7 +180,9 @@ export function useDocsBooks(
 
         const next = loaded.filter((book): book is DocsBook => book !== null && book.count > 0);
         if (!alive) return;
-        if (next.length > 0) setBooks(next);
+        // 빠짐없이 받았으면 빈 목록도 그대로 쓴다 — 화면 편집 창에서 매뉴얼 그룹을 비우거나 빈 그룹으로 바꾼 직후 예전 목차가
+        // 남지 않게. 일부를 못 받았을 때(degraded)만 이미 가진 목차를 둔다.
+        if (next.length > 0 || !degraded) setBooks(next);
         if (next.length > 0 && !degraded) writeCachedBooks(docs, next);
         setSettled(true);
       } catch (error) {
@@ -193,7 +201,9 @@ export function useDocsBooks(
       alive = false;
       controller.abort();
     };
-  }, []);
+    // 처음 한 번, 그리고 화면 편집 창에서 저장할 때마다(liveKey) — liveSource 객체가 아니라 그룹 · 변경 번호로 본다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveKey]);
 
   return { books, settled };
 }

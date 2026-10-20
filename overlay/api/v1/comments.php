@@ -267,6 +267,32 @@ if ($apiMethod === 'POST') {
         );
     }
 
+    // 알림 문구(2026-10-19): 알림만 보고 어느 게시판의 무슨 글·어느 댓글에 누가 무엇을 달았는지 알 수 있게.
+    //   내 글:   [자유게시판] "글 제목…"의 새 댓글        /  닉네임: 댓글 내용
+    //   내 댓글: [자유게시판] 내 댓글 "내 댓글…"의 답글   /  닉네임: 답글 내용
+    if (!function_exists('api_notify_snippet')) {
+        /** 알림에 넣을 짧은 글: 태그·엔티티·줄바꿈을 걷고 공백을 하나로 모은 뒤 $max 자를 넘으면 말줄임표로 자른다. */
+        function api_notify_snippet(string $text, int $max): string
+        {
+            $plain = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $plain = trim((string) preg_replace('/\s+/u', ' ', $plain));
+            if (mb_strlen($plain, 'UTF-8') <= $max) {
+                return $plain;
+            }
+            return rtrim(mb_substr($plain, 0, $max, 'UTF-8')) . '…';
+        }
+    }
+    $boardName = api_notify_snippet((string) ($board['bo_subject'] ?? ''), 20);
+    if ($boardName === '') {
+        $boardName = $bo_table;
+    }
+    $commentText = api_notify_snippet((string) $wr_content, 80);
+    if ($commentText === '') {
+        $commentText = '(내용 없음)';
+    }
+    $commenterName = api_notify_snippet((string) ($member['mb_nick'] ?? ''), 20);
+    $notifyBody = $commenterName !== '' ? $commenterName . ': ' . $commentText : $commentText;
+
     // 원글 작성자에게 푸시 알림 (본인 댓글 / 익명 글은 skip)
     $parentAuthor = DB::fetch(
         "SELECT mb_id, wr_subject FROM {$write_table}
@@ -284,11 +310,12 @@ if ($apiMethod === 'POST') {
     $postAuthorId = $parentAuthor ? (string) $parentAuthor['mb_id'] : '';
     if ($postAuthorId !== '' && $postAuthorId !== $member['mb_id']) {
         // 알림은 한 문(Notify::emit)으로 — 알림함 + 모든 기기 푸시 + 즉시 발송/재시도.
+        $postTitle = api_notify_snippet((string) ($parentAuthor['wr_subject'] ?? ''), 15);
         Notify::emit(
             'comment.created',
             $postAuthorId,
-            "[$bo_table] 새 댓글",
-            mb_substr(strip_tags($wr_content), 0, 80, 'UTF-8'),
+            $postTitle !== '' ? "[{$boardName}] \"{$postTitle}\"의 새 댓글" : "[{$boardName}] 내 글의 새 댓글",
+            $notifyBody,
             $notifyData
         );
     }
@@ -296,16 +323,21 @@ if ($apiMethod === 'POST') {
     if ($replyTo > 0) {
         // 같은 글의 댓글만 — 다른 글 댓글 번호를 넣어 엉뚱한 회원에게 알림을 보내지 못하게(번호 매기기 조회와 같은 범위).
         $replyAuthor = DB::fetch(
-            "SELECT mb_id FROM {$write_table} WHERE wr_id = ? AND wr_is_comment = 1 AND wr_parent = ? LIMIT 1",
+            "SELECT mb_id, wr_content FROM {$write_table} WHERE wr_id = ? AND wr_is_comment = 1 AND wr_parent = ? LIMIT 1",
             [$replyTo, $wr_id]
         );
         $replyAuthorId = $replyAuthor ? (string) $replyAuthor['mb_id'] : '';
         if ($replyAuthorId !== '' && $replyAuthorId !== $member['mb_id'] && $replyAuthorId !== $postAuthorId) {
+            $myComment = api_notify_snippet((string) ($replyAuthor['wr_content'] ?? ''), 15);
+            // 비밀 댓글은 관리자·글쓴이·그 댓글 작성자만 본다(bbs/view_comment.php) — 원댓글 작성자는 아니므로 내용을 가린다.
+            $replyBody = api_is_secret_option($wr_option)
+                ? ($commenterName !== '' ? $commenterName . ': 비밀 답글입니다.' : '비밀 답글입니다.')
+                : $notifyBody;
             Notify::emit(
                 'reply.created',
                 $replyAuthorId,
-                "[$bo_table] 내 댓글에 답글",
-                mb_substr(strip_tags($wr_content), 0, 80, 'UTF-8'),
+                $myComment !== '' ? "[{$boardName}] 내 댓글 \"{$myComment}\"의 답글" : "[{$boardName}] 내 댓글의 답글",
+                $replyBody,
                 $notifyData
             );
         }

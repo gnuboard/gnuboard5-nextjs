@@ -74,7 +74,7 @@ for (const rootFile of rootFiles) {
 }
 files.sort((a, b) => a.archivePath.localeCompare(b.archivePath));
 
-for (const required of ['api/index.php', 'api/.htaccess', 'api/env.example', 'api/lib/Schema.php', 'plugin/webapp/bridge/route.php', 'plugin/webapp/bridge/common.php', 'plugin/webapp/bridge/runtime.php', 'plugin/webapp/notify/tables.php', 'plugin/webapp/notify/Notify.php', 'plugin/webapp/cron/process_push_queue.php']) {
+for (const required of ['api/index.php', 'api/.htaccess', 'api/env.example', 'api/lib/Schema.php', 'plugin/webapp/bridge/route.php', 'plugin/webapp/bridge/common.php', 'plugin/webapp/bridge/runtime.php', 'plugin/webapp/notify/tables.php', 'plugin/webapp/post-history/service.php', 'plugin/webapp/notify/Notify.php', 'plugin/webapp/cron/process_push_queue.php']) {
   if (!files.some((file) => file.archivePath === required)) {
     fail(`Missing ${required}`);
   }

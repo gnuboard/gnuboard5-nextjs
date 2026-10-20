@@ -28,7 +28,11 @@ Static export install notes:
    hints, set each manual's chapter order (the 순서 link), choose per screen
    whether the left sidebar shows on wide screens, and fill in the site texts
    (logo, home, footer). Saved values show up on the next page load; no
-   rebuild.
+   rebuild. A super admin who logs in on the site itself also gets a
+   "화면 설정" button in the top bar and pencil buttons on the home hero,
+   manual list, footer and sidebar; they open the same settings
+   in a dialog (GET/PUT /api/v1/theme-settings, super admin only) and the
+   page updates without a reload.
 4. Menu items come from 환경설정 > 메뉴설정, as with the other themes.
 5. When developing from the source checkout, build the app with:
    cd nextjs

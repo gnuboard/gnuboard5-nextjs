@@ -157,6 +157,8 @@ check_file "$WEB_ROOT/api/social/_bridge_common.php" "Next.js social bridge comm
 check_file "$WEB_ROOT/plugin/social/includes/functions.php" "Gnuboard social plugin functions"
 check_file "$WEB_ROOT/plugin/webapp/bridge/runtime.php" "Next.js runtime extend loader"
 check_file "$WEB_ROOT/plugin/webapp/bridge/social.php" "Next.js social extend loader"
+check_file "$WEB_ROOT/plugin/webapp/notify/tables.php" "Next.js shared table installer"
+check_file "$WEB_ROOT/plugin/webapp/post-history/service.php" "Manual post revision history service"
 check_contains "$WEB_ROOT/plugin/social/includes/functions.php" "social_login_linked_provider_before_member_check" "social linked provider hook"
 check_contains "$WEB_ROOT/plugin/social/includes/functions.php" "social_login_existing_member_before_link_prompt" "social existing member hook"
 check_dir "$WEB_ROOT/theme" "Gnuboard theme directory"

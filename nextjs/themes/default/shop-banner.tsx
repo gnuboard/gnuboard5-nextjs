@@ -193,7 +193,7 @@ export function SoluneShopBanner({ banners }: { banners: ShopBanner[] }) {
         speed={reduce ? 0 : BANNER_SPEED_MS}
         autoplay={multi && !reduce ? { delay: BANNER_INTERVAL_MS, disableOnInteraction: false, pauseOnMouseEnter: true } : false}
         keyboard={{ enabled: true }}
-        a11y={{ prevSlideMessage: "이전 배너", nextSlideMessage: "다음 배너" }}
+        a11y={{ prevSlideMessage: "이전 배너", nextSlideMessage: "다음 배너", paginationBulletMessage: "{{index}}번 배너로 이동" }}
         pagination={multi ? { el: null, clickable: true } : false}
         navigation={multi ? { prevEl: null, nextEl: null } : false}
         onSwiper={(swiper) => {

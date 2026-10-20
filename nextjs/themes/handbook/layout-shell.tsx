@@ -23,6 +23,14 @@ import { ChapterPager } from "./chapter-pager";
 import { HandbookDocsProvider, HandbookHomeTextsProvider } from "./docs-context";
 import { handbookHomeTexts, sidebarState, withSiteTexts, type HandbookThemeSettings } from "./theme-settings";
 import { useHandbookThemeSettings } from "./use-theme-settings";
+import {
+  EditLinks,
+  EditPencil,
+  SettingsEditorButton,
+  SettingsEditorLoader,
+  SettingsEditorNotice,
+} from "./settings-editor/edit-buttons";
+import { useSettingsEditor } from "./settings-editor/editor-store";
 import type {
   G5ThemeConfig,
   G5ThemeLayoutShellProps,
@@ -58,7 +66,8 @@ function useHighlightPath(pathname: string): string {
 function ShellFooter({ config, indexPath }: { config: G5ThemeConfig; indexPath: string }) {
   return (
     <footer className="doc-footer">
-      <div className="doc-footer-inner">
+      <div className="doc-footer-inner doc-edit-anchor">
+        <EditPencil tab="site" label="바닥글 문구 수정" className="is-corner" />
         <div className="doc-footer-cols">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -177,12 +186,15 @@ export function HandbookLayoutShell({
   const config = useMemo(() => withSiteTexts(themeConfig, settings), [themeConfig, settings]);
   const homeTexts = useMemo(() => handbookHomeTexts(themeConfig, settings), [themeConfig, settings]);
   const docsSource = useMemo(() => docsSourceFrom(themeSettings), [themeSettings]);
+  // 최고관리자가 화면 편집 창에서 저장한 설정 — 매뉴얼 목록 · 장 순서가 바뀌었을 수 있어 목차를 그 설정으로 다시 받는다.
+  const liveSettings = useSettingsEditor((state) => state.live);
+  const liveDocsSource = useMemo(() => (liveSettings ? docsSourceFrom(liveSettings) : null), [liveSettings]);
   // Resolve the active path through the runtime helper so the right book is
   // picked when the static export is served under a base path.
   const pathname = currentPathForRuntime(usePathname() || "/");
   const highlightPath = useHighlightPath(pathname);
   const runtimeMenus = useRuntimeMenus(menus);
-  const { books: docsBooks, settled: docsSettled } = useDocsBooks(books, booksComplete, docsSource);
+  const { books: docsBooks, settled: docsSettled } = useDocsBooks(books, booksComplete, docsSource, liveDocsSource);
   const [open, setOpen] = useState(false);
   const currentBook = bookForPath(docsBooks, highlightPath);
   const docsContext = useMemo(() => ({ books: docsBooks, settled: docsSettled }), [docsBooks, docsSettled]);
@@ -286,6 +298,7 @@ export function HandbookLayoutShell({
           <AccountArea />
         </nav>
 
+        <SettingsEditorButton />
         <HandbookThemeSwap />
       </header>
 
@@ -363,6 +376,14 @@ export function HandbookLayoutShell({
               ) : null}
               {showBookBrowse ? <BookBrowseList groups={bookGroups} onNavigate={closeSidebar} /> : null}
 
+              {/* 최고관리자에게만 — 이 사이드바를 보일지, 지금 매뉴얼의 장 순서를 화면 편집 창에서 고친다. */}
+              <EditLinks
+                items={[
+                  { tab: "sidebar", label: "사이드바 설정" },
+                  ...(currentBook ? [{ tab: "chapters" as const, label: "이 매뉴얼 장 순서", chapterTable: currentBook.table }] : []),
+                ]}
+              />
+
               <div className="doc-nav-section">
                 <div className="doc-callout mt-2">
                   <HelpCircle
@@ -386,6 +407,10 @@ export function HandbookLayoutShell({
           </nav>
         </div>
       </div>
+
+      {/* 화면 설정 편집 창 · 저장 알림 — 편집 창은 최고관리자일 때만 따로 받는다. 비운 칸에는 테마 기본 문구를 보인다. */}
+      <SettingsEditorLoader defaults={themeConfig.site} />
+      <SettingsEditorNotice />
     </div>
   );
 }

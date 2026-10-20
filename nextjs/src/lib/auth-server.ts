@@ -15,8 +15,15 @@
 import { cookies } from 'next/headers';
 import { apiBaseUrlForRuntime } from '@/lib/config';
 import { parseApiEnvelope } from '@/lib/api-response';
+import { fetchWithTimeout, isFetchTimeoutError } from '@/lib/server/fetch-timeout';
 
 const TOKEN_COOKIE = 'g5_token';
+
+/**
+ * /auth/me 시간 제한 — 루트 레이아웃이 로그인한 사람의 모든 화면에서 캐시 없이 기다린다. API 가 멈추면 첫 화면이
+ * Node 의 기본 제한(수 분)만큼 멈췄다. 넘으면 비로그인으로 그리고, 브라우저가 붙은 뒤 로그인 상태를 다시 맞춘다.
+ */
+const AUTH_ME_TIMEOUT_MS = 3_000;
 
 export interface ServerUser {
   mb_id: string;
@@ -37,15 +44,25 @@ export async function getCurrentUser(): Promise<ServerUser | null> {
 
   const apiUrl = apiBaseUrlForRuntime();
   try {
-    const res = await fetch(`${apiUrl}/auth/me`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
+    const res = await fetchWithTimeout(
+      `${apiUrl}/auth/me`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+        // Per-user auth state must not be shared or kept stale across requests.
+        cache: 'no-store',
       },
-      // Per-user auth state must not be shared or kept stale across requests.
-      cache: 'no-store',
-    });
-    if (!res.ok) return null;
+      AUTH_ME_TIMEOUT_MS
+    );
+    if (!res.ok) {
+      // 401 · 403 은 토큰 만료 · 로그아웃 — 늘 있는 일이라 남기지 않는다. 그 밖(5xx 등)은 API 쪽 장애라 남긴다.
+      if (res.status !== 401 && res.status !== 403) {
+        console.warn(`[auth-server] /auth/me failed with HTTP ${res.status}; rendering as a guest.`);
+      }
+      return null;
+    }
     const env = parseApiEnvelope<{
       member: Record<string, string | number | undefined>;
       is_super_admin?: boolean;
@@ -66,8 +83,15 @@ export async function getCurrentUser(): Promise<ServerUser | null> {
       mb_image_path: m.mb_image_path ? String(m.mb_image_path) : undefined,
       is_super_admin: !!env.data.is_super_admin,
     };
-  } catch {
-    // 네트워크 단절 / API 다운 — 비로그인 fallback. 사용자는 hydration 후 회복.
+  } catch (error) {
+    // 네트워크 단절 / API 다운 / 시간 초과 — 비로그인 fallback. 사용자는 hydration 후 회복.
+    // 시간 초과와 그 밖의 실패를 로그에서 가른다(장애 원인: API 가 느린지, 닿지 않는지).
+    console.warn(
+      isFetchTimeoutError(error)
+        ? `[auth-server] /auth/me timed out after ${AUTH_ME_TIMEOUT_MS}ms; rendering as a guest.`
+        : '[auth-server] /auth/me request failed; rendering as a guest.',
+      isFetchTimeoutError(error) ? '' : error
+    );
     return null;
   }
 }

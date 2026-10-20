@@ -17,7 +17,7 @@ export const themeConfig = {
     themeColor: "#3159b7",
     footerDescription: "그누보드5의 커뮤니티 공간입니다.",
     customerCenterTitle: "고객센터",
-    customerCenterLines: ["운영시간: 평일 09:00 - 18:00", "이메일: support@example.com"],
+    customerCenterLines: ["운영시간: 평일 09:00 - 18:00"],
     copyrightName: "그누보드5",
   },
 } satisfies G5ThemeConfig;

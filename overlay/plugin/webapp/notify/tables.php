@@ -22,6 +22,7 @@ $g5['web_ticket_table']           = G5_TABLE_PREFIX.'web_ticket';           // �
 $g5['social_apple_token_table']   = G5_TABLE_PREFIX.'social_apple_token';   // Sign in with Apple refresh_token(암호화) — 탈퇴 시 revoke (SC-11)
 $g5['member_public_key_table']    = G5_TABLE_PREFIX.'member_public_key';    // 회원 공개 키 — 주소에 아이디 대신 쓰는 무작위 값 (api/lib/member_key_helpers.php)
 $g5['theme_setting_table']        = G5_TABLE_PREFIX.'theme_setting';        // 테마 설정 — 왼쪽 메뉴 · 사이트 문구 (plugin/webapp/theme-settings/settings.php)
+$g5['post_revision_table']        = G5_TABLE_PREFIX.'post_revision';        // 매뉴얼 게시글 전체 스냅샷 이력
 
 // ---------------------------------------------------------------------------
 // 모바일 앱 버전 정책 — /v1/settings 에서 노출되어 클라이언트가 강제 업데이트 판정.
@@ -215,8 +216,120 @@ if (!function_exists('webapp_admin_dbupgrade')) {
         $login_attempt        = $g5['login_attempt_table'];
         $member_pref          = $g5['member_pref_table'];
         $legal_consent        = $g5['member_legal_consent_table'];
+        $post_revision        = $g5['post_revision_table'];
 
         $changed = false;
+
+        // =====================================================================
+        // 매뉴얼 게시글 변경 이력 — 원본 게시글 표는 MyISAM일 수 있어 별도 InnoDB 로 보관.
+        // =====================================================================
+        if (!webapp_table_exists($post_revision)) {
+            sql_query("CREATE TABLE `{$post_revision}` (
+                `rev_id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `bo_table` VARCHAR(20) NOT NULL,
+                `wr_id` INT UNSIGNED NOT NULL,
+                `history_uuid` CHAR(36) NOT NULL,
+                `rev_no` INT UNSIGNED NOT NULL,
+                `archived_at` DATETIME NULL DEFAULT NULL,
+                `archive_reason` VARCHAR(16) NOT NULL DEFAULT '',
+                `archive_target_bo_table` VARCHAR(20) NOT NULL DEFAULT '',
+                `event` VARCHAR(16) NOT NULL DEFAULT 'updated',
+                `capture_status` VARCHAR(16) NOT NULL DEFAULT 'finalized',
+                `source` VARCHAR(16) NOT NULL DEFAULT 'web',
+                `actor_mb_id` VARCHAR(20) NOT NULL DEFAULT '',
+                `actor_name` VARCHAR(255) NOT NULL DEFAULT '',
+                `actor_role` VARCHAR(16) NOT NULL DEFAULT 'system',
+                `note` VARCHAR(500) NOT NULL DEFAULT '',
+                `wr_subject` VARCHAR(255) NOT NULL DEFAULT '',
+                `wr_seo_title` VARCHAR(200) NOT NULL DEFAULT '',
+                `ca_name` VARCHAR(255) NOT NULL DEFAULT '',
+                `wr_option` VARCHAR(255) NOT NULL DEFAULT '',
+                `wr_link1` TEXT NOT NULL,
+                `wr_link2` TEXT NOT NULL,
+                `wr_content` MEDIUMTEXT NOT NULL,
+                `content_hash` CHAR(64) NOT NULL,
+                `created_at` DATETIME NOT NULL,
+                PRIMARY KEY (`rev_id`),
+                UNIQUE KEY `uniq_post_history_revision_no` (`bo_table`, `wr_id`, `history_uuid`, `rev_no`),
+                KEY `idx_post_revision_active` (`bo_table`, `wr_id`, `archived_at`, `rev_id`),
+                KEY `idx_post_revision_archive` (`archived_at`, `bo_table`, `rev_id`),
+                KEY `idx_post_revision_history` (`history_uuid`, `archived_at`, `rev_no`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci", false);
+            $changed = true;
+        }
+
+        // =====================================================================
+        // 게시글 삭제·이동 후에도 과거 이력을 보관한다. history_uuid 로 글 번호 재사용 시 이력을 분리한다.
+        // =====================================================================
+        if (webapp_table_exists($post_revision)) {
+            if (!webapp_column_exists($post_revision, 'history_uuid')) {
+                sql_query("ALTER TABLE `{$post_revision}` ADD COLUMN `history_uuid` CHAR(36) NULL DEFAULT NULL AFTER `wr_id`", false);
+                $changed = true;
+            }
+            if (!webapp_column_exists($post_revision, 'archived_at')) {
+                sql_query("ALTER TABLE `{$post_revision}` ADD COLUMN `archived_at` DATETIME NULL DEFAULT NULL AFTER `rev_no`", false);
+                $changed = true;
+            }
+            if (!webapp_column_exists($post_revision, 'archive_reason')) {
+                sql_query("ALTER TABLE `{$post_revision}` ADD COLUMN `archive_reason` VARCHAR(16) NOT NULL DEFAULT '' AFTER `archived_at`", false);
+                $changed = true;
+            }
+            if (!webapp_column_exists($post_revision, 'archive_target_bo_table')) {
+                sql_query("ALTER TABLE `{$post_revision}` ADD COLUMN `archive_target_bo_table` VARCHAR(20) NOT NULL DEFAULT '' AFTER `archive_reason`", false);
+                $changed = true;
+            }
+
+            // 기존 한 게시글의 모든 버전에 같은 이력 ID 를 부여한다.
+            if (webapp_column_exists($post_revision, 'history_uuid')) {
+                $missing = sql_query("SELECT bo_table, wr_id FROM `{$post_revision}`
+                                      WHERE history_uuid IS NULL OR history_uuid = ''
+                                      GROUP BY bo_table, wr_id", false);
+                while ($missing && ($group = sql_fetch_array($missing))) {
+                    $uuidRow = sql_fetch("SELECT UUID() AS history_uuid", false);
+                    $historyUuid = sql_real_escape_string((string) ($uuidRow['history_uuid'] ?? ''));
+                    $bo = sql_real_escape_string((string) $group['bo_table']);
+                    $wrId = (int) $group['wr_id'];
+                    if ($historyUuid !== '') {
+                        sql_query("UPDATE `{$post_revision}` SET history_uuid = '{$historyUuid}'
+                                   WHERE bo_table = '{$bo}' AND wr_id = {$wrId}
+                                     AND (history_uuid IS NULL OR history_uuid = '')", false);
+                    }
+                }
+                if (webapp_column_is_nullable($post_revision, 'history_uuid')) {
+                    sql_query("ALTER TABLE `{$post_revision}` MODIFY COLUMN `history_uuid` CHAR(36) NOT NULL", false);
+                    $changed = true;
+                }
+            }
+
+            if (webapp_index_exists($post_revision, 'uniq_post_revision_no')) {
+                sql_query("ALTER TABLE `{$post_revision}` DROP INDEX `uniq_post_revision_no`", false);
+                $changed = true;
+            }
+            if (webapp_index_exists($post_revision, 'idx_post_revision_post')) {
+                sql_query("ALTER TABLE `{$post_revision}` DROP INDEX `idx_post_revision_post`", false);
+                $changed = true;
+            }
+            if (!webapp_index_exists($post_revision, 'uniq_post_history_revision_no')) {
+                sql_query("ALTER TABLE `{$post_revision}` ADD UNIQUE KEY `uniq_post_history_revision_no`
+                           (`bo_table`, `wr_id`, `history_uuid`, `rev_no`)", false);
+                $changed = true;
+            }
+            if (!webapp_index_exists($post_revision, 'idx_post_revision_active')) {
+                sql_query("ALTER TABLE `{$post_revision}` ADD KEY `idx_post_revision_active`
+                           (`bo_table`, `wr_id`, `archived_at`, `rev_id`)", false);
+                $changed = true;
+            }
+            if (!webapp_index_exists($post_revision, 'idx_post_revision_archive')) {
+                sql_query("ALTER TABLE `{$post_revision}` ADD KEY `idx_post_revision_archive`
+                           (`archived_at`, `bo_table`, `rev_id`)", false);
+                $changed = true;
+            }
+            if (!webapp_index_exists($post_revision, 'idx_post_revision_history')) {
+                sql_query("ALTER TABLE `{$post_revision}` ADD KEY `idx_post_revision_history`
+                           (`history_uuid`, `archived_at`, `rev_no`)", false);
+                $changed = true;
+            }
+        }
 
         // =====================================================================
         // 2) g5_push_token — Expo Push 토큰
@@ -228,10 +341,21 @@ if (!function_exists('webapp_admin_dbupgrade')) {
                 `push_token` VARCHAR(255) NOT NULL,
                 `platform` ENUM('android','ios','web') NOT NULL DEFAULT 'android',
                 `last_used_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `registered_at` DATETIME NULL DEFAULT NULL COMMENT '앱이 마지막으로 등록한 시각 — 발송 성공으로는 안 바뀐다',
                 UNIQUE KEY `uniq_token` (`push_token`),
                 INDEX `idx_mb_id` (`mb_id`),
                 INDEX `idx_last_used` (`last_used_at`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci", false);
+            $changed = true;
+        }
+
+        // 앱이 토큰을 등록한 시각(2026-10). last_used_at 은 발송 성공에도 올라가서, 늦게 온 receipt 가
+        // DeviceNotRegistered 일 때 "그 뒤에 다시 등록된 토큰인지" 가를 수 없다(PushQueue::checkReceipts).
+        if (webapp_table_exists($push_token) && !webapp_column_exists($push_token, 'registered_at')) {
+            sql_query("ALTER TABLE `{$push_token}` ADD COLUMN `registered_at` DATETIME NULL DEFAULT NULL AFTER `last_used_at`", false);
+            // 기존 행은 마지막 사용 시각으로 채운다 — NULL 이면 "발송 전 등록"으로 보고 지우므로, 배포 직후 24시간 동안
+            // 이미 다시 등록된 토큰까지 지울 수 있다. last_used_at 은 발송으로도 올라가 덜 지우는 쪽으로 기운다(의도).
+            sql_query("UPDATE `{$push_token}` SET `registered_at` = `last_used_at` WHERE `registered_at` IS NULL", false);
             $changed = true;
         }
 
@@ -414,12 +538,24 @@ if (!function_exists('webapp_admin_dbupgrade')) {
                 `next_attempt_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 `processed_at` DATETIME NULL DEFAULT NULL,
+                `ticket_id`    VARCHAR(64) NULL DEFAULT NULL COMMENT 'Expo push ticket id — 나중에 receipt 로 실제 전달 결과를 확인',
+                `receipt_checked_at` DATETIME NULL DEFAULT NULL,
                 KEY `idx_pending_next` (`status`, `next_attempt_at`, `queue_id`),
+                KEY `idx_receipt` (`status`, `receipt_checked_at`, `processed_at`),
                 KEY `idx_claim_token` (`claim_token`),
                 KEY `idx_mb_id` (`mb_id`),
                 KEY `idx_nt_id` (`nt_id`),
                 KEY `idx_processed_at` (`processed_at`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci", false);
+            $changed = true;
+        }
+        // Expo receipt 확인용 컬럼(2026-10). ticket 이 ok 여도 FCM 단계에서 버려질 수 있어
+        // (예: 기기 토큰 무효) 발송 15분 뒤 receipt 를 물어 실제 결과를 남긴다.
+        if (webapp_table_exists($push_queue) && !webapp_column_exists($push_queue, 'ticket_id')) {
+            sql_query("ALTER TABLE `{$push_queue}`
+                ADD COLUMN `ticket_id` VARCHAR(64) NULL DEFAULT NULL AFTER `processed_at`,
+                ADD COLUMN `receipt_checked_at` DATETIME NULL DEFAULT NULL AFTER `ticket_id`,
+                ADD KEY `idx_receipt` (`status`, `receipt_checked_at`, `processed_at`)", false);
             $changed = true;
         }
 

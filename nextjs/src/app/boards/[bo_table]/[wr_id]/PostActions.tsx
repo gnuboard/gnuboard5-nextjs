@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Bookmark } from "lucide-react";
+import { PostRevisionHistoryDialog } from "@/components/boards/post-history/PostRevisionHistoryDialog";
 import { apiClient } from "@/lib/api";
 import { g5ShortHref } from "@/lib/g5-short-url";
 import { useAuthStore } from "@/store/auth";
@@ -42,6 +43,7 @@ export function PostActions({ boTable, wrId, post, mode = "buttons" }: PostActio
   // 권한은 서버가 그누보드 표준(cf_admin/gr_admin/bo_admin/owner)으로 계산해 내려준다.
   // 비로그인 시 user는 null이라 명시적으로 false 가드.
   const canManage = !!user && !!post.can_manage;
+  const canViewHistory = !!user && !!post.can_view_history;
   const toggleScrap = async () => {
     if (!user) {
       toastError("로그인 후 스크랩할 수 있습니다.");
@@ -178,6 +180,7 @@ export function PostActions({ boTable, wrId, post, mode = "buttons" }: PostActio
           </AlertDialog>
         </>
       )}
+      {canViewHistory && <PostRevisionHistoryDialog boTable={boTable} wrId={wrId} />}
     </div>
   );
 }

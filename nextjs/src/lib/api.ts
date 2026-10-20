@@ -301,7 +301,8 @@ class ApiClient {
         res.status,
         koreanApiFieldErrors(data.errors as Record<string, string | string[]> | undefined, res.status),
         data.message,
-        typeof rawCode === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(rawCode) ? rawCode : undefined
+        typeof rawCode === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(rawCode) ? rawCode : undefined,
+        data.errors
       );
     }
 
@@ -377,13 +378,16 @@ export class ApiError extends Error {
   rawMessage?: string;
   /** 서버가 errors.code 로 준 기계용 오류 코드(예: EMAIL_NOT_VERIFIED). */
   code?: string;
+  /** 화면용 오류 문구로 번역하기 전의 기계용 세부 값(예: 변경 번호). */
+  rawErrors?: Record<string, string>;
 
-  constructor(message: string, status: number, errors?: Record<string, string>, rawMessage?: string, code?: string) {
+  constructor(message: string, status: number, errors?: Record<string, string>, rawMessage?: string, code?: string, rawErrors?: Record<string, string>) {
     super(message);
     this.status = status;
     this.errors = errors;
     this.rawMessage = rawMessage;
     this.code = code;
+    this.rawErrors = rawErrors;
   }
 }
 

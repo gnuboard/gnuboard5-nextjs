@@ -63,6 +63,18 @@ $processed = $result['processed'];
 $sentOk    = $result['ok'];
 $failed    = $result['err'];
 
+// 15분 전에 보낸 것들의 실제 전달 결과(receipt). 무효 토큰은 여기서 지워진다.
+try {
+    $receipts = PushQueue::checkReceipts(1000, 900, 'worker_logf');
+    if ($receipts['checked'] > 0 || $receipts['waiting'] > 0) {
+        worker_logf("receipts: checked=%d ok=%d dead_token=%d failed=%d waiting=%d",
+            $receipts['checked'], $receipts['ok'], $receipts['dead'], $receipts['failed'], $receipts['waiting']);
+    }
+    $failed += $receipts['dead'] + $receipts['failed'];
+} catch (\Throwable $e) {
+    worker_logf("receipts check error: %s", $e->getMessage());
+}
+
 $stats = PushQueue::stats();
 worker_logf("=== process_push_queue done. processed=%d ok=%d err=%d ===", $processed, $sentOk, $failed);
 worker_logf("queue stats: pending=%d processing=%d sent=%d failed=%d",

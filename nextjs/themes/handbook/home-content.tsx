@@ -6,6 +6,7 @@ import { g5ShortHref } from "@/lib/g5-short-url";
 import { formatDate } from "@/lib/utils";
 import { useHandbookDocs, useHandbookHomeTexts } from "./docs-context";
 import { docsIndexPath, type DocsBook, type DocsChapter } from "./docs-nav";
+import { EditPencil } from "./settings-editor/edit-buttons";
 
 const RECENT_COUNT = 5;
 
@@ -39,6 +40,8 @@ function Hero({
 }) {
   return (
     <section className="doc-hero" aria-labelledby="hero-heading">
+      {/* 최고관리자에게만 — 첫 화면 제목 · 소개를 고치는 편집 창(사이트 문구 탭). */}
+      <EditPencil tab="site" label="첫 화면 제목 · 소개 수정" className="is-corner" />
       <span className="doc-eyebrow">
         <BookOpen size={13} aria-hidden />
         매뉴얼
@@ -77,7 +80,8 @@ function BookSection({ books }: { books: DocsBook[] }) {
 
   return (
     <section className="doc-section" aria-labelledby="books-heading">
-      <div className="doc-section-head">
+      <div className="doc-section-head doc-edit-anchor">
+        <EditPencil tab="docs" label="매뉴얼 목록 · 순서 수정" className="is-corner" />
         <span className="doc-section-eyebrow">CONTENTS</span>
         <h2 id="books-heading" className="doc-section-title">
           어느 쪽부터 읽을까요

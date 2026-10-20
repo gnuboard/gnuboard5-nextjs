@@ -196,6 +196,8 @@ export interface Post {
   // 단건 조회 응답에만 포함. 그누보드 표준 권한(cf_admin/gr_admin/bo_admin/owner) 결과.
   can_manage?: boolean;
   admin_role?: 'super' | 'group' | 'board' | '';
+  /** 매뉴얼 그룹 글의 이력을 볼 수 있는 게시판 관리자 권한. 서버가 게시판별로 판정한다. */
+  can_view_history?: boolean;
   is_scrapped?: boolean;
   scrap_id?: number;
 }

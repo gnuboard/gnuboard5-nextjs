@@ -93,7 +93,7 @@ export function SoluneHomeClient({ config, initialHome, initialExtras }: SoluneH
     };
   }, []);
 
-  const columns = home.boardPosts.slice(0, BOARD_PANEL_LIMIT);
+  const columns = home.boardPosts.filter((column) => column.posts.length > 0).slice(0, BOARD_PANEL_LIMIT);
   const rewriteMode = home.bbsRewriteMode;
   const { comments, faqs, poll, gallery, popularKeywords, visit } = extras;
   const waiting = (part: HomePart) => !done.has(part);

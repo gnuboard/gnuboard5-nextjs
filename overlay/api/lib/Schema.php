@@ -18,7 +18,7 @@ if (!defined('_GNUBOARD_')) exit;
 class Schema
 {
     /** 이 값이 바뀌면 표식이 무효가 되어 다음 요청에서 다시 점검한다. */
-    const VERSION = '2026-10-13.1'; // 테마 설정 표 theme_setting (이전: 표 정리용 인덱스 notification_log.idx_read_sent · push_token.idx_last_used) (이전: 에디터 이미지 예전 정보 파일 .meta.json → .meta.php) (이전: content_report.hide_prev_option · hide_prev_wr10, 신고 기각 뒤 되돌리기) (이전: member_pref.notify_dday 는 plugin/dday · plugin/baby 가 만든다) (이전: session_family · revoked_remotely) (이전: social_apple_token SC-11, web_ticket, SC-16, SC-07)
+    const VERSION = '2026-10-16.3'; // 푸시 receipt 컬럼(push_queue.ticket_id · receipt_checked_at, push_token.registered_at)
 
     /**
      * 테이블 키 → 그 키를 등록하는 extend 파일. 키가 없으면 어떤 파일이 빠졌는지 안내한다.
@@ -36,6 +36,7 @@ class Schema
         'account_deletion_request_table' => 'plugin/webapp/notify/tables.php',
         'member_public_key_table'        => 'plugin/webapp/notify/tables.php',
         'theme_setting_table'            => 'plugin/webapp/notify/tables.php',
+        'post_revision_table'            => 'plugin/webapp/notify/tables.php',
     );
 
     /**

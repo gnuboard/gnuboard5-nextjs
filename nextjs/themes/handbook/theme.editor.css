@@ -1,0 +1,441 @@
+/* 화면 설정 편집 — 최고관리자에게만 보이는 위쪽 바 단추 · 영역별 연필 · 편집 창(settings-editor/*).
+   색은 --doc-* 토큰만 쓴다(theme.tokens.css) — 다크 모드가 같이 따라온다. */
+
+/* .doc-icon-btn 은 inline-grid 라 아이콘과 글자가 위아래로 쌓인다 — 이 단추만 가로로 놓는다. */
+.doc-edit-topbar {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  gap: 0.35rem;
+  padding-inline: 0.55rem;
+  color: var(--doc-accent-strong);
+  border-color: color-mix(in oklab, var(--doc-accent) 35%, var(--doc-border));
+  background: var(--doc-accent-soft);
+}
+
+.doc-edit-topbar-text {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+/* 좁은 화면은 아이콘만. */
+@media (max-width: 767px) {
+  .doc-edit-topbar {
+    width: 2.25rem;
+    padding-inline: 0;
+  }
+  .doc-edit-topbar-text {
+    display: none;
+  }
+}
+
+.doc-edit-pencil {
+  display: inline-grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  flex-shrink: 0;
+  border: 1px dashed color-mix(in oklab, var(--doc-accent) 55%, transparent);
+  border-radius: var(--doc-radius-pill);
+  background: var(--doc-surface);
+  color: var(--doc-accent-strong);
+  vertical-align: middle;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.doc-edit-pencil:hover {
+  background: var(--doc-accent-soft);
+  transform: scale(1.06);
+}
+
+.doc-edit-pencil:focus-visible,
+.doc-edit-topbar:focus-visible,
+.doc-editor-tab:focus-visible {
+  outline: 2px solid var(--doc-accent);
+  outline-offset: 2px;
+}
+
+/* 영역 모서리에 띄워 두는 연필 — 부모에 position: relative 가 있어야 한다. */
+.doc-edit-pencil.is-corner {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 2;
+}
+
+.doc-edit-pencil.is-inline {
+  margin-left: 0.4rem;
+}
+
+/* 연필을 모서리에 띄울 영역(매뉴얼 목록 머리 · 바닥글). */
+.doc-edit-anchor {
+  position: relative;
+}
+
+/* 휴대폰 — 최고관리자에게 "화면 설정" 단추가 하나 더 생겨 로고 글자가 두 줄로 꺾였다. 그때만 "docs" 표시를 뺀다. */
+@media (max-width: 479px) {
+  .doc-topbar:has(.doc-edit-topbar) .doc-brand-badge {
+    display: none;
+  }
+}
+
+/* 사이드바 아래의 글자 단추 묶음. */
+.doc-edit-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.75rem 0 0.25rem;
+  padding: 0.6rem;
+  border: 1px dashed color-mix(in oklab, var(--doc-accent) 45%, var(--doc-border));
+  border-radius: var(--doc-radius-md);
+}
+
+.doc-edit-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--doc-radius-pill);
+  background: var(--doc-accent-soft);
+  color: var(--doc-accent-strong);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.doc-edit-link:hover {
+  background: color-mix(in oklab, var(--doc-accent) 18%, var(--doc-surface));
+}
+
+.doc-edit-link:focus-visible {
+  outline: 2px solid var(--doc-accent);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- 편집 창 */
+
+/* margin: auto — Tailwind 의 초기화(* { margin: 0 })가 <dialog> 의 기본 가운데 정렬을 지운다. */
+.doc-editor {
+  width: min(44rem, calc(100vw - 1.5rem));
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--doc-border);
+  border-radius: var(--doc-radius-xl);
+  background: var(--doc-surface);
+  color: var(--doc-body);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.doc-editor::backdrop {
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.doc-editor-box {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 2rem);
+}
+
+.doc-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem 0.5rem;
+}
+
+.doc-editor-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--doc-ink);
+}
+
+.doc-editor-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0 1.25rem;
+  border-bottom: 1px solid var(--doc-border);
+  overflow-x: auto;
+}
+
+.doc-editor-tab {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 2px solid transparent;
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--doc-muted);
+}
+
+.doc-editor-tab[aria-selected="true"] {
+  border-bottom-color: var(--doc-accent);
+  color: var(--doc-accent-strong);
+}
+
+/* 휴대폰 — 네 탭이 한 줄에 들어가게 여백을 줄인다. */
+@media (max-width: 479px) {
+  .doc-editor-tabs {
+    padding-inline: 0.75rem;
+    gap: 0;
+  }
+  .doc-editor-tab {
+    padding-inline: 0.5rem;
+    font-size: 0.85rem;
+  }
+}
+
+.doc-editor-body {
+  flex: 1;
+  min-height: 12rem;
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+}
+
+.doc-editor-fields {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.doc-editor-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.doc-editor-field > label,
+.doc-editor-row > legend {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--doc-ink);
+}
+
+.doc-editor-where {
+  margin-left: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--doc-muted);
+}
+
+.doc-editor-help {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--doc-muted);
+}
+
+.doc-editor-note {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border-left: 3px solid var(--doc-accent);
+  border-radius: var(--doc-radius-sm);
+  background: var(--doc-accent-soft);
+  font-size: 0.85rem;
+  color: var(--doc-body);
+}
+
+.doc-editor-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--doc-border);
+  border-radius: var(--doc-radius-md);
+}
+
+.doc-editor-row > legend {
+  float: left;
+  padding: 0;
+}
+
+/* 보이기 · 숨기기 — 라디오는 화면 밖(sr-only)이라 키보드 포커스를 단추 모양 라벨에 그린다. */
+.doc-editor-row .join label:focus-within {
+  outline: 2px solid var(--doc-accent);
+  outline-offset: 2px;
+  z-index: 1;
+}
+
+.doc-editor-table-wrap {
+  display: grid;
+  gap: 0.5rem;
+  overflow-x: auto;
+}
+
+.doc-editor-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.doc-editor-table th {
+  padding: 0.4rem;
+  border-bottom: 1px solid var(--doc-border);
+  text-align: left;
+  font-weight: 700;
+  color: var(--doc-ink);
+}
+
+.doc-editor-table td {
+  padding: 0.4rem;
+  border-bottom: 1px solid var(--doc-border);
+  vertical-align: top;
+}
+
+.doc-editor-table td .doc-editor-where {
+  display: block;
+  margin: 0.2rem 0 0;
+}
+
+/* 장 순서 */
+.doc-editor-chapters,
+.doc-editor-chapters ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doc-editor-part + .doc-editor-part {
+  margin-top: 0.75rem;
+}
+
+.doc-editor-part-name {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--doc-muted);
+}
+
+.doc-editor-chapter {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: var(--doc-radius-sm);
+}
+
+.doc-editor-chapter:hover {
+  background: var(--doc-surface-muted);
+}
+
+.doc-editor-chapter-no {
+  width: 1.8rem;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  color: var(--doc-muted);
+}
+
+.doc-editor-chapter-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  color: var(--doc-ink);
+}
+
+.doc-editor-move {
+  width: 1.9rem;
+  height: 1.9rem;
+}
+
+.doc-editor-move:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.doc-editor-inline-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.doc-editor-error,
+.doc-editor-done {
+  margin: 0 1.25rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--doc-radius-sm);
+  font-size: 0.85rem;
+}
+
+.doc-editor-fields .doc-editor-error,
+.doc-editor-fields .doc-editor-done {
+  margin: 0;
+}
+
+.doc-editor-error {
+  background: color-mix(in oklab, #dc2626 12%, var(--doc-surface));
+  color: color-mix(in oklab, #dc2626 70%, var(--doc-ink));
+}
+
+.doc-editor-done {
+  background: color-mix(in oklab, #16a34a 12%, var(--doc-surface));
+  color: color-mix(in oklab, #16a34a 65%, var(--doc-ink));
+}
+
+.doc-editor-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 1.25rem 0;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--doc-border-strong);
+  border-radius: var(--doc-radius-md);
+  background: var(--doc-surface-muted);
+  font-size: 0.88rem;
+  color: var(--doc-ink);
+}
+
+.doc-editor-confirm > span {
+  flex: 1;
+}
+
+.doc-editor-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem 1rem;
+  border-top: 1px solid var(--doc-border);
+}
+
+.doc-editor-spacer {
+  flex: 1;
+}
+
+.doc-editor-adminlink {
+  font-size: 0.82rem;
+  color: var(--doc-accent-strong);
+  text-decoration: underline;
+}
+
+/* 저장 알림 — 화면 아래 가운데. 비었으면 보이지 않는다. */
+.doc-editor-notice {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  z-index: 60;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 2rem);
+  padding: 0.65rem 1rem;
+  border-radius: var(--doc-radius-md);
+  background: var(--doc-ink);
+  color: var(--doc-surface);
+  font-size: 0.88rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-card-hover);
+}
+
+.doc-editor-notice:empty {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .doc-edit-pencil {
+    transition: none;
+  }
+  .doc-edit-pencil:hover {
+    transform: none;
+  }
+}

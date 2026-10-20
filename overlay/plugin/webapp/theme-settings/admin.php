@@ -61,7 +61,11 @@ if (!function_exists('webapp_theme_settings_board_updates')) {
      * 화면에서 보낸 게시판별 출력 순서 · 제목을 고칠 값으로 정리한다. $allowed(저장 전 매뉴얼 그룹의 게시판) 밖은 버린다.
      * 빈 제목은 고치지 않는다(게시판 제목을 지우지 않게).
      *
-     * @return array<string, array{order:int, subject?:string}>
+     * 화면이 처음에 보였던 값(orig_order · orig_subject)을 함께 보내면 그 값과 같은 칸은 고치지 않는다 — 화면을 연 사이
+     * 다른 곳(게시판관리 · 다른 관리자)에서 고친 제목 · 순서를, 이 화면에서 손대지 않았는데 예전 값으로 되돌리지 않게.
+     * 바꿀 칸이 없는 게시판은 빠진다.
+     *
+     * @return array<string, array{order?:int, subject?:string}>
      */
     function webapp_theme_settings_board_updates(array $posted, array $allowed): array
     {
@@ -77,7 +81,16 @@ if (!function_exists('webapp_theme_settings_board_updates')) {
             if ($subject !== '') {
                 $update['subject'] = $subject;
             }
-            $out[$table] = $update;
+            if (array_key_exists('orig_order', $row) && $update['order'] === max(0, min(9999, (int) $row['orig_order']))) {
+                unset($update['order']);
+            }
+            if (isset($update['subject']) && array_key_exists('orig_subject', $row)
+                && $update['subject'] === webapp_theme_settings_text($row['orig_subject'], 255)) {
+                unset($update['subject']);
+            }
+            if ($update !== array()) {
+                $out[$table] = $update;
+            }
         }
         return $out;
     }
@@ -137,54 +150,27 @@ if (!function_exists('webapp_theme_settings_request_handler')) {
             $post = array_map_deep('stripslashes', $_POST);
 
             // 장 순서 저장(chapters.php) — 매뉴얼 그룹의 게시판만. 설정 저장과 따로 보내는 폼이다.
-            if (($post['mode'] ?? '') === 'chapters' && function_exists('webapp_theme_settings_reorder_chapters')) {
+            if (($post['mode'] ?? '') === 'chapters') {
                 $board = (string) ($post['chapters_board'] ?? '');
-                $current = webapp_theme_settings_load($theme)['settings'];
-                $chapter_board = webapp_theme_settings_chapter_board($board, webapp_theme_settings_group_boards($current['docs']['group']));
-                if ($chapter_board === null) {
-                    alert('매뉴얼 그룹의 게시판이 아닙니다.');
-                }
                 $orders = isset($post['chapter_order']) && is_array($post['chapter_order']) ? $post['chapter_order'] : array();
-                $error = webapp_theme_settings_reorder_chapters($board, $chapter_board['category_list'], $orders);
-                if ($error !== '') {
-                    alert($error);
+                $saved = webapp_theme_settings_update_chapters($theme, $board, $orders, (string) $member['mb_id']);
+                if ($saved['error'] !== '') {
+                    alert($saved['error']);
                 }
-                // 변경 번호를 올려 화면의 목차 캐시(브라우저 sessionStorage 열쇠)를 버리게 한다 — 설정 값은 그대로 다시 저장.
-                webapp_theme_settings_save($theme, $current, (string) $member['mb_id']);
                 goto_url(G5_ADMIN_URL . '/view.php?call=theme_settings&chapters=' . rawurlencode($board) . '&saved=chapters#ts-chapters');
             }
 
-            // 고칠 수 있는 게시판은 저장 전 그룹(화면에 보였던 목록)의 게시판뿐 — 그룹을 바꾸는 저장에서 새 그룹 게시판을 건드리지 않게.
-            $before = webapp_theme_settings_load($theme)['settings']['docs']['group'];
-            $allowed = array_map(static function ($row) { return (string) $row['bo_table']; }, webapp_theme_settings_group_boards($before));
-
-            $input = array(
-                'docs' => isset($post['docs']) && is_array($post['docs']) ? $post['docs'] : array(),
-                'sidebar' => isset($post['sidebar']) && is_array($post['sidebar']) ? $post['sidebar'] : array(),
-                'site' => isset($post['site']) && is_array($post['site']) ? $post['site'] : array(),
-            );
-            if (webapp_theme_settings_save($theme, $input, (string) $member['mb_id']) === 0) {
-                alert('저장하지 못했습니다. DB 업그레이드(/adm/dbupgrade.php)를 한 번 열어 표를 만든 뒤 다시 저장해 주세요.');
-            }
-
+            // 설정 · 매뉴얼 게시판 순서와 제목(service.php — 화면 편집 API 와 같은 저장).
             $boards = isset($post['boards']) && is_array($post['boards']) ? $post['boards'] : array();
-            foreach (webapp_theme_settings_board_updates($boards, $allowed) as $table => $update) {
-                $set = "bo_order = '" . (int) $update['order'] . "'";
-                if (isset($update['subject'])) {
-                    $set .= ", bo_subject = '" . sql_real_escape_string($update['subject']) . "'";
-                }
-                sql_query("UPDATE `{$g5['board_table']}` SET {$set} WHERE bo_table = '" . sql_real_escape_string($table) . "'", false);
+            $saved = webapp_theme_settings_update($theme, $post, $boards, (string) $member['mb_id']);
+            if ($saved['error'] !== '') {
+                alert($saved['error']);
             }
-
             goto_url(G5_ADMIN_URL . '/view.php?call=theme_settings&saved=1');
         }
 
         $loaded = webapp_theme_settings_load($theme);
-        $groups = array();
-        $result = sql_query("SELECT gr_id, gr_subject FROM `{$g5['group_table']}` ORDER BY gr_order, gr_id", false);
-        while ($result && ($row = sql_fetch_array($result))) {
-            $groups[] = $row;
-        }
+        $groups = webapp_theme_settings_groups();
         $group_boards = webapp_theme_settings_group_boards($loaded['settings']['docs']['group']);
         webapp_theme_settings_admin_state(array(
             'theme' => $theme,
@@ -256,8 +242,11 @@ if (!function_exists('webapp_theme_settings_admin_html')) {
                 . '<th scope="col">출력 순서</th><th scope="col">매뉴얼 이름(게시판 제목)</th><th scope="col">안내 문구</th><th scope="col">장</th></tr></thead><tbody>';
             foreach ($boards as $row) {
                 $table = (string) $row['bo_table'];
-                $out .= '<tr><td class="td_num"><input type="number" min="0" max="9999" name="boards[' . $h($table) . '][order]" value="' . (int) $row['bo_order'] . '" class="tbl_input" size="4"></td>'
-                    . '<td><input type="text" name="boards[' . $h($table) . '][subject]" value="' . $h($row['bo_subject']) . '" class="tbl_input full_input" maxlength="255"> <span class="frm_info">' . $h($table) . '</span></td>'
+                // orig_* — 처음 보인 값. 고치지 않은 칸은 저장하지 않는다(webapp_theme_settings_board_updates).
+                $out .= '<tr><td class="td_num"><input type="number" min="0" max="9999" name="boards[' . $h($table) . '][order]" value="' . (int) $row['bo_order'] . '" class="tbl_input" size="4">'
+                    . '<input type="hidden" name="boards[' . $h($table) . '][orig_order]" value="' . (int) $row['bo_order'] . '"></td>'
+                    . '<td><input type="text" name="boards[' . $h($table) . '][subject]" value="' . $h($row['bo_subject']) . '" class="tbl_input full_input" maxlength="255">'
+                    . '<input type="hidden" name="boards[' . $h($table) . '][orig_subject]" value="' . $h($row['bo_subject']) . '"> <span class="frm_info">' . $h($table) . '</span></td>'
                     . '<td><input type="text" name="docs[hints][' . $h($table) . ']" value="' . $h($hints[$table] ?? '') . '" class="tbl_input full_input" maxlength="100" placeholder="비우면 제목의 &quot;안내 · 이름&quot;에서"></td>'
                     . '<td class="td_num">' . (int) $row['bo_count_write']
                     . ' <a href="' . $h(G5_ADMIN_URL . '/view.php?call=theme_settings&chapters=' . rawurlencode($table)) . '#ts-chapters">순서</a></td></tr>';

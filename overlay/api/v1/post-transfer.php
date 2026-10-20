@@ -59,10 +59,12 @@ if (!$threads) {
     Response::error('선택한 게시글을 찾을 수 없습니다.', 404);
 }
 
+$GLOBALS['webapp_post_history_transfer_source'] = $bo_table;
 $result = api_post_transfer_run($member, $board, $mode, $threads, $targets);
 
 api_call_core('delete_cache_latest', array($bo_table), $member);
 api_run_event('bbs_move_update', array($bo_table, array_column($targets, 'bo_table'), implode(',', $wrIds), ''), $member);
+unset($GLOBALS['webapp_post_history_transfer_source']);
 
 Response::success([
     'mode' => $mode,

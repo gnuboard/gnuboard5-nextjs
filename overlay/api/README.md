@@ -7,7 +7,7 @@ files:
 ```text
 G5_CORS_ALLOWED_ORIGINS=https://your-project.vercel.app,https://gnuboard5-nextjs-greenhub.vercel.app
 G5_SOCIAL_WEB_HOSTS=your-project.vercel.app,gnuboard5-nextjs-greenhub.vercel.app
-G5_SOCIAL_MOBILE_SCHEMES=dday-app
+G5_SOCIAL_MOBILE_SCHEMES=dday-app,sirsoft-g5,g5manual
 ```
 
 Use comma-separated origins for multiple frontends:
@@ -33,7 +33,7 @@ For the split Vercel theme projects used by this package, the file should look l
 ```text
 G5_CORS_ALLOWED_ORIGINS=https://your-project.vercel.app,https://gnuboard5-nextjs-greenhub.vercel.app,http://localhost,http://localhost,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:3003,http://localhost:3000
 G5_SOCIAL_WEB_HOSTS=your-project.vercel.app,gnuboard5-nextjs-greenhub.vercel.app
-G5_SOCIAL_MOBILE_SCHEMES=dday-app
+G5_SOCIAL_MOBILE_SCHEMES=dday-app,sirsoft-g5,g5manual
 ```
 
 For a split HTTPS deployment where the Next.js app and PHP API are on different

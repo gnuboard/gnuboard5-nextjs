@@ -144,16 +144,175 @@ class PushQueue
         }
     }
 
-    /** 작업을 sent 로 마크. */
-    public static function markSent(int $queueId): void
+    /** 작업을 sent 로 마크. ticket id 가 있으면 나중에 receipt 로 실제 전달 결과를 확인한다. */
+    public static function markSent(int $queueId, ?string $ticketId = null): void
     {
         $table = DB::table('push_queue_table');
+        if ($ticketId !== null && $ticketId !== '' && self::hasReceiptColumns()) {
+            DB::execute(
+                "UPDATE `{$table}`
+                    SET status = 'sent', processed_at = NOW(), last_error = NULL, ticket_id = ?
+                  WHERE queue_id = ?",
+                [mb_substr($ticketId, 0, 64), $queueId]
+            );
+            return;
+        }
         DB::execute(
             "UPDATE `{$table}`
                 SET status = 'sent', processed_at = NOW(), last_error = NULL
               WHERE queue_id = ?",
             [$queueId]
         );
+    }
+
+    /** receipt 확인 컬럼이 있는가 — DB 업그레이드 전에도 발송은 깨지지 않게. 요청마다 한 번만 본다. */
+    private static ?bool $receiptColumns = null;
+    public static function hasReceiptColumns(): bool
+    {
+        if (self::$receiptColumns === null) {
+            try {
+                $table = DB::table('push_queue_table');
+                self::$receiptColumns = (bool) DB::fetch("SHOW COLUMNS FROM `{$table}` LIKE 'ticket_id'");
+            } catch (\Throwable $e) {
+                self::$receiptColumns = false;
+            }
+        }
+        return self::$receiptColumns;
+    }
+
+    /** Expo 가 receipt 를 지우기 전(24시간)까지만 물어본다. */
+    public const RECEIPT_TTL_SECONDS = 86400;
+
+    /** push_token 에 registered_at 이 있는가 — 없으면 무효 토큰을 지우지 않는다(다시 등록된 토큰인지 모른다). */
+    private static ?bool $tokenRegisteredAt = null;
+    public static function hasTokenRegisteredAt(): bool
+    {
+        if (self::$tokenRegisteredAt === null) {
+            try {
+                $table = DB::table('push_token_table');
+                self::$tokenRegisteredAt = (bool) DB::fetch("SHOW COLUMNS FROM `{$table}` LIKE 'registered_at'");
+            } catch (\Throwable $e) {
+                self::$tokenRegisteredAt = false;
+            }
+        }
+        return self::$tokenRegisteredAt;
+    }
+
+    /**
+     * receipt 하나를 어떻게 처리할지 — 순수 함수(테스트용).
+     * @param array|null $receipt  getReceipts 응답의 그 ticket 항목. 아직 없으면 null.
+     * @param int        $ageSec   발송 뒤 지난 초
+     * @return array{action:string, error:?string}
+     *   action: 'wait'(아직 없음) | 'ok' | 'dead'(토큰 무효 — 토큰 삭제) | 'failed' | 'expired'(못 받고 만료)
+     */
+    public static function receiptDecision(?array $receipt, int $ageSec): array
+    {
+        if ($receipt === null) {
+            return $ageSec >= self::RECEIPT_TTL_SECONDS
+                ? ['action' => 'expired', 'error' => null]
+                : ['action' => 'wait', 'error' => null];
+        }
+        if (($receipt['status'] ?? '') === 'ok') {
+            return ['action' => 'ok', 'error' => null];
+        }
+        $code = (string) ($receipt['details']['error'] ?? '');
+        $message = (string) ($receipt['message'] ?? 'unknown');
+        $error = mb_substr('receipt: ' . ($code !== '' ? $code . ' - ' : '') . $message, 0, 255);
+        return ['action' => $code === 'DeviceNotRegistered' ? 'dead' : 'failed', 'error' => $error];
+    }
+
+    /**
+     * 발송(ticket ok) 뒤 minAgeSec 이 지난 작업의 receipt 를 물어 실제 결과를 남긴다.
+     * Expo 권장: 15분쯤 뒤에 묻고, 24시간 안에. ticket 이 ok 여도 FCM/APNs 단계에서 실패할 수 있다.
+     * @return array{checked:int, ok:int, dead:int, failed:int, waiting:int}
+     */
+    public static function checkReceipts(int $limit = 1000, int $minAgeSec = 900, ?callable $log = null): array
+    {
+        $result = ['checked' => 0, 'ok' => 0, 'dead' => 0, 'failed' => 0, 'waiting' => 0];
+        if (!self::hasReceiptColumns()) return $result;
+
+        $table = DB::table('push_queue_table');
+        $tokenTable = DB::table('push_token_table');
+        // receipt 는 24시간 뒤 사라진다. 그보다 오래된 미확인 행(ticket 이 없는 옛 행 포함)은 더 묻지 않고
+        // 한 번에 닫는다 — 매분 30일치 sent 행을 다시 훑지 않게.
+        $horizon = self::RECEIPT_TTL_SECONDS + 3600;
+        try {
+            DB::execute(
+                "UPDATE `{$table}` SET receipt_checked_at = NOW()
+                  WHERE status = 'sent' AND receipt_checked_at IS NULL
+                    AND processed_at < NOW() - INTERVAL ? SECOND
+                  LIMIT 1000",
+                [$horizon]
+            );
+        } catch (\Throwable $e) {
+            if ($log) $log('receipt expire sweep failed: ' . $e->getMessage());
+        }
+        $rows = DB::fetchAll(
+            "SELECT queue_id, expo_token, ticket_id, processed_at, TIMESTAMPDIFF(SECOND, processed_at, NOW()) AS age
+               FROM `{$table}`
+              WHERE status = 'sent' AND ticket_id IS NOT NULL AND receipt_checked_at IS NULL
+                AND processed_at <= NOW() - INTERVAL ? SECOND
+                AND processed_at >= NOW() - INTERVAL ? SECOND
+              ORDER BY queue_id ASC
+              LIMIT ?",
+            [$minAgeSec, $horizon, max(1, min(1000, $limit))]
+        );
+        if (!$rows) return $result;
+
+        $ch = curl_init('https://exp.host/--/api/v2/push/getReceipts');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode(['ids' => array_map(fn($r) => (string) $r['ticket_id'], $rows)]),
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
+            CURLOPT_TIMEOUT        => 15,
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr  = curl_error($ch);
+        unset($ch);
+        if ($curlErr || $httpCode !== 200) {
+            if ($log) $log('receipts request failed: ' . ($curlErr ?: "HTTP {$httpCode}"));
+            return $result; // 다음 실행에서 다시 묻는다
+        }
+        $parsed = json_decode((string) $response, true);
+        $receipts = is_array($parsed['data'] ?? null) ? $parsed['data'] : [];
+
+        foreach ($rows as $row) {
+            $receipt = $receipts[(string) $row['ticket_id']] ?? null;
+            $decision = self::receiptDecision(is_array($receipt) ? $receipt : null, (int) $row['age']);
+            $id = (int) $row['queue_id'];
+            try {
+                if ($decision['action'] === 'wait') {
+                    $result['waiting']++;
+                    continue;
+                }
+                if ($decision['action'] === 'ok' || $decision['action'] === 'expired') {
+                    DB::execute("UPDATE `{$table}` SET receipt_checked_at = NOW() WHERE queue_id = ?", [$id]);
+                    if ($decision['action'] === 'ok') $result['ok']++;
+                } else {
+                    if ($decision['action'] === 'dead' && self::hasTokenRegisteredAt()) {
+                        // 토큰이 FCM 에 없다 — 다만 이 발송 뒤에 앱이 같은 토큰을 다시 등록했으면 지우지 않는다.
+                        // (같은 설치본의 Expo 토큰은 문자열이 그대로라, 고친 뒤 다시 등록해도 고치기 전 발송의 receipt 가
+                        // 24시간 동안 DeviceNotRegistered 로 온다.) registered_at 이 없는 옛 행은 발송 전 등록으로 본다.
+                        DB::execute(
+                            "DELETE FROM {$tokenTable}
+                              WHERE push_token = ? AND (registered_at IS NULL OR registered_at <= ?)",
+                            [(string) $row['expo_token'], (string) $row['processed_at']]
+                        );
+                    }
+                    DB::execute(
+                        "UPDATE `{$table}` SET status = 'failed', last_error = ?, receipt_checked_at = NOW() WHERE queue_id = ?",
+                        [$decision['error'], $id]
+                    );
+                    $result[$decision['action'] === 'dead' ? 'dead' : 'failed']++;
+                }
+                $result['checked']++;
+            } catch (\Throwable $e) {
+                if ($log) $log("receipt update failed queue#{$id}: " . $e->getMessage());
+            }
+        }
+        return $result;
     }
 
     public static function markTransientFailure(int $queueId, string $error, int $delaySeconds = 300): void
@@ -456,7 +615,7 @@ class PushQueue
 
                 if ($status === 'ok') {
                     try {
-                        self::markSent((int) $j['queue_id']);
+                        self::markSent((int) $j['queue_id'], is_array($ticket) ? (string) ($ticket['id'] ?? '') : null);
                         DB::execute("UPDATE {$tokenTable} SET last_used_at = NOW() WHERE push_token = ?", [(string) $j['expo_token']]);
                         $sentOk++;
                     } catch (\Throwable $e) {}

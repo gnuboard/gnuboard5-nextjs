@@ -27,15 +27,30 @@ if ($apiMethod === 'POST') {
         : 'android';
 
     // ON DUPLICATE KEY UPDATE: 같은 token이 있으면 mb_id 매핑·platform·last_used_at 갱신.
-    DB::execute(
-        "INSERT INTO {$tokenTable} (mb_id, push_token, platform, last_used_at)
-         VALUES (?, ?, ?, NOW())
-         ON DUPLICATE KEY UPDATE
-            mb_id = VALUES(mb_id),
-            platform = VALUES(platform),
-            last_used_at = NOW()",
-        [$me['mb_id'], $token, $platform]
-    );
+    // registered_at 은 앱이 등록할 때만 바뀐다 — 늦게 온 receipt 가 다시 등록된 토큰을 지우지 않게(PushQueue::checkReceipts).
+    try {
+        DB::execute(
+            "INSERT INTO {$tokenTable} (mb_id, push_token, platform, last_used_at, registered_at)
+             VALUES (?, ?, ?, NOW(), NOW())
+             ON DUPLICATE KEY UPDATE
+                mb_id = VALUES(mb_id),
+                platform = VALUES(platform),
+                last_used_at = NOW(),
+                registered_at = NOW()",
+            [$me['mb_id'], $token, $platform]
+        );
+    } catch (\Throwable $e) {
+        // DB 업그레이드 전(registered_at 컬럼 없음) — 예전 방식으로 등록한다.
+        DB::execute(
+            "INSERT INTO {$tokenTable} (mb_id, push_token, platform, last_used_at)
+             VALUES (?, ?, ?, NOW())
+             ON DUPLICATE KEY UPDATE
+                mb_id = VALUES(mb_id),
+                platform = VALUES(platform),
+                last_used_at = NOW()",
+            [$me['mb_id'], $token, $platform]
+        );
+    }
 
     Response::success(['message' => 'registered'], 201);
 }

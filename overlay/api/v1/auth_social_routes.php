@@ -81,8 +81,9 @@ if ($action === 'social' && isset($apiSegments[1]) && $apiSegments[1] === 'provi
     }
 
     Response::success([
-        'enabled'   => $enabled,
-        'providers' => $providers,
+        'enabled'                => $enabled,
+        'providers'              => $providers,
+        'allowed_mobile_schemes' => nextjs25_social_allowed_mobile_schemes(),
     ]);
 }
 

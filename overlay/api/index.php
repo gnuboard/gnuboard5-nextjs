@@ -602,6 +602,7 @@ $handlers = [
     'auth'          => __DIR__ . '/v1/auth.php',
     'boards'        => __DIR__ . '/v1/boards.php',
     'board-files'   => __DIR__ . '/v1/board-files.php',
+    'board-file-downloads' => __DIR__ . '/v1/board-file-downloads.php', // 첨부 파일 받기(토큰 인증 — 앱)
     'editor-images' => __DIR__ . '/v1/editor-images.php',
     'posts'         => __DIR__ . '/v1/posts.php',
     'post-transfer' => __DIR__ . '/v1/post-transfer.php',
@@ -623,6 +624,7 @@ $handlers = [
     'upload'        => __DIR__ . '/v1/upload.php',
     'search'        => __DIR__ . '/v1/search.php',
     'settings'      => __DIR__ . '/v1/settings.php',
+    'theme-settings' => __DIR__ . '/v1/theme-settings.php',
     'status'        => __DIR__ . '/v1/status.php',
     'menus'         => __DIR__ . '/v1/menus.php',
     'content'       => __DIR__ . '/v1/content.php',
@@ -664,6 +666,7 @@ if (!function_exists('g5_api_session_free_read')) {
                 // 게시판 목록 · 게시판 하나 · 글 목록. 글 하나와 첨부 정리는 다른 경로다.
                 return $count <= 1 || ($count === 2 && $second === 'posts');
             case 'board-files':
+            case 'board-file-downloads':
             case 'faqs':
             case 'faq':
             case 'menus':

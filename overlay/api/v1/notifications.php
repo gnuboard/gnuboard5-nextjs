@@ -335,6 +335,27 @@ if (!$seg0 && $apiMethod === 'POST') {
         }
     }
 
+    // 서버 크론이 "모든 기기가 로컬로 울린다"며 이미 남긴 디데이 알림을, 앱이 켜져 있었거나 알림을 눌러 다시
+    // 올리면 같은 행으로 본다. 앱은 기기의 디데이 id 를 보내 서버 번호와 맞출 수 없어서 회원·제목·며칠 전
+    // 값으로 본다(plugin/dday/cron/send_dday_push.php 와 같은 기준, 2026-10-19). 앱이 보내는 시각은 울린
+    // 시각이 아니라 기록한 시각(알림을 누른 때, 오프라인 큐가 나중에 올린 때)이라 날짜가 다를 수 있어,
+    // 그 시각 앞뒤 48시간으로 본다 — 같은 디데이의 같은 "며칠 전" 알림은 한 주기에 한 번뿐이다.
+    if ($actor['kind'] === 'member' && $type === 'dday' && isset($data['notify_days']) && is_numeric($data['notify_days'])) {
+        $sameReminder = DB::fetch(
+            "SELECT nt_id, nt_type, nt_event, nt_title, nt_body, nt_data, nt_sent_at, nt_read_at
+               FROM {$logTable}
+              WHERE mb_id = ? AND nt_type = 'dday' AND nt_title = ?
+                AND ABS(TIMESTAMPDIFF(HOUR, nt_sent_at, ?)) <= 48
+                AND (CASE WHEN JSON_VALID(nt_data) THEN JSON_UNQUOTE(JSON_EXTRACT(nt_data, '$.notify_days')) END) = ?
+              ORDER BY nt_id DESC
+              LIMIT 1",
+            [$actor['mb_id'], (string) $input['nt_title'], $sentAt, (string) (int) $data['notify_days']]
+        );
+        if ($sameReminder) {
+            Response::success(api_notification_normalize($sameReminder), 200);
+        }
+    }
+
     $mb_id     = $actor['kind'] === 'member' ? $actor['mb_id']     : null;
     $device_id = $actor['kind'] === 'device' ? $actor['device_id'] : null;
 
