@@ -197,8 +197,13 @@ if (!function_exists('dday_nt_admin_menu')) {
             $whereSql = 'WHERE ' . implode(' AND ', $where);
 
             $totalCount = DB::readCount("SELECT COUNT(*) FROM `{$queueTable}` {$whereSql}", $params);
+            // 알림함에 남는 알림은 큐에 nt_id 만 두고 제목 · 본문은 알림 이력에 있다(큐의 nt_title 은 nt_id 없는 푸시만 채운다).
+            // 그래서 이 페이지의 큐 행에 알림 이력의 제목 · 본문을 붙인다 — 필터는 큐 열만 보므로 안쪽 조회에서 끝낸다.
             $rows = DB::readFetchAll(
-                "SELECT * FROM `{$queueTable}` {$whereSql} ORDER BY created_at DESC, queue_id DESC LIMIT ?, ?",
+                "SELECT q.*, l.nt_title AS log_title, l.nt_body AS log_body
+                   FROM (SELECT * FROM `{$queueTable}` {$whereSql} ORDER BY created_at DESC, queue_id DESC LIMIT ?, ?) q
+                   LEFT JOIN `{$logTable}` l ON l.nt_id = q.nt_id
+                  ORDER BY q.created_at DESC, q.queue_id DESC",
                 array_merge($params, array($offset, $perPage))
             );
         } else {
@@ -437,9 +442,13 @@ if (!function_exists('dday_nt_admin_menu')) {
             <?php } ?>
           </td>
           <td><?php echo htmlspecialchars((string) $r['nt_type']); ?></td>
+          <?php
+          $qTitle = (string) $r['nt_title'] !== '' ? (string) $r['nt_title'] : (isset($r['log_title']) ? (string) $r['log_title'] : '');
+          $qBody  = (string) $r['nt_body'] !== '' ? (string) $r['nt_body'] : (isset($r['log_body']) ? (string) $r['log_body'] : '');
+          ?>
           <td>
-            <strong><?php echo htmlspecialchars((string) $r['nt_title']); ?></strong>
-            <?php if ((string) $r['nt_body'] !== '') { ?><br><span class="muted"><?php echo htmlspecialchars((string) $r['nt_body']); ?></span><?php } ?>
+            <?php if ($qTitle !== '') { ?><strong><?php echo htmlspecialchars($qTitle); ?></strong><?php } else { ?><span class="muted">(내용 없음)</span><?php } ?>
+            <?php if ($qBody !== '') { ?><br><span class="muted"><?php echo htmlspecialchars($qBody); ?></span><?php } ?>
             <?php if (!empty($r['nt_id'])) { ?><br><span class="mono">알림#<?php echo (int) $r['nt_id']; ?></span><?php } ?>
           </td>
           <td class="mono"><?php echo htmlspecialchars(dday_nt_mask($r['expo_token'])); ?></td>

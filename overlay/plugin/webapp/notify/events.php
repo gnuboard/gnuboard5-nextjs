@@ -34,7 +34,7 @@ if (!function_exists('g5_webapp_notify_on_comment')) {
             return;
         }
         if ($w !== '' && $w !== 'c') {
-            return; // 수정(cu)·삭제는 알림 없음. '' 은 새 댓글, 'c' 는 댓글의 댓글.
+            return; // 수정(cu)·삭제는 알림 없음. 새 댓글은 'c'(댓글의 답글도 'c' — 그때는 $reply_array 에 부모 댓글이 실린다).
         }
         $bo_table = isset($board['bo_table']) ? (string) $board['bo_table'] : '';
         if ($bo_table === '') {
@@ -42,25 +42,63 @@ if (!function_exists('g5_webapp_notify_on_comment')) {
         }
         $write_table = $g5['write_prefix'] . $bo_table;
         $parent = sql_fetch("select mb_id, wr_subject from `{$write_table}` where wr_id = '" . (int) $wr_id . "' and wr_is_comment = 0");
-        $comment = sql_fetch("select wr_content, wr_name, mb_id from `{$write_table}` where wr_id = '" . (int) $comment_id . "'");
-        if (!$parent || !$comment || empty($parent['mb_id'])) {
+        $comment = sql_fetch("select wr_content, wr_name, wr_option, mb_id from `{$write_table}` where wr_id = '" . (int) $comment_id . "'");
+        if (!$parent || !$comment) {
             return;
         }
-        if ($parent['mb_id'] === (string) $comment['mb_id']) {
-            return; // 자기 글에 자기 댓글
+
+        // 문구는 API(api/v1/comments.php)와 같다 — 어느 화면에서 달아도 같은 알림이 간다.
+        //   내 글:   [자유게시판] "글 제목…"의 새 댓글        /  닉네임: 댓글 내용
+        //   내 댓글: [자유게시판] 내 댓글 "내 댓글…"의 답글   /  닉네임: 답글 내용(비밀 답글이면 가림)
+        $boardName = Notify::snippet(isset($board['bo_subject']) ? $board['bo_subject'] : '', 20);
+        if ($boardName === '') {
+            $boardName = $bo_table;
         }
-        Notify::emit(
-            'comment.created',
-            $parent['mb_id'],
-            '[' . $bo_table . '] 새 댓글',
-            mb_substr(strip_tags((string) $comment['wr_content']), 0, 80, 'UTF-8'),
-            array(
-                'bo_table'  => $bo_table,
-                'wr_id'     => (int) $wr_id,
-                'link'      => '/' . $bo_table . '/' . (int) $wr_id,
-                'commenter' => (string) $comment['wr_name'],
-            )
+        $commenterName = Notify::snippet(!empty($member['mb_nick']) ? $member['mb_nick'] : $comment['wr_name'], 20);
+        $commentText = Notify::snippet($comment['wr_content'], 80);
+        if ($commentText === '') {
+            $commentText = '(내용 없음)';
+        }
+        $notifyBody = $commenterName !== '' ? $commenterName . ': ' . $commentText : $commentText;
+        $commenterId = (string) $comment['mb_id'];
+        $postAuthorId = (string) $parent['mb_id'];
+        $notifyData = array(
+            'bo_table'   => $bo_table,
+            'wr_id'      => (int) $wr_id,
+            'comment_id' => (int) $comment_id,
+            'link'       => '/' . $bo_table . '/' . (int) $wr_id,
+            'commenter'  => (string) $comment['wr_name'],
         );
+
+        if ($postAuthorId !== '' && $postAuthorId !== $commenterId) {
+            $postTitle = Notify::snippet($parent['wr_subject'], 15);
+            Notify::emit(
+                'comment.created',
+                $postAuthorId,
+                $postTitle !== '' ? '[' . $boardName . '] "' . $postTitle . '"의 새 댓글' : '[' . $boardName . '] 내 글의 새 댓글',
+                $notifyBody,
+                $notifyData
+            );
+        }
+
+        // 댓글의 답글이면 그 댓글 작성자에게도 1건(본인 · 글쓴이와 같으면 생략 — 글쓴이는 위에서 이미 받았다).
+        // write_comment_update.php 는 답글일 때 $reply_array 에 부모 댓글 행을 싣는다.
+        $replyAuthorId = is_array($reply_array) && !empty($reply_array['wr_id']) && isset($reply_array['mb_id'])
+            ? (string) $reply_array['mb_id'] : '';
+        if ($replyAuthorId !== '' && $replyAuthorId !== $commenterId && $replyAuthorId !== $postAuthorId) {
+            $myComment = Notify::snippet(isset($reply_array['wr_content']) ? $reply_array['wr_content'] : '', 15);
+            // 비밀 댓글은 관리자 · 글쓴이 · 그 댓글 작성자만 본다(bbs/view_comment.php) — 원댓글 작성자는 아니므로 가린다.
+            $replyBody = strpos((string) $comment['wr_option'], 'secret') !== false
+                ? ($commenterName !== '' ? $commenterName . ': 비밀 답글입니다.' : '비밀 답글입니다.')
+                : $notifyBody;
+            Notify::emit(
+                'reply.created',
+                $replyAuthorId,
+                $myComment !== '' ? '[' . $boardName . '] 내 댓글 "' . $myComment . '"의 답글' : '[' . $boardName . '] 내 댓글의 답글',
+                $replyBody,
+                $notifyData
+            );
+        }
     }
 }
 

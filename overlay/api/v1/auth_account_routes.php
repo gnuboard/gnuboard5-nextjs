@@ -403,36 +403,7 @@ if ($action === 'register' && $apiMethod === 'POST') {
     // Public password registration must pass captcha. Social signup already has
     // a verified OAuth profile ticket and follows gnuboard's captcha-free flow.
     if (!$isSocialSignup) {
-        $captchaInput = isset($input['captcha_key']) ? trim((string) $input['captcha_key']) : '';
-        if ($captchaInput === '') {
-            Response::error('Validation failed.', 422, [
-                'captcha_key' => '자동등록방지 문자를 입력해주세요.',
-            ]);
-        }
-
-        $captchaCount = (int) get_session('ss_captcha_count');
-        if ($captchaCount > 5) {
-            Response::error('자동등록방지 시도 횟수를 초과했습니다. 새로고침해 주세요.', 429, [
-                'captcha_key' => '자동등록방지 새로고침이 필요합니다.',
-            ]);
-        }
-
-        $encryptedInput = $captchaInput;
-        if (function_exists('get_string_encrypt')) {
-            $ip = md5(sha1($_SERVER['REMOTE_ADDR']));
-            $encryptedInput = get_string_encrypt($ip . $captchaInput);
-        }
-
-        if ($encryptedInput !== get_session('ss_captcha_key')) {
-            $_SESSION['ss_captcha_count'] = $captchaCount + 1;
-            Response::error('자동등록방지 문자가 일치하지 않습니다.', 422, [
-                'captcha_key' => '자동등록방지 문자를 다시 확인해주세요.',
-            ]);
-        }
-
-        // Invalidate captcha after successful use to prevent reuse
-        set_session('ss_captcha_key', '');
-        set_session('ss_captcha_count', 0);
+        api_require_captcha($input); // api/lib/request_helpers.php — 비밀번호 찾기(이메일)와 같은 검사
     }
 
     // Check password match

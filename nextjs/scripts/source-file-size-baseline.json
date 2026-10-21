@@ -2,7 +2,6 @@
   "../overlay/api/index.php": 716,
   "../overlay/api/lib/helpers.php": 1051,
   "../overlay/api/social/_bridge_common.php": 760,
-  "../overlay/api/v1/auth_account_routes.php": 709,
   "../overlay/api/v1/boards.php": 760,
   "../overlay/api/v1/members.php": 760,
   "../overlay/api/v1/posts.php": 818,

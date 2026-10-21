@@ -85,7 +85,7 @@ const RAIL_EXCLUDED_PREFIXES = [
   "/mypage",
   "/login",
   "/register",
-  "/forgot-password",
+  // /forgot-password 는 레퍼런스(bbs/password_lost.php)처럼 레일과 함께 그린다 — 제 레이아웃을 갖지 않는다.
   "/bbs",
   "/baby",
   "/organic",

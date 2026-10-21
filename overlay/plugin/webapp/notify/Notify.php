@@ -38,6 +38,20 @@ class Notify
         'system'          => 'system',
     );
 
+    /**
+     * 알림에 넣을 짧은 글 — 태그 · 엔티티 · 줄바꿈을 걷고 공백을 하나로 모은 뒤 $max 자를 넘으면 말줄임표로 자른다.
+     * 댓글 알림 문구(API 의 api/v1/comments.php 와 웹 화면의 notify/events.php)가 같이 쓴다.
+     */
+    public static function snippet($text, $max)
+    {
+        $plain = html_entity_decode(strip_tags((string) $text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $plain = trim((string) preg_replace('/\s+/u', ' ', $plain));
+        if (mb_strlen($plain, 'UTF-8') <= (int) $max) {
+            return $plain;
+        }
+        return rtrim(mb_substr($plain, 0, (int) $max, 'UTF-8')) . '…';
+    }
+
     private static function boot()
     {
         $lib = dirname(__DIR__, 3) . '/api/lib';

@@ -371,31 +371,52 @@ if ($action === 'password-reset' && $apiMethod === 'POST') {
 
         $mbId = isset($input['mb_id']) ? trim((string) $input['mb_id']) : '';
         $mbEmail = isset($input['mb_email']) ? trim((string) $input['mb_email']) : '';
-        if ($mbId !== '' && Validator::email($mbEmail)) {
-            $member = DB::fetch(
-                "SELECT mb_id, mb_email FROM {$memberTable}
-                 WHERE mb_id = ? AND mb_email = ? AND mb_leave_date = '' AND mb_intercept_date = ''
-                 LIMIT 1",
-                [$mbId, $mbEmail]
+        $member = null;
+        if ($mbId !== '') {
+            // 앱 · 예전 화면 — 아이디와 이메일이 둘 다 맞아야 한다.
+            if (Validator::email($mbEmail)) {
+                $member = DB::fetch(
+                    "SELECT mb_id, mb_email FROM {$memberTable}
+                     WHERE mb_id = ? AND mb_email = ? AND mb_leave_date = '' AND mb_intercept_date = ''
+                     LIMIT 1",
+                    [$mbId, $mbEmail]
+                );
+            }
+        } elseif ($mbEmail !== '') {
+            // 웹 화면 — 그누보드 bbs/password_lost.php 와 같이 이메일과 자동등록방지만 받는다. 이메일 형식이 틀리거나,
+            // 그 이메일 회원이 하나가 아니거나(없음 · 여럿), 탈퇴 · 차단 회원이거나, 최고관리자면 보내지 않고 같은 안내만
+            // 한다(bbs/password_lost2.php 와 같은 규칙 — 어느 이메일이 가입돼 있는지 드러나지 않게).
+            api_require_captcha($input);
+            if (Validator::email($mbEmail)
+                && DB::readCount("SELECT COUNT(*) FROM {$memberTable} WHERE mb_email = ?", [$mbEmail]) === 1) {
+                $found = DB::fetch(
+                    "SELECT mb_id, mb_email FROM {$memberTable}
+                     WHERE mb_email = ? AND mb_leave_date = '' AND mb_intercept_date = ''
+                     LIMIT 1",
+                    [$mbEmail]
+                );
+                if ($found && !empty($found['mb_id']) && !(function_exists('is_admin') && is_admin($found['mb_id']) === 'super')) {
+                    $member = $found;
+                }
+            }
+        }
+
+        if ($member && !empty($member['mb_id'])) {
+            $nonce = bin2hex(random_bytes(16));
+            $nonceHash = hash('sha256', $nonce);
+            DB::execute(
+                "UPDATE {$memberTable} SET mb_lost_certify = ? WHERE mb_id = ?",
+                [$nonceHash, $member['mb_id']]
             );
 
-            if ($member && !empty($member['mb_id'])) {
-                $nonce = bin2hex(random_bytes(16));
-                $nonceHash = hash('sha256', $nonce);
-                DB::execute(
-                    "UPDATE {$memberTable} SET mb_lost_certify = ? WHERE mb_id = ?",
-                    [$nonceHash, $member['mb_id']]
-                );
-
-                $resetToken = JWT::encode([
-                    'mb_id' => $member['mb_id'],
-                    'purpose' => 'password_reset',
-                    'nonce' => $nonce,
-                ], null, 600);
-                api_auth_send_password_reset_mail($member, $resetToken);
-                // 그누보드 훅(bbs/password_lost2.php) — 회원, 확인 값(nonce), 저장한 값(mb_lost_certify)
-                api_run_event('password_lost2_after', array($member, $nonce, $nonceHash));
-            }
+            $resetToken = JWT::encode([
+                'mb_id' => $member['mb_id'],
+                'purpose' => 'password_reset',
+                'nonce' => $nonce,
+            ], null, 600);
+            api_auth_send_password_reset_mail($member, $resetToken);
+            // 그누보드 훅(bbs/password_lost2.php) — 회원, 확인 값(nonce), 저장한 값(mb_lost_certify)
+            api_run_event('password_lost2_after', array($member, $nonce, $nonceHash));
         }
 
         api_auth_password_reset_generic_response();

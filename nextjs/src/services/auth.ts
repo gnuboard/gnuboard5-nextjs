@@ -45,9 +45,14 @@ export interface RegisterResponse {
   registration_result_url?: string;
 }
 
+/**
+ * 비밀번호 찾기 요청. 웹 화면은 그누보드 password_lost.php 처럼 이메일 + 자동등록방지(captcha_key)만,
+ * 앱은 아이디 + 이메일로 보낸다(mb_id 를 보내면 자동등록방지 없이 둘 다 맞아야 한다).
+ */
 export interface PasswordResetRequestPayload {
-  mb_id: string;
+  mb_id?: string;
   mb_email: string;
+  captcha_key?: string;
 }
 
 export interface PasswordResetCertRequestPayload {

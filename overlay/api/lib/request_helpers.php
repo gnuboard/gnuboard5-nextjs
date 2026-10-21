@@ -300,3 +300,41 @@ function api_rate_limit_ip(): string
     $chain = api_forwarded_for_chain();
     return $internal && $chain !== [] ? $remote . '>' . end($chain) : $remote;
 }
+
+/**
+ * 자동등록방지(캡차) — GET /v1/captcha 가 세션에 둔 값과 본문의 captcha_key 를 맞춘다(그누보드 chk_captcha 와 같은 규칙).
+ * 틀리면 422(5번 넘게 틀리면 429), 맞으면 그 값을 지워 다시 쓰지 못하게 한다. 회원가입 · 이메일로 비밀번호 찾기가 함께 쓴다.
+ */
+function api_require_captcha(array $input): void
+{
+    $captchaInput = isset($input['captcha_key']) ? trim((string) $input['captcha_key']) : '';
+    if ($captchaInput === '') {
+        Response::error('Validation failed.', 422, [
+            'captcha_key' => '자동등록방지 문자를 입력해주세요.',
+        ]);
+    }
+
+    $captchaCount = (int) get_session('ss_captcha_count');
+    if ($captchaCount > 5) {
+        Response::error('자동등록방지 시도 횟수를 초과했습니다. 새로고침해 주세요.', 429, [
+            'captcha_key' => '자동등록방지 새로고침이 필요합니다.',
+        ]);
+    }
+
+    $encryptedInput = $captchaInput;
+    if (function_exists('get_string_encrypt')) {
+        $ip = md5(sha1($_SERVER['REMOTE_ADDR']));
+        $encryptedInput = get_string_encrypt($ip . $captchaInput);
+    }
+
+    if ($encryptedInput !== get_session('ss_captcha_key')) {
+        $_SESSION['ss_captcha_count'] = $captchaCount + 1;
+        Response::error('자동등록방지 문자가 일치하지 않습니다.', 422, [
+            'captcha_key' => '자동등록방지 문자를 다시 확인해주세요.',
+        ]);
+    }
+
+    // 한 번 쓴 값은 지운다 — 같은 그림으로 여러 번 보내지 못하게.
+    set_session('ss_captcha_key', '');
+    set_session('ss_captcha_count', 0);
+}
