@@ -58,7 +58,8 @@ export function ProductWriteDialog({
           event.preventDefault();
           contentRef.current?.focus();
         }}
-        className="product-quick-add-dialog product-write-dialog flex max-h-[88dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl max-sm:top-auto max-sm:bottom-0 max-sm:max-w-full max-sm:translate-y-0 max-sm:rounded-b-none"
+        // 자세한 후기 · 문의를 쓸 수 있게 담기 창(xl)보다 넓고 높게 — 데스크톱 2xl → 큰 화면 3xl, 화면의 92%까지.
+        className="product-quick-add-dialog product-write-dialog flex max-h-[88dvh] flex-col gap-0 overflow-hidden p-0 sm:max-h-[92dvh] sm:max-w-2xl lg:max-w-3xl max-sm:top-auto max-sm:bottom-0 max-sm:max-w-full max-sm:translate-y-0 max-sm:rounded-b-none"
       >
         <DialogHeader className="product-quick-add-head flex-row items-center gap-3 border-b p-4 pr-12 text-left">
           <span className="product-quick-add-thumb relative block h-14 w-14 flex-none overflow-hidden rounded-md border bg-muted">
@@ -99,15 +100,23 @@ export function ProductWriteDialog({
   );
 }
 
+/**
+ * 후기 · 문의 내용 칸 — 짧은 글용 에디터(80px)로는 한두 줄 후기만 남게 되어, 창 안에서 넉넉히 쓰도록 높인다.
+ * 웹 에디터면 입력 영역(.tiptap)을, 글자 칸(Textarea)이면 칸 자체를 높인다.
+ */
+export const WRITE_CONTENT_CLASS =
+  "product-write-editor min-h-[220px] sm:min-h-[320px] [&_.tiptap]:min-h-[200px]! sm:[&_.tiptap]:min-h-[300px]!";
+
 /** 영카트 itemuseform.skin.php 의 평점 이름(is_score 5 → 1). */
 const SCORE_LABELS: Record<number, string> = { 5: "매우만족", 4: "만족", 3: "보통", 2: "불만", 1: "매우불만" };
 
-/** 평점 — 큰 별 다섯 개와 고른 평점의 이름. */
+/** 평점 — 한 줄로: "평점" · 별 다섯 개 · 고른 평점의 이름. 내용 칸에 자리를 내주도록 낮게. */
 export function ReviewScorePicker({ score, onChange }: { score: number; onChange: (score: number) => void }) {
   return (
-    <fieldset className="product-write-score flex flex-col items-center gap-1.5 rounded-lg bg-muted/60 px-4 py-4">
+    <fieldset className="product-write-score flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-muted/60 px-3 py-2">
       <legend className="sr-only">평점</legend>
-      <div className="flex items-center gap-1">
+      <span className="text-sm font-medium" aria-hidden="true">평점</span>
+      <div className="flex items-center gap-0.5">
         {[1, 2, 3, 4, 5].map((n) => (
           <button
             key={n}
@@ -119,7 +128,7 @@ export function ReviewScorePicker({ score, onChange }: { score: number; onChange
           >
             <Star
               className={cn(
-                "h-8 w-8 transition-colors",
+                "h-6 w-6 transition-colors",
                 n <= score ? "fill-amber-400 text-amber-400" : "fill-transparent text-muted-foreground/30"
               )}
             />
@@ -180,6 +189,7 @@ export function ReviewPhotoField({
           id={inputId}
           type="file"
           accept="image/jpeg,image/png,image/gif,image/webp"
+          multiple
           onChange={onPick}
           disabled={uploading}
           className="sr-only"

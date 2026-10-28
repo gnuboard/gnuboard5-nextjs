@@ -101,6 +101,10 @@ export function applyPublisherBranding(repoRoot, publicTheme) {
   // 공개판은 모든 값을 주석으로 둔 사용자용 예시로 바꾼다(Nicepay 줄부터는 원본 그대로).
   rewrite(join(repoRoot, 'overlay', 'api', 'env.example'), [
     [/^[\s\S]*?(?=# Optional\. Nicepay)/, PUBLIC_ENV_EXAMPLE_HEAD],
+    // 앱 버전 정책 예시 — 원본은 관리자 개인 앱(디데이)의 기본값 위치 · 버전 · 스토어 주소다.
+    [/\(e\.g\. plugin\/dday\/dday\.php\)/, '(plugin/webapp/notify/tables.php, or your own extend/ file)'],
+    [/^# G5_APP_LATEST_VERSION=.*$/m, '# G5_APP_LATEST_VERSION=1.2.0'],
+    [/details\?id=net\.thisgun\.dday/g, 'details?id=com.example.app'],
   ]);
 
   // 원본 저장소의 브랜치 · 폴더 정책은 공개 저장소와 상관없다. 공개 저장소는 main 하나다.

@@ -175,6 +175,7 @@ export function TiptapEditor({
   });
   const {
     uploading,
+    progress: uploadProgress,
     error: uploadError,
     clearError: clearUploadError,
     fileInputRef,
@@ -576,6 +577,7 @@ export function TiptapEditor({
         type="file"
         aria-label="파일 첨부"
         accept={EDITOR_IMAGE_ACCEPT}
+        multiple
         className="hidden"
         onChange={handleFileInputChange}
       />
@@ -599,6 +601,7 @@ export function TiptapEditor({
         <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground bg-muted/50 border-b">
           <Loader2 className="w-3 h-3 animate-spin" />
           이미지 업로드 중...
+          {uploadProgress && uploadProgress.total > 1 ? ` (${uploadProgress.done}/${uploadProgress.total})` : null}
         </div>
       )}
 

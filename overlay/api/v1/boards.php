@@ -581,7 +581,6 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'POST') {
 
     // Prepare fields
     $wr_subject   = $input['wr_subject'];
-    $wr_content   = $input['wr_content'];
     $wr_seo_source = isset($input['wr_seo_title']) && trim((string) $input['wr_seo_title']) !== ''
         ? trim((string) $input['wr_seo_title'])
         : $wr_subject;
@@ -617,6 +616,11 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'POST') {
     // $qstr(목록 쿼리)과 이동 주소는 API 에 없으므로 빈 값.
     $hookW = $replyParent ? 'r' : '';
     api_run_before_event('write_update_before', array($board, $replyParent ? (int) $replyParent['wr_id'] : 0, $hookW, ''), $member);
+
+    // 웹 에디터가 data/tmp 에 둔 사진을 data/editor 로 옮기고 본문 주소를 바꾼다(api/lib/editor-uploads.php).
+    // 검사를 다 통과한 뒤에 옮긴다 — 앞에서 막히면 옮긴 사진이 어느 글에도 붙지 못한다. 글 번호는 등록 뒤에 붙인다.
+    $editorMoved  = api_editor_tmp_finalize((string) $input['wr_content'], $member);
+    $wr_content   = $editorMoved['html'];
 
     $now = date('Y-m-d H:i:s');
     $ip  = $_SERVER['REMOTE_ADDR'];
@@ -678,6 +682,7 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'POST') {
         "UPDATE {$write_table} SET wr_parent = ? WHERE wr_id = ?",
         [$wr_id, $wr_id]
     );
+    api_editor_attach($editorMoved['ids'], api_editor_target('write', $wr_id, $wr_id, $bo_table));
 
     DB::execute(
         "INSERT INTO " . DB::table('board_new_table') . "

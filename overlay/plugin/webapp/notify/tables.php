@@ -23,6 +23,7 @@ $g5['social_apple_token_table']   = G5_TABLE_PREFIX.'social_apple_token';   // S
 $g5['member_public_key_table']    = G5_TABLE_PREFIX.'member_public_key';    // 회원 공개 키 — 주소에 아이디 대신 쓰는 무작위 값 (api/lib/member_key_helpers.php)
 $g5['theme_setting_table']        = G5_TABLE_PREFIX.'theme_setting';        // 테마 설정 — 왼쪽 메뉴 · 사이트 문구 (plugin/webapp/theme-settings/settings.php)
 $g5['post_revision_table']        = G5_TABLE_PREFIX.'post_revision';        // 매뉴얼 게시글 전체 스냅샷 이력
+$g5['editor_image_table']         = G5_TABLE_PREFIX.'editor_image';         // 웹 에디터로 올린 사진 — 임시(data/tmp) → 글 저장 때 data/editor (api/lib/editor-uploads.php)
 
 // ---------------------------------------------------------------------------
 // 모바일 앱 버전 정책 — /v1/settings 에서 노출되어 클라이언트가 강제 업데이트 판정.
@@ -914,6 +915,46 @@ if (!function_exists('webapp_admin_dbupgrade')) {
                 `ts_updated_at` DATETIME NULL DEFAULT NULL,
                 `ts_updated_by` VARCHAR(20) NOT NULL DEFAULT '',
                 PRIMARY KEY (`ts_theme`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci", false);
+            $changed = true;
+        }
+
+        // =====================================================================
+        // 4.6) g5_editor_image — 웹 에디터로 올린 사진 대장(api/lib/editor-uploads.php).
+        //      웹 에디터(글 · 댓글 · 상품 후기 · 상품 문의 · 1:1 문의)에서 올린 사진은 data/tmp/editor_upload/ 에 두었다가
+        //      (ei_state 0) 그 글을 저장할 때 data/editor/<yymm>/ 으로 옮기고 그 글에 붙인다(1). 글을 지우면 붙은 사진도
+        //      지운다(plugin/webapp/editor/events.php). 앱 · 그 밖의 바로 저장, 복사된 글이 함께 쓰는 사진은 2(지우지 않음).
+        //      붙은 곳: ei_kind(write 게시판 글 · 댓글, item_use 상품 후기, item_qa 상품 문의, qa 1:1 문의) · bo_table(write 만)
+        //      · ei_ref_id(wr_id · is_id · iq_id · qa_id) · ei_parent_id(글 번호 — 글을 지우면 그 댓글 사진까지 한 번에).
+        //      ei_file 은 무작위 이름이라 본문 주소에서 바로 찾는다(UNIQUE). 경로는 G5_DATA_PATH 기준 상대 경로로 —
+        //      서버를 옮기거나 하위 폴더에 설치해도 그대로 맞는다. ei_state · ei_datetime 은 오래된 임시 사진 정리.
+        // =====================================================================
+        $editor_image = isset($g5['editor_image_table']) ? $g5['editor_image_table'] : '';
+        if ($editor_image !== '' && !webapp_table_exists($editor_image)) {
+            sql_query("CREATE TABLE `{$editor_image}` (
+                `ei_id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                `ei_file`        VARCHAR(64) NOT NULL,
+                `ei_dir`         VARCHAR(64) NOT NULL,
+                `ei_state`       TINYINT UNSIGNED NOT NULL DEFAULT 0,
+                `mb_id`          VARCHAR(20) NOT NULL DEFAULT '',
+                `ei_kind`        VARCHAR(16) NOT NULL DEFAULT '',
+                `bo_table`       VARCHAR(20) NOT NULL DEFAULT '',
+                `ei_ref_id`      INT UNSIGNED NOT NULL DEFAULT 0,
+                `ei_parent_id`   INT UNSIGNED NOT NULL DEFAULT 0,
+                `ei_source`      VARCHAR(255) NOT NULL DEFAULT '',
+                `ei_mime`        VARCHAR(32) NOT NULL DEFAULT '',
+                `ei_size`        INT UNSIGNED NOT NULL DEFAULT 0,
+                `ei_width`       SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+                `ei_height`      SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+                `ei_ip`          VARCHAR(45) NOT NULL DEFAULT '',
+                `ei_datetime`    DATETIME NOT NULL,
+                `ei_attached_at` DATETIME NULL DEFAULT NULL,
+                PRIMARY KEY (`ei_id`),
+                UNIQUE KEY `uniq_editor_image_file` (`ei_file`),
+                KEY `idx_editor_image_ref` (`ei_kind`, `bo_table`, `ei_ref_id`),
+                KEY `idx_editor_image_parent` (`ei_kind`, `bo_table`, `ei_parent_id`),
+                KEY `idx_editor_image_state` (`ei_state`, `ei_datetime`),
+                KEY `idx_editor_image_member` (`mb_id`, `ei_datetime`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci", false);
             $changed = true;
         }

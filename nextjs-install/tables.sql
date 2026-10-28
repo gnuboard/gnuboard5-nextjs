@@ -275,3 +275,29 @@ CREATE TABLE IF NOT EXISTS `g5_theme_setting` (
     `ts_updated_by` VARCHAR(20) NOT NULL DEFAULT '',
     PRIMARY KEY (`ts_theme`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `g5_editor_image` (
+    `ei_id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `ei_file`        VARCHAR(64) NOT NULL,
+    `ei_dir`         VARCHAR(64) NOT NULL,
+    `ei_state`       TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    `mb_id`          VARCHAR(20) NOT NULL DEFAULT '',
+    `ei_kind`        VARCHAR(16) NOT NULL DEFAULT '',
+    `bo_table`       VARCHAR(20) NOT NULL DEFAULT '',
+    `ei_ref_id`      INT UNSIGNED NOT NULL DEFAULT 0,
+    `ei_parent_id`   INT UNSIGNED NOT NULL DEFAULT 0,
+    `ei_source`      VARCHAR(255) NOT NULL DEFAULT '',
+    `ei_mime`        VARCHAR(32) NOT NULL DEFAULT '',
+    `ei_size`        INT UNSIGNED NOT NULL DEFAULT 0,
+    `ei_width`       SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    `ei_height`      SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    `ei_ip`          VARCHAR(45) NOT NULL DEFAULT '',
+    `ei_datetime`    DATETIME NOT NULL,
+    `ei_attached_at` DATETIME NULL DEFAULT NULL,
+    PRIMARY KEY (`ei_id`),
+    UNIQUE KEY `uniq_editor_image_file` (`ei_file`),
+    KEY `idx_editor_image_ref` (`ei_kind`, `bo_table`, `ei_ref_id`),
+    KEY `idx_editor_image_parent` (`ei_kind`, `bo_table`, `ei_parent_id`),
+    KEY `idx_editor_image_state` (`ei_state`, `ei_datetime`),
+    KEY `idx_editor_image_member` (`mb_id`, `ei_datetime`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

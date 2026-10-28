@@ -98,7 +98,7 @@ $publicSettings = [
      *  - app_store_url_android/ios: 스토어 직링크. 미설정이면 클라이언트 폴백.
      *  - app_force_update_message: 강제 업데이트 모달 본문 (i18n 미반영, 서버 단일 메시지).
      *
-     * 보안 패치 배포 후 운영자가 G5_APP_MIN_VERSION 환경변수 또는 상수만 올리면
+     * 보안 패치 배포 후 운영자가 api/.env 의 G5_APP_MIN_VERSION(또는 상수)만 올리면
      * 옛 버전 사용자가 다음 부팅 시 강제 업그레이드 화면으로 막힌다.
      */
     'app_min_version'           => defined('G5_APP_MIN_VERSION') ? (string) G5_APP_MIN_VERSION : '0.0.0',
@@ -270,6 +270,43 @@ if (!function_exists('api_settings_company')) {
         }
         return $company ?: null;
     }
+}
+
+if (!function_exists('api_settings_env_app_policy')) {
+    /**
+     * api/.env 의 전역 버전 정책(G5_APP_MIN_VERSION 등) — 코드 기본값(plugin/dday/dday.php 의 상수)보다 먼저 본다.
+     * 스토어에 새 버전을 올릴 때 운영자가 .env 한 줄만 고치면 되게 하려는 것이다. 디데이 앱은 ?app 없이 /settings 를
+     * 부르므로 아래 앱별 값(G5_APP_<PACKAGE>_*)은 닿지 않는다. 값 형식은 앱별 값과 같은 규칙으로 거른다.
+     * 상수는 이미 plugin 이 정해 둬서 g5_api_config_value 로는 .env 를 볼 수 없다 — .env · 환경변수만 읽는다.
+     */
+    function api_settings_env_app_policy($env)
+    {
+        $fields = [
+            'min_version'          => 'G5_APP_MIN_VERSION',
+            'latest_version'       => 'G5_APP_LATEST_VERSION',
+            'store_url_android'    => 'G5_APP_STORE_URL_ANDROID',
+            'store_url_ios'        => 'G5_APP_STORE_URL_IOS',
+            'force_update_message' => 'G5_APP_FORCE_UPDATE_MESSAGE',
+        ];
+        $overrides = [];
+        foreach ($fields as $field => $key) {
+            if (is_array($env) && isset($env[$key])) {
+                $raw = (string) $env[$key];
+            } else {
+                $raw = getenv($key);
+                $raw = is_string($raw) ? $raw : '';
+            }
+            $value = api_settings_app_value($field, $raw);
+            if ($value !== '') {
+                $overrides['app_' . $field] = $value;
+            }
+        }
+        return $overrides;
+    }
+}
+
+foreach (api_settings_env_app_policy(isset($G5_API_ENV) ? $G5_API_ENV : null) as $key => $value) {
+    $publicSettings[$key] = $value;
 }
 
 $requestedApp = isset($_GET['app']) ? trim((string) $_GET['app']) : '';

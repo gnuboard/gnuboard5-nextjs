@@ -255,9 +255,13 @@ if ($uploadQuotaMsg !== null) {
 
 // ---------------------------------------------------------------------------
 // Save file (그누보드5 표준: /data/editor/YYMM/)
+// 웹 에디터(stage=tmp 를 붙여 보냄)의 사진은 data/tmp/editor_upload/ 에 두었다가 그 글을 저장할 때 옮긴다
+// (api/lib/editor-uploads.php). 앱 · 그 밖, 사진 대장 표가 아직 없는 설치본은 예전처럼 바로 저장.
 // ---------------------------------------------------------------------------
-$ym = date('ym');
-$uploadDir = G5_DATA_PATH . '/editor/' . $ym;
+$editorLedger = function_exists('api_editor_uploads_ready') && api_editor_uploads_ready();
+$saveToTmp = $editorLedger && (string) ($_POST['stage'] ?? '') === 'tmp';
+$saveDir = $saveToTmp ? API_EDITOR_TMP_DIR : 'editor/' . date('ym');
+$uploadDir = G5_DATA_PATH . '/' . $saveDir;
 
 if (!is_dir($uploadDir)) {
     @mkdir($uploadDir, 0755, true);
@@ -345,7 +349,35 @@ switch ($detectedMime) {
 unset($srcImg, $dstImg);
 
 $finalSize = filesize($destPath);
-$fileUrl = G5_DATA_URL . '/editor/' . $ym . '/' . $newFilename;
+if ($editorLedger) {
+    $recorded = api_editor_upload_record([
+        'file'   => $newFilename,
+        'dir'    => $saveDir,
+        'state'  => $saveToTmp ? API_EDITOR_STATE_TMP : API_EDITOR_STATE_KEPT,
+        'mb_id'  => (string) $member['mb_id'],
+        'source' => (string) $originalName,
+        'mime'   => (string) $detectedMime,
+        'size'   => (int) $finalSize,
+        'width'  => $dstW,
+        'height' => $dstH,
+        'ip'     => (string) ($_SERVER['REMOTE_ADDR'] ?? ''),
+    ]);
+    if (!$recorded && $saveToTmp) {
+        // 대장에 적지 못한 임시 사진은 글을 저장할 때 옮길 수 없다 — 바로 저장한 것으로 돌린다.
+        $saveDir = 'editor/' . date('ym');
+        $fallbackDir = G5_DATA_PATH . '/' . $saveDir;
+        if (!is_dir($fallbackDir)) {
+            @mkdir($fallbackDir, 0755, true);
+            @file_put_contents($fallbackDir . '/index.html', '');
+        }
+        if (@rename($destPath, $fallbackDir . '/' . $newFilename)) {
+            $destPath = $fallbackDir . '/' . $newFilename;
+        } else {
+            $saveDir = API_EDITOR_TMP_DIR;
+        }
+    }
+}
+$fileUrl = G5_DATA_URL . '/' . $saveDir . '/' . $newFilename;
 @file_put_contents(
     api_upload_editor_meta_path($destPath),
     API_UPLOAD_META_GUARD . json_encode([

@@ -428,20 +428,32 @@ if ($action === 'password-reset' && $apiMethod === 'POST') {
             Response::error('Identity verification password reset is disabled.', 403);
         }
 
-        $certNo = isset($input['cert_no']) ? trim((string) $input['cert_no']) : '';
-        $certType = isset($input['cert_type']) ? trim((string) $input['cert_type']) : '';
-        $sessionCertNo = (string) get_session('ss_cert_no');
-        $sessionCertType = (string) get_session('ss_cert_type');
-        $sessionDupinfo = (string) get_session('ss_cert_dupinfo');
+        $certToken = isset($input['cert_token']) ? trim((string) $input['cert_token']) : '';
+        if ($certToken !== '') {
+            // 앱 — 본인인증 WebView(api/cert/*_start.php?pageType=find&client=app)의 결과 페이지가 서명한 토큰(SC-21).
+            // 앱 요청은 WebView 의 PHP 세션을 함께 쓰지 않으므로 세션 대신 토큰의 중복가입확인정보로 회원을 찾는다.
+            $claims = api_cert_token_read($certToken, 'find');
+            if ($claims === null) {
+                Response::error('Invalid or expired verification session.', 422);
+            }
+            $sessionDupinfo = (string) $claims['dupinfo'];
+        } else {
+            // 웹 — 같은 세션에서 본인인증을 마친 cert_no.
+            $certNo = isset($input['cert_no']) ? trim((string) $input['cert_no']) : '';
+            $certType = isset($input['cert_type']) ? trim((string) $input['cert_type']) : '';
+            $sessionCertNo = (string) get_session('ss_cert_no');
+            $sessionCertType = (string) get_session('ss_cert_type');
+            $sessionDupinfo = (string) get_session('ss_cert_dupinfo');
 
-        if ($certNo === '' || $certType === '' || $sessionCertNo === '' || $sessionCertNo !== $certNo) {
-            Response::error('Invalid or expired verification session.', 422);
-        }
-        if ($sessionCertType !== '' && $sessionCertType !== $certType) {
-            Response::error('Verification type does not match.', 422);
-        }
-        if ($sessionDupinfo === '') {
-            Response::error('Verification session is missing identity data.', 422);
+            if ($certNo === '' || $certType === '' || $sessionCertNo === '' || $sessionCertNo !== $certNo) {
+                Response::error('Invalid or expired verification session.', 422);
+            }
+            if ($sessionCertType !== '' && $sessionCertType !== $certType) {
+                Response::error('Verification type does not match.', 422);
+            }
+            if ($sessionDupinfo === '') {
+                Response::error('Verification session is missing identity data.', 422);
+            }
         }
 
         $member = DB::fetch(

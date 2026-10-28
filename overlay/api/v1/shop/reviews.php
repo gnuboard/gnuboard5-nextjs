@@ -166,6 +166,9 @@ if ($subAction !== '' && preg_match('/^\d+$/', (string) $subAction)) {
         Response::error('Validation failed.', 422, $errors);
     }
 
+    // 수정 중에 새로 올린 사진(data/tmp)을 data/editor 로 옮기고 이 후기에 붙인다(api/lib/editor-uploads.php).
+    $is_content = api_editor_tmp_finalize($is_content, $member, api_editor_target('item_use', $reviewId))['html'];
+
     DB::execute(
         "UPDATE {$reviewTable}
          SET is_subject = ?,
@@ -441,6 +444,10 @@ if ($apiMethod === 'POST' && $subAction === '') {
         }
     }
 
+    // 웹 에디터 · 사진 첨부가 data/tmp 에 둔 사진을 data/editor 로 옮긴다 — 후기 번호는 등록 뒤에 붙인다.
+    $editorMoved = api_editor_tmp_finalize($is_content, $member);
+    $is_content = $editorMoved['html'];
+
     $isConfirm = (int) ($default['de_item_use_use'] ?? 0) === 1 ? '0' : '1';
     $isName = shop_api_review_author_name($member);
     $isPassword = (string) ($member['mb_password'] ?? '');
@@ -472,6 +479,7 @@ if ($apiMethod === 'POST' && $subAction === '') {
     );
 
     $newId = DB::lastInsertId();
+    api_editor_attach($editorMoved['ids'], api_editor_target('item_use', (int) $newId));
     if (function_exists('run_event')) {
         api_run_event('shop_item_use_created', array($newId, $it_id), $member);
     }

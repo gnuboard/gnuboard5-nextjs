@@ -22,6 +22,7 @@ if (!defined('_GNUBOARD_')) {
  *   notify/admin.php    관리자 → 알림 발송 현황 화면
  *   notify/admin_prefs.php  관리자 → 알림 설정 현황(회원별 알림 수신 설정)
  *   notify/admin_order_push.php  관리자 주문 저장(입금 확인·송장) 직후 앱 주문 푸시(SC-07, 예전 g5app.extend.php)
+ *   editor/events.php   글 · 댓글 · 상품 후기 · 문의 · 1:1 문의를 지우면 웹 에디터로 올린 사진(대장에 붙은 것)도 지우기
  *
  * plugin/webapp/ 가 없으면 조용히 끝낸다 — 이 파일만 남은 설치본이 죽지 않게.
  */
@@ -29,7 +30,7 @@ if (!defined('_GNUBOARD_')) {
 $g5_webapp_plugin_dir = (defined('G5_PATH') ? G5_PATH : dirname(__DIR__)) . '/plugin/webapp';
 
 if (is_dir($g5_webapp_plugin_dir)) {
-    foreach (array('mail/smtp_auth.php', 'notify/tables.php', 'post-history/service.php', 'post-history/admin.php', 'bridge/api_session.php', 'bridge/runtime.php', 'bridge/social.php', 'bridge/legacy_guard.php', 'notify/events.php', 'notify/admin.php', 'notify/admin_prefs.php', 'notify/admin_order_push.php', 'theme-settings/settings.php', 'theme-settings/chapters.php', 'theme-settings/service.php', 'theme-settings/admin.php') as $g5_webapp_plugin_file) {
+    foreach (array('mail/smtp_auth.php', 'notify/tables.php', 'post-history/service.php', 'post-history/admin.php', 'bridge/api_session.php', 'bridge/runtime.php', 'bridge/social.php', 'bridge/legacy_guard.php', 'notify/events.php', 'notify/admin.php', 'notify/admin_prefs.php', 'notify/admin_order_push.php', 'editor/events.php', 'theme-settings/settings.php', 'theme-settings/chapters.php', 'theme-settings/service.php', 'theme-settings/admin.php') as $g5_webapp_plugin_file) {
         if (is_file($g5_webapp_plugin_dir . '/' . $g5_webapp_plugin_file)) {
             require_once $g5_webapp_plugin_dir . '/' . $g5_webapp_plugin_file;
         }

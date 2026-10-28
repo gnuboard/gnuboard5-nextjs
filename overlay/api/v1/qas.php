@@ -367,6 +367,11 @@ if (!$seg0 && $apiMethod === 'POST') {
     $ip = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '';
     $attachments = api_qa_process_attachments(null, $qaConfig, api_qa_is_admin($me));
 
+    // 웹 에디터가 data/tmp 에 둔 사진을 data/editor 로 옮긴다 — 첨부 파일 검사까지 통과한 뒤에. 문의 번호는 등록 뒤에
+    // 붙인다(api/lib/editor-uploads.php).
+    $editorMoved = api_editor_tmp_finalize((string) $payload['qa_content'], $me);
+    $payload['qa_content'] = $editorMoved['html'];
+
     DB::execute(
         "INSERT INTO {$qaContentTable}
             (qa_num, qa_parent, qa_related, mb_id, qa_name, qa_email, qa_hp,
@@ -396,6 +401,7 @@ if (!$seg0 && $apiMethod === 'POST') {
     );
 
     $qaId = (int) DB::lastInsertId();
+    api_editor_attach($editorMoved['ids'], api_editor_target('qa', $qaId));
     $qaRelated = $qaId;
     if ($replySource && (int) ($replySource['qa_related'] ?? 0) > 0) {
         $qaRelated = (int) $replySource['qa_related'];
@@ -455,6 +461,12 @@ if ($qaId > 0 && !$seg1 && ($apiMethod === 'PATCH' || $isMultipartPatch)) {
     }
 
     $input = get_request_body();
+    // 수정 중에 새로 올린 사진(data/tmp)을 data/editor 로 옮기고 이 문의(답변)에 붙인다.
+    if (isset($input['qa_content']) && is_string($input['qa_content'])) {
+        $input['qa_content'] = api_editor_tmp_finalize(
+            $input['qa_content'], $me, api_editor_target('qa', $qaId, (int) $row['qa_parent'])
+        )['html'];
+    }
 
     if ((int) $row['qa_type'] === 1) {
         if (!$isAdmin) {
@@ -550,6 +562,14 @@ if ($qaId > 0 && $seg1 === 'answer' && $apiMethod === 'POST') {
          LIMIT 1",
         [$qaId]
     );
+    // 웹 에디터가 data/tmp 에 둔 사진을 data/editor 로 옮긴다 — 있던 답변이면 바로, 새 답변이면 등록 뒤에 붙인다.
+    $editorMoved = ['ids' => []];
+    if (isset($input['qa_content']) && is_string($input['qa_content'])) {
+        $editorMoved = api_editor_tmp_finalize(
+            $input['qa_content'], $me, $answer ? api_editor_target('qa', (int) $answer['qa_id'], $qaId) : null
+        );
+        $input['qa_content'] = $editorMoved['html'];
+    }
     // 답변을 고칠 때 qa_html 을 보내지 않으면 원래 형식을 지킨다(api_qa_html_flag).
     $payload = api_qa_answer_payload($input, $answer ? (int) $answer['qa_html'] : 0);
     $answerId = 0;
@@ -603,6 +623,7 @@ if ($qaId > 0 && $seg1 === 'answer' && $apiMethod === 'POST') {
             ]
         );
         $answerId = (int) DB::lastInsertId();
+        api_editor_attach($editorMoved['ids'], api_editor_target('qa', $answerId, $qaId));
     }
 
     DB::execute(

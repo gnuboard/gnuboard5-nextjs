@@ -18,7 +18,7 @@ if (!defined('_GNUBOARD_')) exit;
 class Schema
 {
     /** 이 값이 바뀌면 표식이 무효가 되어 다음 요청에서 다시 점검한다. */
-    const VERSION = '2026-10-16.3'; // 푸시 receipt 컬럼(push_queue.ticket_id · receipt_checked_at, push_token.registered_at)
+    const VERSION = '2026-10-27.2'; // 웹 에디터 사진 대장(editor_image)
 
     /**
      * 테이블 키 → 그 키를 등록하는 extend 파일. 키가 없으면 어떤 파일이 빠졌는지 안내한다.
@@ -37,6 +37,7 @@ class Schema
         'member_public_key_table'        => 'plugin/webapp/notify/tables.php',
         'theme_setting_table'            => 'plugin/webapp/notify/tables.php',
         'post_revision_table'            => 'plugin/webapp/notify/tables.php',
+        'editor_image_table'             => 'plugin/webapp/notify/tables.php',
     );
 
     /**

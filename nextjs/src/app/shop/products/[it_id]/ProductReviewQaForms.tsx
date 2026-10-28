@@ -6,9 +6,10 @@ import type { ShopPolicy } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RichTextField, useSiteEditor } from "@/components/editor/RichTextField";
+import { EDITOR_UPLOAD_STAGE } from "@/components/editor/useEditorImageUpload";
 import { hasContent } from "@/lib/editor-content";
 import { toastSuccess, toastError } from "@/lib/toast";
-import { ProductWriteDialog, ReviewPhotoField, ReviewScorePicker } from "./ProductWriteDialog";
+import { ProductWriteDialog, ReviewPhotoField, ReviewScorePicker, WRITE_CONTENT_CLASS } from "./ProductWriteDialog";
 
 // 상품 후기 작성 폼 — 로그인 회원만 접근. 백엔드에서 영카트 후기 작성 정책을 검증.
 export function ReviewForm({
@@ -57,25 +58,34 @@ export function ReviewForm({
     setOpen(false);
   };
 
+  // 여러 장을 고르면 고른 순서대로 한 장씩 올린다(/upload 는 한 번에 한 장). 실패한 장만 알리고 나머지는 계속.
   const uploadImage = async (event: ChangeEvent<HTMLInputElement>) => {
     const input = event.target;
-    const file = input.files?.[0];
-    if (!file) return;
-    const fd = new FormData();
-    fd.append("file", file);
+    const files = Array.from(input.files ?? []);
+    // 같은 파일을 다시 첨부할 수 있게 input 리셋(files 는 위에서 배열로 옮겨 두었다).
+    input.value = "";
+    if (files.length === 0) return;
     setUploading(true);
     try {
-      const res = await api.upload<{ url: string }>("/upload", fd);
-      const url = (res.data as { url?: string })?.url;
-      if (url) {
-        setImageUrls((prev) => [...prev, url]);
+      for (const file of files) {
+        const fd = new FormData();
+        fd.append("file", file);
+        // 웹 에디터 사진과 같이 임시로 올린다 — 후기를 등록할 때 서버가 옮기고, 후기를 지우면 함께 지운다.
+        fd.append("stage", EDITOR_UPLOAD_STAGE);
+        try {
+          // POST /upload 는 file_url 로 돌려준다(api/v1/upload.php) — 예전에는 없는 url 을 읽어 사진이 빠졌다.
+          const res = await api.upload<{ file_url: string }>("/upload", fd);
+          const url = res.data?.file_url;
+          if (url) {
+            setImageUrls((prev) => [...prev, url]);
+          }
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : "업로드 실패";
+          toastError(files.length > 1 ? `${file.name}: ${message}` : message);
+        }
       }
-    } catch (err: unknown) {
-      toastError(err instanceof Error ? err.message : "업로드 실패");
     } finally {
       setUploading(false);
-      // 같은 파일을 다시 첨부할 수 있게 input 리셋.
-      input.value = "";
     }
   };
 
@@ -165,8 +175,9 @@ export function ReviewForm({
                 value={content}
                 onChange={setContent}
                 useEditor={siteEditor}
-                rows={6}
-                className="product-write-editor"
+                rows={12}
+                className={WRITE_CONTENT_CLASS}
+                placeholder="상품을 써 보니 어땠나요? 사이즈 · 색감 · 품질 · 배송 등 다른 분께 도움이 될 이야기를 자세히 남겨 주세요."
                 ariaLabel="후기 내용"
               />
             </div>
@@ -303,8 +314,8 @@ export function QaForm({
                 value={question}
                 onChange={setQuestion}
                 useEditor={siteEditor}
-                rows={6}
-                className="product-write-editor"
+                rows={12}
+                className={WRITE_CONTENT_CLASS}
                 ariaLabel="문의 내용"
               />
             </div>

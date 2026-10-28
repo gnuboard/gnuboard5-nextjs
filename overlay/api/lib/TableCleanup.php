@@ -12,6 +12,10 @@
  *   device_ip             90일 동안 안 보인 기기의 IP · 브라우저 정보만 비움. 행은 남긴다 — 이미 등록된 기기 번호를
  *                         남이 다시 서명받지 못하게 막는 근거다(api/v1/devices.php). IP · 브라우저 정보는 등록 직후
  *                         10분 재서명 확인과 1시간 요청 한도에만 쓴다.
+ *   editor_tmp/unbound    글쓰기 화면에서 올리고 글에 붙지 못한 임시 사진(data/tmp/editor_upload)과, data/editor 로 옮긴 뒤
+ *                         저장이 실패해 붙지 못한 사진을 3일 뒤 파일 · 대장 행째 삭제(api/lib/editor-uploads.php)
+ *   editor_orphan         붙은 글이 없어진 사진 — 삭제 이벤트 없이 지워진 글(관리자의 게시판 삭제 · 상품 삭제 등). 붙은 지
+ *                         하루 넘은 것만
  *
  * 한 번에 BATCH 행씩 나눠 지운다 — 크론이 없던 사이트의 첫 정리가 큰 표를 한 문장으로 오래 잠그지 않게. 나눠 지운 몫은
  * 그때그때 반영되므로, 웹 요청(runWithin)이 시간 안에 다 못 끝내도 다음에 이어서 한다.
@@ -31,7 +35,7 @@ require_once __DIR__ . '/RefreshToken.php';
 final class TableCleanup
 {
     /** run() 이 도는 차례. push_queue · notification_log 는 결과에서 두 칸(sent/failed · read/unread)으로 나뉜다. */
-    public const STEPS = ['push_token', 'push_queue', 'notification_log', 'refresh_token', 'social_signup_ticket', 'device_ip'];
+    public const STEPS = ['push_token', 'push_queue', 'notification_log', 'refresh_token', 'social_signup_ticket', 'device_ip', 'editor_tmp', 'editor_orphan'];
 
     /** 한 문장으로 지우는(비우는) 최대 행 수. */
     private const BATCH = 2000;
@@ -45,6 +49,8 @@ final class TableCleanup
         'WEBAPP_REFRESH_TOKEN_KEEP_DAYS'       => 30,
         'WEBAPP_SIGNUP_TICKET_KEEP_DAYS'       => 1,
         'WEBAPP_DEVICE_IP_KEEP_DAYS'           => 90,
+        'WEBAPP_EDITOR_TMP_KEEP_DAYS'          => 3,
+        'WEBAPP_EDITOR_ORPHAN_GRACE_DAYS'      => 1,
     ];
 
     /**
@@ -143,6 +149,17 @@ final class TableCleanup
                     'social_signup_ticket_table', 'expires_at', self::days('WEBAPP_SIGNUP_TICKET_KEEP_DAYS'), $limit)];
             case 'device_ip':
                 return static fn (int $limit): array => ['device_ip' => self::clearDeviceIps($limit)];
+            case 'editor_tmp':
+                return static function (int $limit): array {
+                    require_once __DIR__ . '/editor-uploads.php';
+                    $days = self::days('WEBAPP_EDITOR_TMP_KEEP_DAYS');
+                    return ['editor_tmp' => api_editor_tmp_gc($days, $limit), 'editor_unbound' => api_editor_unbound_gc($days, $limit)];
+                };
+            case 'editor_orphan':
+                return static function (int $limit): array {
+                    require_once __DIR__ . '/editor-uploads.php';
+                    return ['editor_orphan' => api_editor_orphan_gc(self::days('WEBAPP_EDITOR_ORPHAN_GRACE_DAYS'), $limit)];
+                };
         }
         return static fn (int $limit): array => [];
     }
@@ -178,6 +195,13 @@ final class TableCleanup
                 return ['social_signup_ticket' => $count('social_signup_ticket_table', 'expires_at < ?', self::days('WEBAPP_SIGNUP_TICKET_KEEP_DAYS'))];
             case 'device_ip':
                 return ['device_ip' => $count('device_table', 'last_seen_at < ? AND ' . self::DEVICE_HAS_IP, self::days('WEBAPP_DEVICE_IP_KEEP_DAYS'))];
+            case 'editor_tmp':
+                require_once __DIR__ . '/editor-uploads.php';
+                $days = self::days('WEBAPP_EDITOR_TMP_KEEP_DAYS');
+                return ['editor_tmp' => api_editor_tmp_gc_count($days), 'editor_unbound' => api_editor_unbound_gc_count($days)];
+            case 'editor_orphan':
+                require_once __DIR__ . '/editor-uploads.php';
+                return ['editor_orphan' => api_editor_orphan_gc_count(self::days('WEBAPP_EDITOR_ORPHAN_GRACE_DAYS'))];
         }
         return [];
     }

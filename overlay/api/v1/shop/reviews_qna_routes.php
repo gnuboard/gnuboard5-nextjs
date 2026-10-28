@@ -95,6 +95,9 @@ if ($qnaAction !== '' && preg_match('/^\d+$/', (string) $qnaAction)) {
         Response::error('Validation failed.', 422, $errors);
     }
 
+    // 수정 중에 새로 올린 사진(data/tmp)을 data/editor 로 옮기고 이 문의에 붙인다(api/lib/editor-uploads.php).
+    $iq_question = api_editor_tmp_finalize($iq_question, $member, api_editor_target('item_qa', $iqId))['html'];
+
     DB::execute(
         "UPDATE {$qnaTable}
          SET iq_subject = ?,
@@ -360,6 +363,10 @@ if ($apiMethod === 'POST' && $qnaAction === '') {
         $iq_name = trim(strip_tags((string) ($member['mb_nick'] ?? $member['mb_id'])));
     }
 
+    // 웹 에디터가 data/tmp 에 둔 사진을 data/editor 로 옮긴다 — 문의 번호는 등록 뒤에 붙인다.
+    $editorMoved = api_editor_tmp_finalize($iq_question, $member);
+    $iq_question = $editorMoved['html'];
+
     DB::execute(
         "INSERT INTO " . DB::table('g5_shop_item_qa_table') . " SET
             it_id       = ?,
@@ -383,6 +390,7 @@ if ($apiMethod === 'POST' && $qnaAction === '') {
     );
 
     $newId = DB::lastInsertId();
+    api_editor_attach($editorMoved['ids'], api_editor_target('item_qa', (int) $newId));
     if (function_exists('run_event')) {
         api_run_event('shop_item_qa_created', array($newId, $it_id), $member);
     }

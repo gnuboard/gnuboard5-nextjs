@@ -590,6 +590,13 @@ if (!$action && $apiMethod === 'PATCH') {
         $input['wr_option'] = api_build_wr_option(array('wr_option' => $options)); // 원본 순서(html, secret, mail)로
     }
 
+    // 수정 중에 새로 올린 사진(data/tmp)을 data/editor 로 옮기고 이 글에 붙인다(api/lib/editor-uploads.php).
+    if (isset($input['wr_content']) && is_string($input['wr_content'])) {
+        $input['wr_content'] = api_editor_tmp_finalize(
+            $input['wr_content'], $member, api_editor_target('write', (int) $wr_id, (int) $post['wr_parent'], $bo_table)
+        )['html'];
+    }
+
     // Build SET clause with only allowed fields using parameterized bindings
     $setClauses = [];
     $params     = [];

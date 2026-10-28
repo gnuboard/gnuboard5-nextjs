@@ -462,6 +462,7 @@ require_once __DIR__ . '/lib/helpers.php';
 require_once __DIR__ . '/lib/hooks.php'; // 그누보드 원본과 같은 훅(run_event / run_replace)을 API 동작에서도 부른다
 require_once __DIR__ . '/lib/image-variants.php';
 require_once __DIR__ . '/lib/editor-images.php';
+require_once __DIR__ . '/lib/editor-uploads.php'; // 에디터 사진 대장 — 임시(data/tmp) → 글 저장 때 data/editor
 require_once __DIR__ . '/lib/PushQueue.php';
 // 알림의 단 하나의 문. plugin/webapp/notify 에 있고, 없으면(옛 배치) 아무 것도 안 하는 대역을 둔다.
 if (is_file(dirname(__DIR__) . '/plugin/webapp/notify/Notify.php')) {

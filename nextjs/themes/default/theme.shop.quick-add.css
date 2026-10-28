@@ -87,7 +87,9 @@ body[data-g5-theme-source="default"]:has(.solune-shop-page) .product-quick-add-d
    옵션 고르기 창과 같은 틀(.product-quick-add-dialog)에 넓이와 입력칸 말씨만 더한다: 칸 이름 12.5 · 600,
    입력칸 높이 44 · 모서리 8, 별점 · 안내는 옅은 회색 상자, 비밀글은 고르면 초록 테두리 상자. */
 body[data-g5-theme-source="default"]:has(.solune-shop-page) .product-quick-add-dialog.product-write-dialog {
-  @media (min-width: 640px) { max-width: 560px; }
+  /* 자세한 후기 · 문의를 쓰도록 넓게 — 태블릿 680 · 데스크톱 760. */
+  @media (min-width: 640px) { max-width: 680px; }
+  @media (min-width: 1024px) { max-width: 760px; }
 
   .product-write-body label.block,
   .product-write-photos > p { margin-bottom: 6px; color: var(--solune-text-soft); font-size: 12.5px; font-weight: 600; }

@@ -93,7 +93,9 @@ if ($apiMethod === 'POST') {
         Response::error('Validation failed.', 422, $errors);
     }
 
-    $wr_content = $input['wr_content'];
+    // 웹 에디터가 data/tmp 에 둔 사진을 data/editor 로 옮긴다 — 댓글 번호는 등록 뒤에 붙인다(api/lib/editor-uploads.php).
+    $editorMoved = api_editor_tmp_finalize((string) $input['wr_content'], $member);
+    $wr_content = $editorMoved['html'];
 
     // ─── 동시성 락 ───
     // 같은 글에 두 사용자가 동시에 댓글을 달면 SELECT MAX + 1 패턴은
@@ -218,6 +220,7 @@ if ($apiMethod === 'POST') {
 
     // Get the inserted comment ID
     $commentId = (int) DB::lastInsertId();
+    api_editor_attach($editorMoved['ids'], api_editor_target('write', $commentId, (int) $wr_id, $bo_table));
 
     DB::execute(
         "INSERT INTO " . DB::table('board_new_table') . "
@@ -410,7 +413,10 @@ if ($apiMethod === 'PATCH') {
         ]);
     }
 
-    $wr_content = $input['wr_content'];
+    // 수정 중에 새로 올린 사진(data/tmp)을 data/editor 로 옮기고 이 댓글에 붙인다.
+    $wr_content = api_editor_tmp_finalize(
+        (string) $input['wr_content'], $member, api_editor_target('write', (int) $commentId, (int) $comment['wr_parent'], $bo_table)
+    )['html'];
     $now = date('Y-m-d H:i:s');
 
     // Option update — 요청에 비밀 여부(wr_secret · secret · wr_option)가 있을 때만 바꾼다.
