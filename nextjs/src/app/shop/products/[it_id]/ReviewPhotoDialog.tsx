@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Swiper as SwiperInstance } from "swiper";
 import { A11y } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -23,6 +23,8 @@ type ReviewPhotoDialogProps = {
   product: ReviewPhotoProduct;
   onClose: () => void;
   onPhotoError: (url: string) => void;
+  /** 지금 보는 후기의 [수정] · [삭제](쓴 사람 · 최고관리자에게만, 없으면 null) — 레퍼런스 .solune-review-lightbox-cmd. */
+  renderCommands?: (review: ShopReview) => ReactNode;
 };
 
 const ROUND_BUTTON =
@@ -30,7 +32,7 @@ const ROUND_BUTTON =
 
 /**
  * 포토 후기 크게 보기 — 레퍼런스 solune itemuse.skin.php 의 #solune-review-lightbox:
- * 왼쪽은 그 후기의 사진(넘기기 · 점), 오른쪽은 상품 머리 · 별 · 작성자 · 날짜 · 제목 · 본문 · "사진 N장",
+ * 왼쪽은 그 후기의 사진(넘기기 · 점), 오른쪽은 상품 머리 · 별 · 작성자 · 날짜 · 제목 · 본문(글과 사진) · "사진 N장",
  * 바닥은 [이전 후기] 위치 [다음 후기]. 폰에서는 사진이 위, 글이 아래로 쌓인다.
  * 사진 없는 후기로 넘어가면 사진 칸에 "사진 없음".
  */
@@ -42,6 +44,7 @@ export function ReviewPhotoDialog({
   product,
   onClose,
   onPhotoError,
+  renderCommands,
 }: ReviewPhotoDialogProps) {
   const [reviewIndex, setReviewIndex] = useState(startReview);
   const [photoIndex, setPhotoIndex] = useState(startPhoto);
@@ -54,6 +57,7 @@ export function ReviewPhotoDialog({
   const currentPhoto = Math.min(photoIndex, Math.max(photos.length - 1, 0));
 
   if (!review) return null;
+  const commands = renderCommands?.(review) ?? null;
 
   const goReview = (next: number) => {
     if (next < 0 || next >= reviews.length) return;
@@ -73,9 +77,11 @@ export function ReviewPhotoDialog({
       <DialogContent
         onKeyDown={handleKeyDown}
         showCloseButton={false}
-        className="review-photo-dialog flex max-h-[92dvh] w-[calc(100%-2rem)] max-w-[1040px] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-[1040px] md:grid md:h-[min(720px,88dvh)] md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]"
+        className="review-photo-dialog flex max-h-[92dvh] w-[calc(100%-2rem)] max-w-[1040px] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-[1040px] md:grid md:h-[min(720px,88dvh)] md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)]"
       >
-        <div className="review-photo-stage relative h-[42dvh] flex-none bg-neutral-900 md:h-full">
+        {/* 줄 높이를 창 높이로 묶는다(grid-rows minmax(0,1fr) · min-h-0). 묶지 않으면 세로로 긴 사진 · 긴 본문만큼 줄이
+            늘어나, 사진이 보이는 칸 아래로 처져 가운데를 벗어나고 바닥의 [이전 후기] · [다음 후기]가 창 밖에 잘린다. */}
+        <div className="review-photo-stage relative h-[42dvh] flex-none bg-neutral-900 md:h-full md:min-h-0">
           {photos.length > 0 ? (
             <Swiper
               key={review.is_id}
@@ -144,7 +150,7 @@ export function ReviewPhotoDialog({
           )}
         </div>
 
-        <div className="review-photo-side flex min-h-0 flex-1 flex-col">
+        <div className="review-photo-side flex min-h-0 flex-1 flex-col md:h-full">
           <div className="review-photo-head flex items-center gap-3 border-b px-5 py-3.5">
             {product.image ? (
               <img src={product.image} alt="" className="h-10 w-10 flex-none rounded-md object-cover" />
@@ -180,10 +186,12 @@ export function ReviewPhotoDialog({
             <DialogTitle className="review-photo-title mt-3 text-lg font-bold leading-snug">{review.is_subject}</DialogTitle>
             <DialogDescription asChild>
               <div>
-                {/* 사진은 왼쪽 칸이 보여 주므로 본문 안의 사진은 감춘다. */}
+                {/* 본문은 글과 사진 그대로 — 레퍼런스 .solune-review-lightbox-text: 문단 사이는 붙이고, 사진은 칸 폭을
+                    넘지 않게 줄여 위아래로 세운다. 넓은 사진은 500px 썸네일(is_content_view). 그리기 전에 user 정책으로
+                    거른다(허용한 태그 · 속성만, http · https 주소만 — on* · style · javascript: · data: 는 빠진다). */}
                 <SafeHtml
-                  className="review-photo-text prose prose-sm mt-3 max-w-none text-muted-foreground [&_img]:hidden"
-                  html={review.is_content}
+                  className="review-photo-text prose prose-sm mt-3 max-w-none leading-[1.85] text-muted-foreground [&_img]:my-2 [&_img]:block [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-lg [&_p]:my-0"
+                  html={review.is_content_view || review.is_content}
                   policy="user"
                 />
               </div>
@@ -191,6 +199,7 @@ export function ReviewPhotoDialog({
             {photos.length > 0 && (
               <p className="review-photo-chip mt-4 inline-flex rounded-full bg-muted px-3 py-1 text-xs">사진 {photos.length}장</p>
             )}
+            {commands ? <div className="review-photo-cmd mt-4 flex gap-2">{commands}</div> : null}
           </div>
 
           <div className="review-photo-foot flex items-center justify-between gap-3 border-t bg-muted/60 px-5 py-3.5">

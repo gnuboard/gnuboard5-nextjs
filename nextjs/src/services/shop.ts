@@ -311,10 +311,11 @@ export async function getShopShippingQuote(params: {
 
 export async function getShopProductReviews(
   itId: string,
-  page = 1
+  page = 1,
+  perPage?: number
 ): Promise<ShopReview[]> {
   const response = await apiClient.get<unknown>("/shop/reviews", {
-    params: { it_id: itId, page },
+    params: { it_id: itId, page, per_page: perPage },
   });
 
   return validateApiData(response.data, shopReviewListSchema, []);
@@ -327,10 +328,11 @@ export async function getShopProductReviews(
 export async function getShopProductReviewPage(
   itId: string,
   page = 1,
-  focusIsId?: number
+  focusIsId?: number,
+  perPage?: number
 ): Promise<ShopReviewListResult> {
   const response = await apiClient.get<unknown>("/shop/reviews", {
-    params: { it_id: itId, page, focus_is_id: focusIsId || undefined },
+    params: { it_id: itId, page, focus_is_id: focusIsId || undefined, per_page: perPage },
   });
 
   return {
@@ -348,6 +350,7 @@ export async function getShopReviews(
       per_page: params.perPage,
       q: params.q || undefined,
       sfl: params.q && params.sfl ? params.sfl : undefined,
+      it_id: params.itId || undefined,
     },
   });
 
@@ -405,6 +408,8 @@ export interface ShopReviewListParams {
   q?: string;
   /** 검색 항목 — 그누보드 itemuselist 의 sfl(i.it_name · r.it_id · r.is_subject · r.is_content · r.is_name · r.mb_id). */
   sfl?: string;
+  /** 이 상품의 후기만 — 상품코드가 정확히 같은 것(검색의 r.it_id 는 앞부분 일치라 다른 상품이 섞일 수 있다). */
+  itId?: string;
 }
 
 export interface ShopReviewListResult {

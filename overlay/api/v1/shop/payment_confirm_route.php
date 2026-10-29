@@ -14,6 +14,35 @@ if (!function_exists('shop_payment_awaiting_deposit')) {
             && (int) ($order['od_misu'] ?? 0) > 0;
     }
 }
+
+if (!function_exists('shop_payment_confirm_already_confirmed')) {
+    /**
+     * '준비'가 아닌 주문에 같은 결제의 확인이 다시 왔는가(응답을 못 받은 앱의 재전송) — 같은 PG 이고 저장된 거래번호와
+     * 같거나 거래번호 없이 왔으면 성공 응답 data, 아니면 null.
+     */
+    function shop_payment_confirm_already_confirmed(array $order, string $pgService, array $input, string $orderId): ?array
+    {
+        $storedTno = trim((string) ($order['od_tno'] ?? ''));
+        $requestTno = pg_mobile_request_value($input, [
+            'payment_key', 'paymentKey',
+            'tid', 'TID', 'TxTid', 'P_TID',
+            'tno', 'TNO',
+        ]);
+        if (!in_array((string) ($order['od_status'] ?? ''), ['주문', '입금'], true)
+            || strtolower(trim((string) ($order['od_pg'] ?? ''))) !== $pgService
+            || $storedTno === ''
+            || ($requestTno !== '' && $requestTno !== $storedTno)) {
+            return null;
+        }
+        return [
+            'order_id' => $orderId,
+            'tno'      => $storedTno,
+            'status'   => (string) $order['od_status'],
+            'awaiting_deposit' => shop_payment_awaiting_deposit($order),
+            'already_confirmed' => true,
+        ];
+    }
+}
 // =========================================================================
 // POST /v1/shop/payment/confirm
 // PG-side verification + order finalization
@@ -62,52 +91,23 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
         Response::error('Payment provider mismatch.', 422);
     }
     if ($order['od_status'] !== '준비') {
-        $storedTno = trim((string) ($order['od_tno'] ?? ''));
-        $requestTno = pg_mobile_request_value($input, [
-            'payment_key', 'paymentKey',
-            'tid', 'TID', 'TxTid', 'P_TID',
-            'tno', 'TNO',
-        ]);
-        if (in_array($order['od_status'], ['주문', '입금'], true)
-            && $preparedPgNormalized === $pg_service
-            && $storedTno !== ''
-            && ($requestTno === '' || $requestTno === $storedTno)) {
-            Response::success([
-                'order_id' => (string) $order_id,
-                'tno'      => $storedTno,
-                'status'   => (string) $order['od_status'],
-                'awaiting_deposit' => shop_payment_awaiting_deposit($order),
-                'already_confirmed' => true,
-            ]);
+        $done = shop_payment_confirm_already_confirmed($order, $pg_service, $input, (string) $order_id);
+        if ($done !== null) {
+            Response::success($done);
         }
         Response::error('Order is not in pending state.', 400);
     }
 
-    // PG-specific verification
     $cfg = pg_load_config();
     if (!$cfg) {
         Response::error('Shop config not found.', 500);
     }
-    $verifyResult = shop_payment_confirm_verify_pg($pg_service, $input, $cfg, (string) $order_id, $amount, $order);
 
-    if (!$verifyResult['ok']) {
-        if (!empty($verifyResult['restore_cart'])) {
-            // 명확한 실패만 카트 복구. timeout/망취소 실패처럼 PG 승인 가능성이 있으면 보류한다.
-            shop_api_restore_pending_order_cart($order, $member, '결제 실패: ' . $verifyResult['error']);
-            // SC-02: 오류 envelope 에는 data 가 없으므로 복원 카트 id 는 errors.cart_id 로 준다.
-            Response::error('Payment verification failed: ' . $verifyResult['error'], 400, [
-                'cart_id' => shop_api_last_cart_id(),
-            ]);
-        }
-
-        pg_append_order_history((string) $order_id, '결제 대사 필요: ' . (string) $verifyResult['error']);
-        // SC-14: 앱은 message 대신 errors.code 로 분기한다(재전송 금지 → 고객센터 안내).
-        Response::error('Payment result requires manual reconciliation: ' . $verifyResult['error'], 409, [
-            'code' => 'manual_reconciliation',
-        ]);
-    }
-
+    // 주문 잠금은 PG 승인 앞에서 잡는다 — 주문을 바꾸는 쪽(자동 취소 · 주문 취소 · 결제 취소 · 입금통보 · 구매확정)이 모두
+    // 이 잠금을 쓰므로, 잠근 뒤 '준비'를 다시 보고 승인하면 그사이 취소된 초안에 돈만 받는 일이 없다(SC-15 남은 위험).
+    // 같은 확인이 겹쳐 오면 둘째는 여기서 기다리다 409 confirm_in_progress 로 돌아가 PG 를 두 번 부르지 않는다.
     // 잠금 이름은 DB 의 주문번호로(shop_api_order_lock_name 과 같은 이유 — 앞에 0 을 붙인 order_id 도 같은 주문을 찾는다).
+    // Response::* 는 exit 하므로 응답 앞에서 잠금을 직접 푼다(연결이 닫혀도 풀리지만 기다리지 않게).
     $lock = pg_payment_confirm_acquire_lock((string) $order['od_id']);
     if (empty($lock['ok'])) {
         // SC-14: confirm_in_progress(다른 확인이 진행 중 — 2/4/8초 백오프) | lock_busy(락 오류 — 짧게 재시도)
@@ -116,8 +116,54 @@ if ($apiMethod === 'POST' && $action === 'confirm') {
             'lock_error' => (string) ($lock['error'] ?? ''),
         ]);
     }
-
     $lockName = (string) ($lock['lock'] ?? '');
+
+    $order = DB::fetch(
+        "SELECT * FROM " . DB::table('g5_shop_order_table') . " WHERE od_id = ? LIMIT 1",
+        [$order['od_id']]
+    );
+    if (!$order || (string) $order['od_status'] !== '준비') {
+        pg_payment_confirm_release_lock($lockName);
+        $done = $order ? shop_payment_confirm_already_confirmed($order, $pg_service, $input, (string) $order_id) : null;
+        if ($done !== null) {
+            if (!$member && empty($order['mb_id'])) {
+                $done['uid'] = shop_api_set_guest_order_cookie($order);
+            }
+            Response::success($done);
+        }
+        Response::error('Order is not in pending state.', 400);
+    }
+    if ((int) ($order['od_receipt_price'] ?? 0) + (int) ($order['od_misu'] ?? 0) !== $amount) {
+        pg_payment_confirm_release_lock($lockName);
+        Response::error('Amount mismatch.', 422);
+    }
+
+    // PG-specific verification
+    try {
+        $verifyResult = shop_payment_confirm_verify_pg($pg_service, $input, $cfg, (string) $order_id, $amount, $order);
+    } catch (Throwable $e) {
+        pg_payment_confirm_release_lock($lockName);
+        throw $e;
+    }
+
+    if (!$verifyResult['ok']) {
+        if (!empty($verifyResult['restore_cart'])) {
+            // 명확한 실패만 카트 복구. timeout/망취소 실패처럼 PG 승인 가능성이 있으면 보류한다. 잠근 채로 되돌린다.
+            shop_api_restore_pending_order_cart($order, $member, '결제 실패: ' . $verifyResult['error']);
+            pg_payment_confirm_release_lock($lockName);
+            // SC-02: 오류 envelope 에는 data 가 없으므로 복원 카트 id 는 errors.cart_id 로 준다.
+            Response::error('Payment verification failed: ' . $verifyResult['error'], 400, [
+                'cart_id' => shop_api_last_cart_id(),
+            ]);
+        }
+
+        pg_append_order_history((string) $order_id, '결제 대사 필요: ' . (string) $verifyResult['error']);
+        pg_payment_confirm_release_lock($lockName);
+        // SC-14: 앱은 message 대신 errors.code 로 분기한다(재전송 금지 → 고객센터 안내).
+        Response::error('Payment result requires manual reconciliation: ' . $verifyResult['error'], 409, [
+            'code' => 'manual_reconciliation',
+        ]);
+    }
     // 회원은 주문 만들기(무통장)와 같은 회원 잠금도 잡는다 — 다른 주문의 확정과 동시에 같은 쿠폰을 쓰지 못하게.
     // 못 잡으면 PG 를 취소하지 않고 "진행 중"으로 돌려보낸다(앱이 다시 시도한다). 이름 잠금을 하나만 드는 옛 DB 에서는
     // 둘째 잠금이 위 주문 잠금을 풀어 버리므로 잡지 않는다 — 그때도 쿠폰 중복은 아래 INSERT 가 막는다(PG 취소).

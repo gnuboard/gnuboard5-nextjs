@@ -2,12 +2,13 @@
 
 import { useEffect, useId, useState, type ChangeEvent, type FormEvent } from "react";
 import { api } from "@/lib/api";
-import type { ShopPolicy } from "@/lib/api";
+import type { ShopPolicy, ShopReview } from "@/lib/api";
+import { updateShopReview } from "@/services/shop";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RichTextField, useSiteEditor } from "@/components/editor/RichTextField";
 import { EDITOR_UPLOAD_STAGE } from "@/components/editor/useEditorImageUpload";
-import { hasContent } from "@/lib/editor-content";
+import { contentForEditor, hasContent } from "@/lib/editor-content";
 import { toastSuccess, toastError } from "@/lib/toast";
 import { ProductWriteDialog, ReviewPhotoField, ReviewScorePicker, WRITE_CONTENT_CLASS } from "./ProductWriteDialog";
 
@@ -21,6 +22,7 @@ export function ReviewForm({
   initialOpen = false,
   triggerLabel = "+ 후기 작성",
   triggerClassName,
+  review,
 }: {
   itId: string;
   itName: string;
@@ -31,6 +33,8 @@ export function ReviewForm({
   /** 창을 여는 단추 — 사용후기 탭 요약 상자의 "사용후기 쓰기"처럼 자리마다 글자 · 모양이 다르다. */
   triggerLabel?: string;
   triggerClassName?: string;
+  /** 고칠 후기 — 주면 그 후기로 채워 열고 PATCH 로 고친다(쓴 사람 · 최고관리자, 후기 목록의 [수정]). */
+  review?: ShopReview;
 }) {
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState("");
@@ -51,6 +55,16 @@ export function ReviewForm({
       setOpen(true);
     }
   }, [initialOpen]);
+
+  // 고칠 때는 열 때마다 그 후기로 채운다. 에디터로 고칠 때 글자 후기는 줄마다 문단으로 넣는다(마이페이지와 같다).
+  const openForm = () => {
+    if (review) {
+      setSubject(review.is_subject);
+      setContent(siteEditor ? contentForEditor(review.is_content) : review.is_content);
+      setScore(Math.min(5, Math.max(1, Number(review.is_score) || 5)));
+    }
+    setOpen(true);
+  };
 
   // 닫으면 올려 둔 사진만 비운다 — 제목 · 내용 · 평점은 다시 열 때 이어 쓴다.
   const close = () => {
@@ -109,13 +123,14 @@ export function ReviewForm({
         .map((url) => `<p><img src="${url.replace(/"/g, "&quot;")}" alt="" /></p>`)
         .join("\n");
       const reviewContent = [content.trim(), imageHtml].filter(Boolean).join("\n");
-      await api.post("/shop/reviews", {
-        it_id: itId,
-        is_subject: subject.trim(),
-        is_content: reviewContent,
-        is_score: score,
-      });
-      toastSuccess("후기가 등록되었습니다.");
+      const payload = { is_subject: subject.trim(), is_content: reviewContent, is_score: score };
+      if (review) {
+        await updateShopReview(review.is_id, payload);
+        toastSuccess("후기가 수정되었습니다.");
+      } else {
+        await api.post("/shop/reviews", { it_id: itId, ...payload });
+        toastSuccess("후기가 등록되었습니다.");
+      }
       setSubject("");
       setContent("");
       setScore(5);
@@ -123,7 +138,7 @@ export function ReviewForm({
       setOpen(false);
       onSubmitted();
     } catch (err: unknown) {
-      const m = err instanceof Error ? err.message : "등록 실패";
+      const m = err instanceof Error ? err.message : review ? "수정 실패" : "등록 실패";
       toastError(m);
     } finally {
       setSubmitting(false);
@@ -132,19 +147,20 @@ export function ReviewForm({
 
   return (
     <>
-      <Button variant="outline" size="sm" className={triggerClassName} onClick={() => setOpen(true)}>
+      <Button variant="outline" size="sm" className={triggerClassName} onClick={openForm}>
         {triggerLabel}
       </Button>
       {open && (
         <ProductWriteDialog
-          title="상품후기 작성"
+          title={review ? "상품후기 수정" : "상품후기 작성"}
           itName={itName}
           itImage={itImage}
           formId={formId}
-          submitLabel="후기 등록"
+          submitLabel={review ? "수정하기" : "후기 등록"}
           busy={submitting}
           onClose={close}
           notice={
+            review ? undefined : (
             <>
               {policy?.review_requires_completed_order
                 ? "주문 상태가 완료인 상품에만 후기 작성 가능합니다."
@@ -153,6 +169,7 @@ export function ReviewForm({
                 ? " 등록한 후기는 관리자 확인 후 노출됩니다."
                 : " 등록한 후기는 바로 노출됩니다."}
             </>
+            )
           }
         >
           <form id={formId} className="space-y-4" onSubmit={handleSubmit}>

@@ -112,7 +112,7 @@ interface ProductDetailViewProps {
   canWriteQa: boolean;
   shippingPolicy: ShopPolicy | null;
   legacyProductForm: string;
-  onReviewSubmitted: () => void;
+  onReviewSubmitted: (options?: { keepPage?: boolean }) => void;
   onQaSubmitted: () => void;
   reviews: ShopReview[];
   reviewSummary: ShopReviewSummary | null;
@@ -261,9 +261,13 @@ export function ProductDetailView({
       count: 0,
       percentage: 0,
     }));
+  // 구매 패널의 별점 · 리뷰 수 — 후기 요약을 다시 받았으면(새 후기를 쓴 뒤 등) 그 수로. 탭 숫자도 같은 수다.
+  const ratedProduct = reviewSummary
+    ? { ...product, review_count: reviewSummary.total, review_avg: reviewSummary.average }
+    : product;
   const tabs: ProductDetailTab[] = [
     { id: "description", label: "상품설명" },
-    { id: "reviews", label: "상품후기", count: product.review_count ?? 0 },
+    { id: "reviews", label: "상품후기", count: reviewTotal },
     { id: "qa", label: "상품문의", count: qaTotal ?? product.qa_count ?? 0 },
     { id: "shipping", label: "배송정보" },
   ];
@@ -324,6 +328,7 @@ export function ProductDetailView({
 
         <ProductPurchasePanel
           {...purchaseControlProps}
+          product={ratedProduct}
           productRewriteMode={productRewriteMode}
           hasDiscount={hasDiscount}
           discountPercent={discountPercent}

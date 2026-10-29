@@ -15,6 +15,7 @@ import type { BbsRewriteMode } from "@/lib/board-url";
 import { isBbsSeoRewrite } from "@/lib/board-url";
 import { useRuntimeRouteParam, useRuntimeRouteReady } from "@/hooks/use-runtime-route-param";
 import { STATIC_PRODUCT_SENTINELS } from "./static-fallback";
+import { REVIEW_PAGE_SIZE } from "./review-photo-strip";
 import { useRecentProductsStore } from "@/store/recent-products";
 import {
   addCartItemDirect,
@@ -28,7 +29,6 @@ import {
   getShopShippingFreeThreshold,
   getShopProductReviewSummary,
   getShopProductQaPage,
-  getShopProductReviews,
   getShopProductReviewPage,
 } from "@/services/shop";
 import { getClientPublicSettings } from "@/services/settings";
@@ -89,6 +89,8 @@ export default function ProductDetailClient({
   const [reviewLastPage, setReviewLastPage] = useState(1);
   // 주소의 ?is_id= — 첫 불러오기에서만 서버에 넘겨 그 후기가 있는 쪽을 연다. 쪽을 옮기면 비운다.
   const [pendingFocusIsId, setPendingFocusIsId] = useState(0);
+  // 사용후기를 다시 받는 표 — 새 후기를 쓰면 올려, 이미 1쪽이어도 쪽 번호 · 요약까지 새로 받게 한다.
+  const [reviewReload, setReviewReload] = useState(0);
   const [qaPage, setQaPage] = useState(1);
   // 상품문의 쪽 — 사용후기와 같다(서버가 연 쪽 · 마지막 쪽 · 주소의 ?iq_id= 를 첫 불러오기에서만).
   const [qaShownPage, setQaShownPage] = useState(1);
@@ -323,7 +325,7 @@ export default function ProductDetailClient({
   useEffect(() => {
     if (activeTab === "reviews" && it_id) {
       Promise.all([
-        getShopProductReviewPage(it_id, reviewPage, pendingFocusIsId || undefined).catch(() => null),
+        getShopProductReviewPage(it_id, reviewPage, pendingFocusIsId || undefined, REVIEW_PAGE_SIZE).catch(() => null),
         getShopProductReviewSummary(it_id).catch(() => null),
       ]).then(([nextPage, nextSummary]) => {
         setReviews(nextPage?.items ?? []);
@@ -332,7 +334,7 @@ export default function ProductDetailClient({
         setReviewSummary(nextSummary);
       });
     }
-  }, [activeTab, reviewPage, it_id, pendingFocusIsId]);
+  }, [activeTab, reviewPage, it_id, pendingFocusIsId, reviewReload]);
 
   /** 사용후기 쪽 옮기기 — 찾아간 후기 표시는 그만두고, 탭 머리로 올라가 새 쪽을 처음부터 보게 한다. */
   const handleReviewPageChange = useCallback((nextPage: number) => {
@@ -500,14 +502,17 @@ export default function ProductDetailClient({
     }
   }, [product, requireLogin, handleMemberActionError]);
 
-  const handleReviewSubmitted = useCallback(() => {
-    if (!product) return;
-    getShopProductReviews(product.it_id, 1).then(setReviews).catch(() => undefined);
-    getShopProductReviewSummary(product.it_id)
-      .then(setReviewSummary)
-      .catch(() => undefined);
-    setReviewPage(1);
-  }, [product]);
+  const handleReviewSubmitted = useCallback(
+    (options?: { keepPage?: boolean }) => {
+      if (!product) return;
+      // 새 후기는 맨 앞(1쪽)에 선다. 고치거나 지웠으면(keepPage) 지금 보이는 쪽을 다시 받는다 — ?is_id= 로 찾아온
+      // 쪽이면 reviewPage 와 다를 수 있어 보이는 쪽(reviewShownPage)으로. 후기 · 쪽 번호 · 요약은 한 번에 새로 받는다.
+      setPendingFocusIsId(0);
+      setReviewPage(options?.keepPage ? reviewShownPage : 1);
+      setReviewReload((count) => count + 1);
+    },
+    [product, reviewShownPage]
+  );
 
   const handleQaSubmitted = useCallback(() => {
     if (!product) return;

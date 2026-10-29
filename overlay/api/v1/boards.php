@@ -503,13 +503,8 @@ if ($bo_table && $subResource === 'posts' && $apiMethod === 'POST') {
 
     $write_table = DB::writeTable($bo_table);
 
-    // 어드민은 anti-spam 우회. 일반 회원만 throttle 체크.
-    if ($adminRole === '') {
-        $throttleMsg = Throttle::checkPostCreate($write_table, (string) $member['mb_id']);
-        if ($throttleMsg !== null) {
-            Response::error($throttleMsg, 429);
-        }
-    }
+    // 회원별 잠금 → 방금 쓴 같은 글이면 그 글로 응답 → 쿨다운(어드민 우회). 막히면 여기서 응답하고 끝난다.
+    Throttle::guardPostCreate($write_table, $member, $input, $adminRole === '');
 
     $writePoint = (int) ($board['bo_write_point'] ?? 0);
     $memberPoint = (int) ($member['mb_point'] ?? 0);

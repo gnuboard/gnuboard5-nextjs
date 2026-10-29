@@ -126,7 +126,8 @@ function api_view_thumbnail_html($html, $thumb_width)
             }
             $path = api_editor_image_path($ref[0], $ref[1]);
             $size = $path !== '' ? @getimagesize($path) : false;
-            if (!$size || ($size[2] === IMAGETYPE_GIF && function_exists('is_animated_gif') && is_animated_gif($path))) {
+            // 움직이는 GIF · WebP · APNG 는 그대로 — 썸네일은 첫 장면만 남는다(image-variants 의 api_image_is_still).
+            if (!$size || !api_image_is_still($path, (string) ($size['mime'] ?? ''))) {
                 return $tag;
             }
 

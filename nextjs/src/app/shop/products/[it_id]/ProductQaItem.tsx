@@ -42,8 +42,9 @@ export function QaListItem({ qa, onChanged }: { qa: ShopQA; onChanged: () => voi
   const isLocked = qa.can_view === false;
   const isSecret = String(qa.iq_secret ?? "0") === "1";
   const isAnswered = qa.is_answered === true || (qa.iq_answer ?? "").trim() !== "";
-  const canEdit = qa.can_edit === true && !isLocked && !isAnswered;
-  const canDelete = qa.can_delete === true && !isAnswered;
+  // 수정 · 삭제는 서버가 정한다 — 최고관리자는 늘, 쓴 사람은 답이 달리기 전까지(영카트 itemqa.skin.php).
+  const canEdit = qa.can_edit === true && !isLocked;
+  const canDelete = qa.can_delete === true;
 
   useEffect(() => {
     setEditing(false);

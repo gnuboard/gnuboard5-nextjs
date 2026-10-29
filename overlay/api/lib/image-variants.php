@@ -18,6 +18,9 @@ if (!defined('_GNUBOARD_')) {
     exit;
 }
 
+// 움직이는 그림 판별(api_image_is_still · api_image_is_animated_*) — 사본을 만들지 정할 때 쓴다.
+require_once __DIR__ . '/image-frames.php';
+
 /** WebP 품질. 측정에서 갤러리 PNG 8장 509KB → 79KB, 눈으로 구분하기 어려웠다. */
 const API_IMAGE_WEBP_QUALITY = 80;
 /** 이보다 큰 그림은 바꾸지 않는다 — GD 가 픽셀마다 메모리를 잡아 공유호스팅 한도를 넘긴다. */
@@ -127,7 +130,8 @@ if (!function_exists('api_image_variant_widths')) {
             }
         }
 
-        return array_values(array_unique(array_merge([240, 400, 800, 1440, 1920], api_image_board_view_widths(), $galleryWidths)));
+        // 500 — 영카트 사용후기 본문 사진 폭(shop/itemuse.php 의 $thumbnail_width, SHOP_REVIEW_VIEW_WIDTH).
+        return array_values(array_unique(array_merge([240, 400, 500, 800, 1440, 1920], api_image_board_view_widths(), $galleryWidths)));
     }
 }
 
@@ -348,53 +352,6 @@ if (!function_exists('api_image_cropped_copy')) {
         }
 
         return api_image_core_thumbnail($source_path, $width, $height, true);
-    }
-}
-
-if (!function_exists('api_image_is_animated_png')) {
-    /**
-     * 움직이는 PNG(APNG)인지 — 첫 그림 조각(IDAT) 앞에 애니메이션 조각(acTL)이 있으면 그렇다.
-     * GD 로 옮기면 첫 장면만 남으므로 GIF · WebP 처럼 건드리지 않는다.
-     */
-    function api_image_is_animated_png(string $path): bool
-    {
-        $fp = @fopen($path, 'rb');
-        if (!$fp) {
-            return false;
-        }
-        $animated = false;
-        if (fread($fp, 8) === "\x89PNG\r\n\x1a\n") {
-            while (!feof($fp)) {
-                $head = fread($fp, 8);
-                if (strlen($head) < 8) {
-                    break;
-                }
-                $length = unpack('N', substr($head, 0, 4))[1];
-                $type = substr($head, 4, 4);
-                if ($type === 'acTL') {
-                    $animated = true;
-                    break;
-                }
-                if ($type === 'IDAT' || $type === 'IEND' || fseek($fp, $length + 4, SEEK_CUR) !== 0) {
-                    break;
-                }
-            }
-        }
-        fclose($fp);
-
-        return $animated;
-    }
-}
-
-if (!function_exists('api_image_is_still')) {
-    /** 움직이지 않는 그림인지 — GIF · WebP 는 통째로, PNG 는 APNG 가 아닐 때만. 움직이는 그림은 줄이면 첫 장면만 남는다. */
-    function api_image_is_still(string $path, string $mime): bool
-    {
-        if ($mime === 'image/gif' || $mime === 'image/webp') {
-            return false;
-        }
-
-        return !($mime === 'image/png' && api_image_is_animated_png($path));
     }
 }
 

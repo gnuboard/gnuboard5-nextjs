@@ -25,6 +25,11 @@ $subAction = isset($shopSegments[0]) ? $shopSegments[0] : '';
 
 require_once __DIR__ . '/reviews_helpers.php';
 
+/** 사용후기 본문 사진의 썸네일 폭 — 영카트 shop/itemuse.php 의 $thumbnail_width(이 폭은 image-variants 가 받는다). */
+if (!defined('SHOP_REVIEW_VIEW_WIDTH')) {
+    define('SHOP_REVIEW_VIEW_WIDTH', 500);
+}
+
 // ----- GET /v1/shop/reviews/summary?it_id=XXX - Review score distribution -----
 if ($subAction === 'summary') {
     if ($apiMethod !== 'GET') {
@@ -48,6 +53,21 @@ if ($subAction === 'summary') {
     ) ?: [];
 
     $total = (int) ($base['total'] ?? 0);
+    $photoCount = (int) ($base['photo_count'] ?? 0);
+    // 상품 하나면 사진이 든 후기만 골라 다시 센다 — 화면이 지우는 사진(shop_api_review_dropped_photo_hosts)만 있는
+    // 후기는 포토 후기가 아니다. 전체 요약은 사진 수를 쓰지 않으므로 SQL 셈 그대로(다 읽지 않는다).
+    if ($it_id !== '' && $photoCount > 0) {
+        $photoRows = DB::fetchAll(
+            "SELECT is_content FROM {$reviewTable} WHERE {$scopeSql} AND is_content LIKE '%<img%'",
+            $scopeParams
+        );
+        $photoCount = 0;
+        foreach ($photoRows as $photoRow) {
+            if (shop_api_review_has_visible_photo((string) ($photoRow['is_content'] ?? ''))) {
+                $photoCount++;
+            }
+        }
+    }
     $scoreRows = DB::fetchAll(
         "SELECT is_score, COUNT(*) AS cnt
          FROM {$reviewTable}
@@ -73,7 +93,7 @@ if ($subAction === 'summary') {
     Response::success([
         'total' => $total,
         'average' => round((float) ($base['average_score'] ?? 0), 1),
-        'photo_count' => (int) ($base['photo_count'] ?? 0),
+        'photo_count' => $photoCount,
         'scores' => $scores,
     ]);
 }
@@ -106,6 +126,11 @@ if ($subAction !== '' && preg_match('/^\d+$/', (string) $subAction)) {
     $reviewId = (int) $subAction;
     $reviewTable = DB::table('g5_shop_item_use_table');
     $itemTable = DB::table('g5_shop_item_table');
+    // 최고관리자는 남의 후기도 보고 고치고 지운다 — 영카트 itemuse.skin.php · itemuseformupdate.php 의 $is_admin.
+    // 그 밖에는 내 후기만(mb_id 조건).
+    $isAdmin = Auth::adminRole($member) === 'super';
+    $ownerSql = $isAdmin ? '' : ' AND mb_id = ?';
+    $ownerParams = $isAdmin ? [] : [$member['mb_id']];
 
     $review = DB::fetch(
         "SELECT r.is_id, r.it_id, r.mb_id, r.is_subject, r.is_content, r.is_score,
@@ -113,8 +138,8 @@ if ($subAction !== '' && preg_match('/^\d+$/', (string) $subAction)) {
                 i.it_name, i.ca_id, i.it_price, i.it_img1, i.it_seo_title
          FROM {$reviewTable} r
          LEFT JOIN {$itemTable} i ON i.it_id = r.it_id
-         WHERE r.is_id = ? AND r.mb_id = ? LIMIT 1",
-        [$reviewId, $member['mb_id']]
+         WHERE r.is_id = ?" . ($isAdmin ? '' : ' AND r.mb_id = ?') . " LIMIT 1",
+        array_merge([$reviewId], $ownerParams)
     );
     if (!$review) {
         Response::error('Product review not found.', 404);
@@ -131,8 +156,8 @@ if ($subAction !== '' && preg_match('/^\d+$/', (string) $subAction)) {
 
         DB::execute(
             "DELETE FROM {$reviewTable}
-             WHERE is_id = ? AND mb_id = ?",
-            [$reviewId, $member['mb_id']]
+             WHERE is_id = ?{$ownerSql}",
+            array_merge([$reviewId], $ownerParams)
         );
         if (function_exists('run_event')) {
             api_run_event('shop_item_use_deleted', array($reviewId, (string) ($review['it_id'] ?? '')), $member);
@@ -174,8 +199,8 @@ if ($subAction !== '' && preg_match('/^\d+$/', (string) $subAction)) {
          SET is_subject = ?,
              is_content = ?,
              is_score = ?
-         WHERE is_id = ? AND mb_id = ?",
-        [$is_subject, $is_content, $is_score, $reviewId, $member['mb_id']]
+         WHERE is_id = ?{$ownerSql}",
+        array_merge([$is_subject, $is_content, $is_score, $reviewId], $ownerParams)
     );
     // 본문에서 뺀 사진은 이 후기에서 뗀다 — 며칠 뒤 정리된다(api/lib/editor-uploads.php).
     api_editor_release_removed(api_editor_target('item_use', $reviewId), $is_content);
@@ -193,8 +218,8 @@ if ($subAction !== '' && preg_match('/^\d+$/', (string) $subAction)) {
                 i.it_name, i.ca_id, i.it_price, i.it_img1, i.it_seo_title
          FROM {$reviewTable} r
          LEFT JOIN {$itemTable} i ON i.it_id = r.it_id
-         WHERE r.is_id = ? AND r.mb_id = ? LIMIT 1",
-        [$reviewId, $member['mb_id']]
+         WHERE r.is_id = ?" . ($isAdmin ? '' : ' AND r.mb_id = ?') . " LIMIT 1",
+        array_merge([$reviewId], $ownerParams)
     );
 
     Response::success(shop_api_format_my_review_row($updated));
@@ -259,6 +284,11 @@ if ($apiMethod === 'GET' && $subAction === '') {
 
     $it_id = isset($_GET['it_id']) ? trim($_GET['it_id']) : '';
     [$page, $perPage, $offset] = api_page_params(20, 100);
+    // 보는 사람 — 후기마다 수정 · 삭제 단추를 낼지(can_edit · can_delete). 영카트 itemuse.skin.php 처럼
+    // 최고관리자이거나 쓴 사람. 응답은 private · no-store 라 사람마다 달라도 된다.
+    $viewer = Auth::getUser();
+    $viewerId = !empty($viewer['mb_id']) ? (string) $viewer['mb_id'] : '';
+    $viewerIsAdmin = $viewer && Auth::adminRole($viewer) === 'super';
     $q       = trim((string) ($_GET['q'] ?? ($_GET['stx'] ?? '')));
     $sfl     = trim((string) ($_GET['sfl'] ?? ''));
     $sst     = trim((string) ($_GET['sst'] ?? 'r.is_id'));
@@ -359,7 +389,8 @@ if ($apiMethod === 'GET' && $subAction === '') {
     $reviews = [];
     foreach ($rows as $row) {
         $productImage = api_image_url_with_width(shop_api_item_image_url($row['it_id'] ?? '', $row['it_img1'] ?? ''), 400);
-        $reviews[] = [
+        $canMutate = $viewerIsAdmin || ($viewerId !== '' && $viewerId === (string) $row['mb_id']);
+        $review = [
             'is_id'      => $row['is_id'],
             'it_id'      => $row['it_id'],
             'it_name'    => $row['it_name'] ?? '',
@@ -374,6 +405,8 @@ if ($apiMethod === 'GET' && $subAction === '') {
             'is_time'    => $row['is_time'],
             'is_confirm' => $row['is_confirm'],
             'mb_nick'    => $row['is_name'],
+            'can_edit'   => $canMutate,
+            'can_delete' => $canMutate,
             // 관리자 답변(그누보드 itemuselist 의 내용보기 겹창에 함께 나온다).
             'is_reply_subject' => (string) ($row['is_reply_subject'] ?? ''),
             'is_reply_content' => (string) ($row['is_reply_content'] ?? ''),
@@ -382,6 +415,17 @@ if ($apiMethod === 'GET' && $subAction === '') {
             // 후기 카드 사진 — 후기 본문의 첫 사진, 없으면 상품 사진(그누보드 get_itemuselist_thumbnail 과 같다).
             'thumbnail_url' => api_editor_first_image_url($row['is_content'] ?? '', 400) ?: $productImage,
         ];
+        // 상품 상세 사용후기 탭의 펼친 본문 — 영카트 shop/itemuse.php 처럼 SHOP_REVIEW_VIEW_WIDTH 보다 넓은 에디터
+        // 사진을 그 폭의 썸네일로(get_view_thumbnail). 바뀐 사진이 있을 때만 싣는다 — is_content 는 그대로 두어
+        // 사진 줄 · 크게 보기 창이 원본을 쓴다.
+        if ($it_id !== '') {
+            $rawContent = (string) ($row['is_content'] ?? '');
+            $viewContent = api_view_thumbnail_html($rawContent, SHOP_REVIEW_VIEW_WIDTH);
+            if ($viewContent !== $rawContent) {
+                $review['is_content_view'] = api_rewrite_editor_image_urls($viewContent);
+            }
+        }
+        $reviews[] = $review;
     }
 
     Response::paginated($reviews, $total, $page, $perPage);

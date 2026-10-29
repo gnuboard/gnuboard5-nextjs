@@ -16,7 +16,8 @@ import { cn, formatPrice } from "@/lib/utils";
 import { useThemeSlot } from "@/components/providers/ThemeSlotsProvider";
 import { ReviewForm, QaForm } from "./ProductReviewQaForms";
 import { QaListItem } from "./ProductQaItem";
-import { ReviewList, ReviewSummaryBox } from "./ProductReviewList";
+import { ReviewList, ReviewSummaryBox, useRecentPhotoReviews } from "./ProductReviewList";
+import { photoReviewTotal } from "./review-photo-strip";
 
 export type ProductDetailTab = {
   id: string;
@@ -64,7 +65,8 @@ export function ProductDetailTabs({
   canWriteQa: boolean;
   shippingPolicy: ShopPolicy | null;
   legacyProductForm: string;
-  onReviewSubmitted: () => void;
+  /** 후기를 쓰거나(1쪽으로) 고치고 지운 뒤(keepPage — 보던 쪽 그대로) 다시 받는다. */
+  onReviewSubmitted: (options?: { keepPage?: boolean }) => void;
   onQaSubmitted: () => void;
   reviews: ShopReview[];
   reviewSummary: ShopReviewSummary | null;
@@ -288,8 +290,9 @@ function DescriptionTab({
 }
 
 /**
- * 사용후기 탭 — 레퍼런스 solune itemuse.skin.php: 평점 요약 상자(오른쪽 끝에 [사용후기 쓰기]), 포토 후기 줄,
- * "최신순 · N개", 후기마다 접힌 한 줄(누르면 본문 — ProductReviewList).
+ * 사용후기 탭 — 레퍼런스 solune itemuse.skin.php: 평점 요약 상자(오른쪽 끝에 [사용후기 쓰기]), 최근 후기 30건의
+ * 포토 후기 줄([더 보기]), "최신순 · N개", 후기마다 접힌 한 줄(누르면 본문), 쪽 번호와 "이 상품의 후기 전체 보기"
+ * (ProductReviewList).
  */
 function ReviewsTab({
   product,
@@ -311,7 +314,8 @@ function ReviewsTab({
   canWriteReview: boolean;
   shippingPolicy: ShopPolicy | null;
   legacyProductForm: string;
-  onReviewSubmitted: () => void;
+  /** 후기를 쓰거나(1쪽으로) 고치고 지운 뒤(keepPage — 보던 쪽 그대로) 다시 받는다. */
+  onReviewSubmitted: (options?: { keepPage?: boolean }) => void;
   reviews: ShopReview[];
   reviewSummary: ShopReviewSummary | null;
   reviewPage: number;
@@ -324,13 +328,14 @@ function ReviewsTab({
 }) {
   const writeClass =
     "product-review-write h-11 rounded-md border-0 bg-primary px-6 text-[13.5px] font-semibold text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground max-sm:w-full";
-  const photoCount = reviewSummary?.photo_count ?? 0;
+  const recent = useRecentPhotoReviews(product.it_id, reviewTotal);
+  const photoTotal = photoReviewTotal(recent.reviews, reviewSummary?.photo_count ?? 0);
   return (
     <section className="product-reviews">
       <ReviewSummaryBox
         average={reviewAverage}
         total={reviewTotal}
-        photoCount={photoCount}
+        photoCount={photoTotal}
         scores={reviewScores}
         action={
           canWriteReview ? (
@@ -352,17 +357,21 @@ function ReviewsTab({
         }
       />
       <ReviewList
+        key={product.it_id}
+        itId={product.it_id}
         reviews={reviews}
+        recent={recent}
         total={reviewTotal}
-        photoCount={photoCount}
+        photoTotal={photoTotal}
         product={{ name: product.it_name, price: product.it_price, image: product.image_url }}
         pager={<ReviewPager page={reviewPage} lastPage={reviewLastPage} onPageChange={onReviewPageChange} />}
+        onChanged={() => onReviewSubmitted({ keepPage: true })}
       />
     </section>
   );
 }
 
-/** 사용후기 쪽 번호 — 전에는 첫 쪽(20개)만 보여 그 뒤 후기는 볼 길이 없었다. 지금 쪽 둘레 다섯 쪽과 처음 · 끝. */
+/** 사용후기 쪽 번호(한 쪽 REVIEW_PAGE_SIZE 건) — 지금 쪽 둘레 다섯 쪽과 처음 · 끝. */
 function ReviewPager({
   page,
   lastPage,

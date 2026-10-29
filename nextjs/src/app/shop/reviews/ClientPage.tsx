@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
  *   검색 줄(항목 고르기 · 검색어 · 검색) → "전체 N건 · 평균 N.N★ | 전체보기" → 후기 하나가 카드 하나인 격자
  *   (상품 · 별점 · 제목 · 두 줄 발췌 · 사진 셋과 +N · 작성자 · 날짜 · 후기 바로가기 · 내용보기) → 쪽 번호.
  *   "내용보기" 는 이 자리에서 본문 전체와 관리자 답변을 겹창으로 연다.
+ *   ?it_id= 로 오면(상품 상세의 "이 상품의 후기 전체 보기") 그 상품 후기만 — 머리 줄에 상품 이름, "전체보기"로 푼다.
  */
 
 /** 그누보드 itemuselist 의 검색 항목(sfl). API 가 같은 이름을 받는다. */
@@ -339,6 +340,8 @@ export default function ShopReviewsPage() {
   const query = (searchParams.get("q") || searchParams.get("stx") || "").trim();
   const requestedField = searchParams.get("sfl") || "";
   const field = SEARCH_FIELDS.some((option) => option.value === requestedField) ? requestedField : DEFAULT_SEARCH_FIELD;
+  // ?it_id= — 상품 상세의 "이 상품의 후기 전체 보기". 상품코드가 정확히 같은 후기만, 쪽 · 검색을 옮겨도 남는다.
+  const itemFilter = (searchParams.get("it_id") || "").trim();
 
   const [items, setItems] = useState<ShopReview[]>([]);
   const [meta, setMeta] = useState<ApiMeta | undefined>();
@@ -379,7 +382,13 @@ export default function ShopReviewsPage() {
     setLoading(true);
     setErrorMessage("");
     try {
-      const result = await getShopReviews({ page, perPage: PER_PAGE, q: query, sfl: query ? field : undefined });
+      const result = await getShopReviews({
+        page,
+        perPage: PER_PAGE,
+        q: query,
+        sfl: query ? field : undefined,
+        itId: itemFilter || undefined,
+      });
       setItems(result.items);
       setMeta(result.meta);
     } catch (err: unknown) {
@@ -389,7 +398,7 @@ export default function ShopReviewsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, query, field]);
+  }, [page, query, field, itemFilter]);
 
   useEffect(() => {
     loadItems();
@@ -397,12 +406,13 @@ export default function ShopReviewsPage() {
 
   const baseParams = useMemo(() => {
     const params = new URLSearchParams();
+    if (itemFilter) params.set("it_id", itemFilter);
     if (query) {
       params.set("sfl", field);
       params.set("q", query);
     }
     return params;
-  }, [field, query]);
+  }, [field, query, itemFilter]);
 
   function moveTo(params: URLSearchParams) {
     runtimeRouterPush(router, `/shop/reviews${params.toString() ? `?${params}` : ""}`);
@@ -411,6 +421,7 @@ export default function ShopReviewsPage() {
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const params = new URLSearchParams();
+    if (itemFilter) params.set("it_id", itemFilter);
     const nextQuery = searchText.trim();
     if (nextQuery) {
       params.set("sfl", searchField);
@@ -427,6 +438,8 @@ export default function ShopReviewsPage() {
 
   const total = meta?.total ?? 0;
   const hrefFor = (item: ShopReview) => shopProductHref(item, productRewriteMode);
+  // 상품 하나로 좁혔으면 그 상품 이름(받은 후기에서) — 후기가 없으면 상품코드.
+  const itemLabel = itemFilter ? items[0]?.it_name || itemFilter : "";
 
   return (
     <div className="shop-reviews-page pt-6 md:pt-10">
@@ -468,10 +481,20 @@ export default function ShopReviewsPage() {
       </form>
 
       <div className="mb-4 flex min-h-5 flex-wrap items-center justify-between gap-x-3 gap-y-2 text-sm text-muted-foreground">
-        <span>
+        <span className="shop-reviews-count">
+          {itemLabel && meta ? (
+            <>
+              <strong className="shop-reviews-item font-medium text-foreground">{itemLabel}</strong>
+              <span className="mx-1.5" aria-hidden="true">·</span>
+            </>
+          ) : null}
           {query ? (
             <>
               검색 결과 <strong className="font-medium tabular-nums text-foreground">{total.toLocaleString()}</strong>건
+            </>
+          ) : itemFilter && meta ? (
+            <>
+              후기 <strong className="font-medium tabular-nums text-foreground">{total.toLocaleString()}</strong>건
             </>
           ) : meta ? (
             <>

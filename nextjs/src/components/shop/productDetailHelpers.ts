@@ -1,4 +1,5 @@
 import { formatPrice } from "@/lib/utils";
+import { shouldDropHtmlImage } from "@/lib/sanitize";
 import type { ShopProduct, ShopProductOption } from "@/lib/api";
 import type { ShopCartAddResponse } from "@/services/cart";
 
@@ -254,13 +255,16 @@ export function productDetailFormFromSearch(search: string) {
   return "";
 }
 
-/** 후기 본문의 사진 주소(올린 차례). 웹 에디터 · 사진 첨부 모두 본문에 <img> 로 들어 있다. */
+/**
+ * 후기 본문의 사진 주소(올린 차례). 웹 에디터 · 사진 첨부 모두 본문에 <img> 로 들어 있다. 본문을 그릴 때 sanitize 가
+ * 지우는 사진(shouldDropHtmlImage — 지금은 없는 데모 호스트)은 빼서 사진 줄 · 포토 후기 수 · 크게 보기와 맞춘다.
+ */
 export function reviewImageUrls(html: string): string[] {
   const urls: string[] = [];
   const pattern = /<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']/gi;
   for (let match = pattern.exec(html); match; match = pattern.exec(html)) {
     const url = match[1].replace(/&amp;/g, "&").trim();
-    if (url && !url.startsWith("data:") && !urls.includes(url)) urls.push(url);
+    if (url && !url.startsWith("data:") && !shouldDropHtmlImage(url) && !urls.includes(url)) urls.push(url);
   }
   return urls;
 }

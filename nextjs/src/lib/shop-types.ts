@@ -344,6 +344,11 @@ export interface ShopReview {
   is_score: number;
   is_subject: string;
   is_content: string;
+  /** 상품 상세 사용후기 탭의 펼친 본문 — 500px 보다 넓은 사진을 썸네일로 바꾼 것(바뀐 사진이 있을 때만). */
+  is_content_view?: string;
+  /** 보는 사람이 고치고 지울 수 있는지 — 최고관리자이거나 쓴 사람(상품의 후기 목록이 준다). */
+  can_edit?: boolean;
+  can_delete?: boolean;
   is_confirm?: string;
   is_time: string;
   product_image_url?: string;

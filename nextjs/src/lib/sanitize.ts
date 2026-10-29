@@ -73,7 +73,11 @@ const droppedHtmlImageHosts = new Set([
   "www.hancomlifecare.com",
 ]);
 
-function shouldDropHtmlImage(src: string | undefined): boolean {
+/**
+ * 본문에서 지우는 사진인지 — 예전 데모 자료가 가리키지만 지금은 없는 호스트(demo.sir.kr 404 등). 후기 사진 셈
+ * (reviewImageUrls)도 이것으로 거른다. API 의 shop_api_review_dropped_photo_hosts 와 같게 둔다.
+ */
+export function shouldDropHtmlImage(src: string | undefined): boolean {
   if (!src) return false;
 
   try {

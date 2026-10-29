@@ -2,7 +2,7 @@
   "../overlay/api/index.php": 717,
   "../overlay/api/lib/helpers.php": 1051,
   "../overlay/api/social/_bridge_common.php": 772,
-  "../overlay/api/v1/boards.php": 765,
+  "../overlay/api/v1/boards.php": 760,
   "../overlay/api/v1/members.php": 760,
   "../overlay/api/v1/posts.php": 842,
   "../overlay/api/v1/shop/orders.php": 785,

@@ -37,6 +37,11 @@ class Throttle
     public const COMMENT_PER_MINUTE = 8;
     public const COMMENT_PER_HOUR = 60;
 
+    /** 같은 회원이 이 시간(초) 안에 제목·본문이 똑같은 글을 또 보내면 다시 보낸 것으로 보고 새로 만들지 않는다. */
+    public const POST_DUPLICATE_WINDOW_SECONDS = 600;
+    /** 댓글은 같은 글에 같은 말을 일부러 다는 경우가 있어 짧게 본다. */
+    public const COMMENT_DUPLICATE_WINDOW_SECONDS = 60;
+
     /** 로그인 실패 한도 — IP+계정 단위. 초과 시 lock-out. */
     public const LOGIN_FAIL_THRESHOLD = 5;
     public const LOGIN_LOCKOUT_SECONDS = 15 * 60;
@@ -46,6 +51,92 @@ class Throttle
     /** 계정/이메일 존재 확인 같은 enum-위험 엔드포인트의 IP-기반 quota. */
     public const ENUM_PER_MINUTE = 10;
     public const ENUM_PER_HOUR   = 60;
+
+    /**
+     * 한 회원의 글·댓글 쓰기를 한 줄로 세운다(게시판별). 연타로 거의 동시에 온 두 요청이 둘 다 "직전 글 없음"을
+     * 보고 쿨다운을 통과하지 않게, 직전 기록을 보기 전에 잡는다. 요청이 끝나 DB 연결이 닫히면 MySQL 이 푼다.
+     * 10초 안에 못 잡으면 false. 이름 잠금을 쓸 수 없는 DB 면 true(예전처럼 쿨다운만으로 동작).
+     */
+    public static function lockMemberWrite(string $write_table, string $mb_id): bool
+    {
+        if ($mb_id === '') return true;
+        try {
+            $row = DB::fetch('SELECT GET_LOCK(?, 10) AS got', ['g5api_write_' . md5($write_table . '|' . $mb_id)]);
+        } catch (\Throwable $e) {
+            return true;
+        }
+        return (int) ($row['got'] ?? 0) === 1;
+    }
+
+    /**
+     * 같은 회원이 방금 쓴 글 중 제목·본문이 똑같은 글의 wr_id. 없으면 null.
+     * 응답을 못 받고 다시 보낸 요청이 중복 글을 만들지 않게 그 글을 돌려주는 데 쓴다. lockMemberWrite 뒤에 부른다.
+     */
+    public static function findRecentDuplicatePost(string $write_table, string $mb_id, string $subject, string $content): ?int
+    {
+        if ($mb_id === '') return null;
+        $rows = DB::fetchAll(
+            "SELECT wr_id, wr_subject, wr_content FROM {$write_table}
+              WHERE mb_id = ? AND wr_is_comment = 0 AND wr_datetime >= ?
+              ORDER BY wr_id DESC LIMIT 5",
+            [$mb_id, date('Y-m-d H:i:s', time() - self::POST_DUPLICATE_WINDOW_SECONDS)]
+        );
+        foreach ($rows as $row) {
+            // DB 비교는 대소문자·끝 공백을 무시하므로 PHP 에서 정확히 비교한다.
+            if ((string) $row['wr_subject'] === $subject && (string) $row['wr_content'] === $content) {
+                return (int) $row['wr_id'];
+            }
+        }
+        return null;
+    }
+
+    /** findRecentDuplicatePost 의 댓글판 — 같은 글(wr_parent)에 같은 본문. */
+    public static function findRecentDuplicateComment(string $write_table, string $mb_id, int $wr_parent, string $content): ?int
+    {
+        if ($mb_id === '') return null;
+        $rows = DB::fetchAll(
+            "SELECT wr_id, wr_content FROM {$write_table}
+              WHERE mb_id = ? AND wr_is_comment = 1 AND wr_parent = ? AND wr_datetime >= ?
+              ORDER BY wr_id DESC LIMIT 5",
+            [$mb_id, $wr_parent, date('Y-m-d H:i:s', time() - self::COMMENT_DUPLICATE_WINDOW_SECONDS)]
+        );
+        foreach ($rows as $row) {
+            if ((string) $row['wr_content'] === $content) {
+                return (int) $row['wr_id'];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * POST /v1/boards/{bo_table}/posts 의 글쓰기 앞 검사. 막히거나 중복이면 여기서 응답하고 끝난다(Response 가 exit).
+     *   1) 회원별 잠금 — 연타로 거의 동시에 온 두 요청이 둘 다 쿨다운을 통과하지 않게.
+     *   2) 방금 쓴 글과 제목·본문이 같으면(응답을 못 받고 다시 보낸 경우 등) 새로 만들지 않고 그 글을 200 으로.
+     *   3) 쿨다운·분/시간 한도 — $applyThrottle 이 false(어드민)면 건너뛴다.
+     */
+    public static function guardPostCreate(string $write_table, array $member, array $input, bool $applyThrottle): void
+    {
+        $mb_id = (string) ($member['mb_id'] ?? '');
+        if (!self::lockMemberWrite($write_table, $mb_id)) {
+            Response::error('잠시 후 다시 시도해주세요.', 429);
+        }
+        $subject = $input['wr_subject'] ?? null;
+        $content = $input['wr_content'] ?? null;
+        if (is_string($subject) && is_string($content)) {
+            $duplicateId = self::findRecentDuplicatePost($write_table, $mb_id, $subject, $content);
+            if ($duplicateId !== null) {
+                $post = DB::fetch("SELECT * FROM {$write_table} WHERE wr_id = ? LIMIT 1", [$duplicateId]);
+                unset($post['wr_password'], $post['wr_ip']);
+                Response::success($post, 200);
+            }
+        }
+        if ($applyThrottle) {
+            $throttleMsg = self::checkPostCreate($write_table, $mb_id);
+            if ($throttleMsg !== null) {
+                Response::error($throttleMsg, 429);
+            }
+        }
+    }
 
     /**
      * 게시글 작성 가능 여부 검사. 막힐 사유 있으면 'message' 반환, 통과면 null.

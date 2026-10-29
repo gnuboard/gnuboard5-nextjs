@@ -29,6 +29,11 @@ if ($qnaAction !== '' && preg_match('/^\d+$/', (string) $qnaAction)) {
     $iqId = (int) $qnaAction;
     $qnaTable = DB::table('g5_shop_item_qa_table');
     $itemTable = DB::table('g5_shop_item_table');
+    // 최고관리자는 남의 문의도, 답이 달린 문의도 고치고 지운다 — 영카트 itemqaformupdate.php 의 if (!$is_admin).
+    // 그 밖에는 답이 없는 내 문의만.
+    $isAdmin = Auth::adminRole($member) === 'super';
+    $ownerSql = $isAdmin ? '' : ' AND mb_id = ?';
+    $ownerParams = $isAdmin ? [] : [$member['mb_id']];
 
     $qna = DB::fetch(
         "SELECT q.iq_id, q.it_id, q.mb_id, q.iq_subject, q.iq_question, q.iq_answer,
@@ -36,8 +41,8 @@ if ($qnaAction !== '' && preg_match('/^\d+$/', (string) $qnaAction)) {
                 i.it_name, i.ca_id, i.it_price, i.it_img1, i.it_seo_title
          FROM {$qnaTable} q
          LEFT JOIN {$itemTable} i ON i.it_id = q.it_id
-         WHERE q.iq_id = ? AND q.mb_id = ? LIMIT 1",
-        [$iqId, $member['mb_id']]
+         WHERE q.iq_id = ?" . ($isAdmin ? '' : ' AND q.mb_id = ?') . " LIMIT 1",
+        array_merge([$iqId], $ownerParams)
     );
     if (!$qna) {
         Response::error('Product Q&A not found.', 404);
@@ -47,7 +52,7 @@ if ($qnaAction !== '' && preg_match('/^\d+$/', (string) $qnaAction)) {
         Response::success(shop_api_format_my_qna_row($qna));
     }
 
-    if (trim((string) ($qna['iq_answer'] ?? '')) !== '') {
+    if (!$isAdmin && trim((string) ($qna['iq_answer'] ?? '')) !== '') {
         Response::error('Answered product Q&A cannot be changed.', 409);
     }
 
@@ -57,8 +62,8 @@ if ($qnaAction !== '' && preg_match('/^\d+$/', (string) $qnaAction)) {
 
         DB::execute(
             "DELETE FROM {$qnaTable}
-             WHERE iq_id = ? AND mb_id = ?",
-            [$iqId, $member['mb_id']]
+             WHERE iq_id = ?{$ownerSql}",
+            array_merge([$iqId], $ownerParams)
         );
         if (function_exists('run_event')) {
             api_run_event('shop_item_qa_deleted', array($iqId, (string) ($qna['it_id'] ?? '')), $member);
@@ -105,8 +110,8 @@ if ($qnaAction !== '' && preg_match('/^\d+$/', (string) $qnaAction)) {
              iq_secret = ?,
              iq_email = ?,
              iq_hp = ?
-         WHERE iq_id = ? AND mb_id = ?",
-        [$iq_subject, $iq_question, $iq_secret, $iq_email, $iq_hp, $iqId, $member['mb_id']]
+         WHERE iq_id = ?{$ownerSql}",
+        array_merge([$iq_subject, $iq_question, $iq_secret, $iq_email, $iq_hp, $iqId], $ownerParams)
     );
     // 본문에서 뺀 사진은 이 문의에서 뗀다 — 며칠 뒤 정리된다(api/lib/editor-uploads.php).
     api_editor_release_removed(api_editor_target('item_qa', $iqId), $iq_question);
@@ -120,8 +125,8 @@ if ($qnaAction !== '' && preg_match('/^\d+$/', (string) $qnaAction)) {
                 i.it_name, i.ca_id, i.it_price, i.it_img1, i.it_seo_title
          FROM {$qnaTable} q
          LEFT JOIN {$itemTable} i ON i.it_id = q.it_id
-         WHERE q.iq_id = ? AND q.mb_id = ? LIMIT 1",
-        [$iqId, $member['mb_id']]
+         WHERE q.iq_id = ?" . ($isAdmin ? '' : ' AND q.mb_id = ?') . " LIMIT 1",
+        array_merge([$iqId], $ownerParams)
     );
 
     Response::success(shop_api_format_my_qna_row($updated));
@@ -287,7 +292,8 @@ if ($apiMethod === 'GET' && $qnaAction === '') {
         $isOwner = $viewerId !== '' && $viewerId === (string) $row['mb_id'];
         $isAnswered = trim((string) ($row['iq_answer'] ?? '')) !== '';
         $canView = !$isSecret || $isOwner || $isAdmin;
-        $canMutate = $isOwner && !$isAnswered;
+        // 수정 · 삭제 — 최고관리자는 늘, 쓴 사람은 답이 달리기 전까지(영카트 itemqa.skin.php).
+        $canMutate = $isAdmin || ($isOwner && !$isAnswered);
         $qnaList[] = [
             'iq_id'       => $row['iq_id'],
             'it_id'       => $row['it_id'],

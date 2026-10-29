@@ -36,6 +36,32 @@ if ($apiMethod === 'POST') {
         Response::error('You do not have permission to comment in this board.', 403);
     }
 
+    $input = get_request_body();
+
+    // 같은 회원의 댓글 쓰기를 한 줄로 세우고, 방금 같은 글에 단 댓글과 본문이 같으면(연타·다시 보낸 요청)
+    // 새로 만들지 않고 그 댓글을 돌려준다 — 글쓰기(boards.php)와 같은 규칙.
+    if (!Throttle::lockMemberWrite($write_table, (string) $member['mb_id'])) {
+        Response::error('잠시 후 다시 시도해주세요.', 429);
+    }
+    if (isset($input['wr_content']) && is_string($input['wr_content'])) {
+        $duplicateId = Throttle::findRecentDuplicateComment(
+            $write_table,
+            (string) $member['mb_id'],
+            (int) $target_id,
+            $input['wr_content']
+        );
+        if ($duplicateId !== null) {
+            $comment = DB::fetch(
+                "SELECT wr_id, wr_parent, wr_comment, wr_comment_reply,
+                        wr_content, wr_name, mb_id, wr_datetime, wr_option
+                 FROM {$write_table}
+                 WHERE wr_id = ? LIMIT 1",
+                [$duplicateId]
+            );
+            Response::success($comment, 200);
+        }
+    }
+
     // Anti-spam — 어드민 우회
     $adminRole = Auth::adminRole($member, $bo_table);
     if ($adminRole === '') {
@@ -81,8 +107,6 @@ if ($apiMethod === 'POST') {
     ) && !Auth::canManagePost($member, $bo_table, $parentPost)) {
         Response::error('Parent post not found.', 404);
     }
-
-    $input = get_request_body();
 
     // Validate
     $errors = Validator::validate([

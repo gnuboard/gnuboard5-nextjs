@@ -150,6 +150,40 @@ if (!function_exists('shop_api_clean_review_content')) {
     }
 }
 
+if (!function_exists('shop_api_review_dropped_photo_hosts')) {
+    /**
+     * 화면이 후기 본문에서 지우는 사진 호스트 — 예전 데모 자료가 가리키지만 지금은 없는 주소(demo.sir.kr 404 등).
+     * nextjs/src/lib/sanitize.ts 의 droppedHtmlImageHosts 와 같게 둔다. 포토 후기 수도 이 사진은 세지 않는다.
+     */
+    function shop_api_review_dropped_photo_hosts(): array
+    {
+        return ['demo.sir.co.kr', 'demo.sir.kr', 'www.hancomlifecare.com'];
+    }
+}
+
+if (!function_exists('shop_api_review_has_visible_photo')) {
+    /** 후기 본문에 화면에 보일 사진이 있는지 — data: 주소 · 지우는 호스트(shop_api_review_dropped_photo_hosts)만 있으면 없다. */
+    function shop_api_review_has_visible_photo(string $html): bool
+    {
+        if (!preg_match_all('/<img\b[^>]*?\bsrc\s*=\s*["\']([^"\']+)["\']/i', $html, $matches)) {
+            return false;
+        }
+        $dropped = shop_api_review_dropped_photo_hosts();
+        foreach ($matches[1] as $src) {
+            $src = trim(html_entity_decode($src, ENT_QUOTES, 'UTF-8'));
+            if ($src === '' || stripos($src, 'data:') === 0) {
+                continue;
+            }
+            $host = strtolower((string) parse_url($src, PHP_URL_HOST));
+            if ($host === '' || !in_array($host, $dropped, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
 if (!function_exists('shop_api_normalize_review_score')) {
     function shop_api_normalize_review_score($value): int
     {

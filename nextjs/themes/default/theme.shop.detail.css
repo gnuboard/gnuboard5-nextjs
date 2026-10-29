@@ -197,7 +197,12 @@ body[data-g5-theme-source="default"] .solune-shop-page {
   .product-review-content { color: var(--solune-text-soft); font-size: 14.5px; line-height: 1.75; }
   .product-review-toggle { border-color: var(--solune-border); border-radius: 8px; background: var(--solune-surface); color: var(--solune-text); }
   .product-review-toggle:hover, .product-review-toggle:focus-visible { border-color: var(--solune-text); }
-  :is(.product-review-photo, .product-review-thumb, .product-review-toggle):focus-visible { outline: 2px solid var(--solune-primary); outline-offset: 2px; }
+  .product-review-photo-more { border-color: var(--solune-border); border-radius: 10px; background: var(--solune-surface); color: var(--solune-text); }
+  .product-review-photo-more:hover { border-color: var(--solune-text); }
+  .product-review-photo-more-n { color: var(--solune-muted); }
+  .product-review-all { color: var(--solune-text-soft); }
+  .product-review-all:hover { color: var(--solune-primary); }
+  :is(.product-review-photo, .product-review-thumb, .product-review-toggle, .product-review-photo-more, .product-review-all):focus-visible { outline: 2px solid var(--solune-primary); outline-offset: 2px; }
   .solune-pdp-aside .product-supply-options { margin-top: 14px; }
   .solune-pdp-aside .product-selected { margin-top: 16px; }
   .solune-pdp-aside .product-total-value { font-size: 20px; }
