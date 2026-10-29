@@ -107,7 +107,6 @@ test.describe("order form when the cart changes", () => {
       const card = page.getByText("신용카드", { exact: true }).first();
       test.skip((await card.count()) === 0, "신용카드 결제가 꺼져 있다");
       await card.click();
-      await page.getByLabel("전체 동의").check();
 
       const prepared = page.waitForResponse((response) => response.url().includes("/shop/payment/prepare"));
       await page.locator("button.shop-order-submit").first().click();

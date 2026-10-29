@@ -39,20 +39,10 @@
     "targetLines": 650,
     "nextStep": "Move runtime origin, auth, image, and theme checks into reusable guard modules."
   },
-  "../overlay/api/v1/auth_account_routes.php": {
-    "priority": "medium",
-    "targetLines": 650,
-    "nextStep": "Split account profile, password, email verification, and session routes."
-  },
   "../overlay/api/v1/shop/orders.php": {
     "priority": "medium",
     "targetLines": 650,
     "nextStep": "Separate order list, detail, cancellation, and guest lookup handlers."
-  },
-  "../overlay/api/v1/qas.php": {
-    "priority": "low",
-    "targetLines": 650,
-    "nextStep": "Move the new-question rate limits and the mail/SMS notification into a qa_create_limits.php helper next to the other qa helpers."
   },
   "../overlay/api/v1/posts.php": {
     "priority": "medium",

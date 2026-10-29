@@ -299,54 +299,75 @@ $resizeMaxWidth  = defined('SMARTEDITOR_UPLOAD_MAX_WIDTH')  ? SMARTEDITOR_UPLOAD
 $resizeMaxHeight = defined('SMARTEDITOR_UPLOAD_MAX_HEIGHT') ? SMARTEDITOR_UPLOAD_MAX_HEIGHT : 2800;
 $imageQuality    = defined('SMARTEDITOR_UPLOAD_IMAGE_QUALITY') ? SMARTEDITOR_UPLOAD_IMAGE_QUALITY : 98;
 
-// 보안: 모든 이미지를 GD 로 재인코딩 — 메타데이터 / EXIF / polyglot payload 제거.
-// resize 가 필요 없는 작은 이미지도 sanitize 위해 재인코딩한다.
-// GIF 는 첫 프레임만 보존 (애니메이션 손실 trade-off — 보안 우선).
-$srcImg = null;
-switch ($detectedMime) {
-    case 'image/jpeg': $srcImg = @imagecreatefromjpeg($destPath); break;
-    case 'image/png':  $srcImg = @imagecreatefrompng($destPath); break;
-    case 'image/webp': $srcImg = @imagecreatefromwebp($destPath); break;
-    case 'image/gif':  $srcImg = @imagecreatefromgif($destPath); break;
-    case 'image/bmp':
-    case 'image/x-ms-bmp': $srcImg = @imagecreatefrombmp($destPath); break;
+// 움직이는 그림(GIF · WebP · APNG) — GD 는 첫 장면만 읽고 움직이는 WebP 는 읽지도 못하므로 다시 그리지 않는다. 대신
+// 조각 단위로 다시 엮어 메타데이터 · 끝 뒤에 덧붙은 자료를 버린다(api/lib/image-animation.php). 크기는 줄이지 않는다
+// (그누보드 원본 에디터도 원본을 둔다). 움직이지 않거나 구조가 이상하거나 스크립트 흔적이 있으면 아래에서 다시 그린다.
+$keptAnimation = false;
+require_once __DIR__ . '/../lib/image-animation.php';
+if (api_image_animation_candidate($destPath, $detectedMime)) {
+    $cleanImage = api_image_clean_animation($detectedMime, (string) @file_get_contents($destPath), $imageWidth, $imageHeight);
+    // 옆 파일에 다 쓴 뒤 바꿔 넣는다 — 덜 써진 채(디스크 가득 등) 원본 자리에 남지 않게. 못 하면 아래 GD 로.
+    $cleanPath = $destPath . '.clean';
+    if ($cleanImage !== null && @file_put_contents($cleanPath, $cleanImage) === strlen($cleanImage) && @rename($cleanPath, $destPath)) {
+        $keptAnimation = true;
+        $dstW = $imageWidth;
+        $dstH = $imageHeight;
+    }
+    if (is_file($cleanPath)) {
+        @unlink($cleanPath);
+    }
+    unset($cleanImage);
 }
 
-if (!$srcImg) {
-    // GD 가 디코딩 실패 — 형식 위장 가능성 (예: PNG header 만 가짜)
-    @unlink($destPath);
-    Response::error('Image decode failed. File may be corrupted or malformed.', 400);
+if (!$keptAnimation) {
+    // 보안: 그 밖의 모든 이미지를 GD 로 재인코딩 — 메타데이터 / EXIF / polyglot payload 제거.
+    // resize 가 필요 없는 작은 이미지도 sanitize 위해 재인코딩한다.
+    $srcImg = null;
+    switch ($detectedMime) {
+        case 'image/jpeg': $srcImg = @imagecreatefromjpeg($destPath); break;
+        case 'image/png':  $srcImg = @imagecreatefrompng($destPath); break;
+        case 'image/webp': $srcImg = @imagecreatefromwebp($destPath); break;
+        case 'image/gif':  $srcImg = @imagecreatefromgif($destPath); break;
+        case 'image/bmp':
+        case 'image/x-ms-bmp': $srcImg = @imagecreatefrombmp($destPath); break;
+    }
+
+    if (!$srcImg) {
+        // GD 가 디코딩 실패 — 형식 위장 가능성 (예: PNG header 만 가짜)
+        @unlink($destPath);
+        Response::error('Image decode failed. File may be corrupted or malformed.', 400);
+    }
+
+    $srcW = imagesx($srcImg);
+    $srcH = imagesy($srcImg);
+
+    // resize 필요 여부 — 한도 초과 시 비례 축소, 아니면 그대로
+    $ratio = min(1.0, $resizeMaxWidth / $srcW, $resizeMaxHeight / $srcH);
+    $dstW = (int) round($srcW * $ratio);
+    $dstH = (int) round($srcH * $ratio);
+
+    $dstImg = imagecreatetruecolor($dstW, $dstH);
+    // 투명도 보존 (PNG / WebP / GIF)
+    if (in_array($detectedMime, ['image/png', 'image/webp', 'image/gif'])) {
+        imagealphablending($dstImg, false);
+        imagesavealpha($dstImg, true);
+        $transparent = imagecolorallocatealpha($dstImg, 0, 0, 0, 127);
+        imagefilledrectangle($dstImg, 0, 0, $dstW, $dstH, $transparent);
+    }
+    imagecopyresampled($dstImg, $srcImg, 0, 0, 0, 0, $dstW, $dstH, $srcW, $srcH);
+
+    switch ($detectedMime) {
+        case 'image/jpeg': imagejpeg($dstImg, $destPath, $imageQuality); break;
+        case 'image/png':  imagepng($dstImg, $destPath, min(9, (int)(9 - $imageQuality / 11))); break;
+        case 'image/webp': imagewebp($dstImg, $destPath, $imageQuality); break;
+        case 'image/gif':  imagegif($dstImg, $destPath); break;
+        case 'image/bmp':
+        case 'image/x-ms-bmp': imagebmp($dstImg, $destPath); break;
+    }
+
+    // PHP 8.0+ 는 GD resource 자동 free — imagedestroy 가 8.5 deprecated.
+    unset($srcImg, $dstImg);
 }
-
-$srcW = imagesx($srcImg);
-$srcH = imagesy($srcImg);
-
-// resize 필요 여부 — 한도 초과 시 비례 축소, 아니면 그대로
-$ratio = min(1.0, $resizeMaxWidth / $srcW, $resizeMaxHeight / $srcH);
-$dstW = (int) round($srcW * $ratio);
-$dstH = (int) round($srcH * $ratio);
-
-$dstImg = imagecreatetruecolor($dstW, $dstH);
-// 투명도 보존 (PNG / WebP / GIF)
-if (in_array($detectedMime, ['image/png', 'image/webp', 'image/gif'])) {
-    imagealphablending($dstImg, false);
-    imagesavealpha($dstImg, true);
-    $transparent = imagecolorallocatealpha($dstImg, 0, 0, 0, 127);
-    imagefilledrectangle($dstImg, 0, 0, $dstW, $dstH, $transparent);
-}
-imagecopyresampled($dstImg, $srcImg, 0, 0, 0, 0, $dstW, $dstH, $srcW, $srcH);
-
-switch ($detectedMime) {
-    case 'image/jpeg': imagejpeg($dstImg, $destPath, $imageQuality); break;
-    case 'image/png':  imagepng($dstImg, $destPath, min(9, (int)(9 - $imageQuality / 11))); break;
-    case 'image/webp': imagewebp($dstImg, $destPath, $imageQuality); break;
-    case 'image/gif':  imagegif($dstImg, $destPath); break;
-    case 'image/bmp':
-    case 'image/x-ms-bmp': imagebmp($dstImg, $destPath); break;
-}
-
-// PHP 8.0+ 는 GD resource 자동 free — imagedestroy 가 8.5 deprecated.
-unset($srcImg, $dstImg);
 
 $finalSize = filesize($destPath);
 if ($editorLedger) {

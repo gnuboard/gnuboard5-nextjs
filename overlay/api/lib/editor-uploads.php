@@ -11,6 +11,8 @@
  *   3) 글을 지우면 붙은 사진 파일과 행을 지운다 — api_editor_delete_attached(). 그누보드 화면 · 관리자 화면 · API 가 같은
  *      그누보드 이벤트(bbs_delete · qa_delete · shop_item_use_deleted …)를 부르므로 plugin/webapp/editor/events.php 한 곳에서.
  *      글을 복사하면 두 글이 같은 파일을 쓰므로 그 사진은 2(지우지 않음)로 돌리고, 옮기면 새 게시판 · 번호로 고친다.
+ *      수정 이력을 남기는 게시판(매뉴얼)은 지운 글의 옛 판이 보관함에 남으므로 그 글 자신의 사진은 2 로 돌린다.
+ *      글을 고쳐 본문에서 뺀 사진은 api_editor_release_removed() 가 글에서 떼고, 4) 의 붙지 못한 사진처럼 정리된다.
  *   4) 글에 붙지 못한 임시 사진(글을 안 쓰고 나감)과 옮긴 뒤 저장이 실패해 붙지 못한 사진은 TableCleanup 의 editor_tmp
  *      단계가 WEBAPP_EDITOR_TMP_KEEP_DAYS(기본 3일 — 글쓰기 임시 저장이 하루 가므로 여유를 둔다) 뒤에 파일과 행을 함께 지운다.
  *   5) 삭제 이벤트 없이 글이 사라진 경우(관리자의 게시판 삭제 · 상품 삭제 등)는 editor_orphan 단계가 원래 표에 그 번호가
@@ -273,6 +275,66 @@ function api_editor_delete_attached(string $kind, string $boTable, int $id, bool
         [$kind, $kind === 'write' ? $boTable : '', $id, API_EDITOR_STATE_ATTACHED]
     );
     return api_editor_purge_rows($rows, API_EDITOR_STATE_ATTACHED);
+}
+
+/**
+ * 글을 고쳐 저장했다 — 이 글($target)에 붙은 사진 중 저장한 본문($savedHtml)에 더는 없는 것을 글에서 뗀다. 바로 지우지는
+ * 않는다: 뗀 사진은 붙지 못한 사진(ei_kind '')이 되어 WEBAPP_EDITOR_TMP_KEEP_DAYS 뒤 editor_tmp 단계(api_editor_unbound_gc)가
+ * 지우고, 그 사이 같은 사진을 다시 넣어 저장하면 api_editor_resolve() 가 다시 붙인다. 수정 이력을 남기는 게시판(매뉴얼)은
+ * 옛 판이 그 사진을 계속 쓰므로 부르는 쪽에서 건너뛴다. 저장은 이미 끝났으므로 실패해도 응답을 막지 않는다(로그만).
+ *
+ * @param array{kind:string,bo_table:string,ref_id:int,parent_id:int} $target api_editor_target()
+ * @return int 뗀 사진 수
+ */
+function api_editor_release_removed(array $target, string $savedHtml): int
+{
+    $refId = (int) ($target['ref_id'] ?? 0);
+    if ($refId <= 0 || !in_array($target['kind'] ?? '', API_EDITOR_KINDS, true) || !api_editor_uploads_ready()) {
+        return 0;
+    }
+    try {
+        $table = DB::table('editor_image_table');
+        $rows = DB::fetchAll(
+            "SELECT ei_id, ei_file FROM `{$table}` WHERE ei_kind = ? AND bo_table = ? AND ei_ref_id = ? AND ei_state = ?",
+            [$target['kind'], (string) ($target['bo_table'] ?? ''), $refId, API_EDITOR_STATE_ATTACHED]
+        );
+        $ids = [];
+        foreach ($rows as $row) {
+            if (stripos($savedHtml, (string) $row['ei_file']) === false) {
+                $ids[] = (int) $row['ei_id'];
+            }
+        }
+        if ($ids === []) {
+            return 0;
+        }
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        return (int) DB::execute(
+            "UPDATE `{$table}` SET ei_kind = '', bo_table = '', ei_ref_id = 0, ei_parent_id = 0, ei_attached_at = ?
+              WHERE ei_state = ? AND ei_id IN ({$placeholders})",
+            array_merge([date('Y-m-d H:i:s'), API_EDITOR_STATE_ATTACHED], $ids)
+        );
+    } catch (Throwable $e) {
+        error_log('[editor-uploads] release: ' . $e->getMessage());
+        return 0;
+    }
+}
+
+/**
+ * 지운 글 자신의 사진을 남긴다 — 수정 이력을 남기는 게시판(매뉴얼)은 지운 글의 옛 판을 보관함에 두고 계속 보여 주므로
+ * 그 사진을 2(지우지 않음)로 돌린다. 댓글은 이력에 없으니 그 사진은 뒤이은 api_editor_delete_attached() 가 지운다.
+ *
+ * @return int 남긴 사진 수
+ */
+function api_editor_keep_attached(string $kind, string $boTable, int $id): int
+{
+    if ($id <= 0 || !in_array($kind, API_EDITOR_KINDS, true) || !api_editor_uploads_ready()) {
+        return 0;
+    }
+    return (int) DB::execute(
+        'UPDATE `' . DB::table('editor_image_table') . '` SET ei_state = ?
+          WHERE ei_kind = ? AND bo_table = ? AND ei_ref_id = ? AND ei_state = ?',
+        [API_EDITOR_STATE_KEPT, $kind, $kind === 'write' ? $boTable : '', $id, API_EDITOR_STATE_ATTACHED]
+    );
 }
 
 /**

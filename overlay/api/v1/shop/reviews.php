@@ -177,6 +177,8 @@ if ($subAction !== '' && preg_match('/^\d+$/', (string) $subAction)) {
          WHERE is_id = ? AND mb_id = ?",
         [$is_subject, $is_content, $is_score, $reviewId, $member['mb_id']]
     );
+    // 본문에서 뺀 사진은 이 후기에서 뗀다 — 며칠 뒤 정리된다(api/lib/editor-uploads.php).
+    api_editor_release_removed(api_editor_target('item_use', $reviewId), $is_content);
     if (function_exists('run_event')) {
         api_run_event('shop_item_use_updated', array($reviewId, (string) ($review['it_id'] ?? '')), $member);
     }

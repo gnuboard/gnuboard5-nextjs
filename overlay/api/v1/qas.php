@@ -27,6 +27,7 @@ require_once __DIR__ . '/qas_attachments.php';
 require_once __DIR__ . '/qas_content.php';
 require_once __DIR__ . '/qas_notify.php';
 require_once __DIR__ . '/qas_payload.php';
+require_once __DIR__ . '/qas_lookup.php';
 
 $seg0 = isset($apiSegments[0]) ? $apiSegments[0] : '';
 $seg1 = isset($apiSegments[1]) ? $apiSegments[1] : '';
@@ -147,111 +148,6 @@ function api_qa_normalize_row($row, $viewer, $includeAnswer = false, $includeRel
     }
 
     return $item;
-}
-
-/**
- * 질문의 이전글 · 다음글 — 그누보드 bbs/qaview.php 와 같다. 이전글은 qa_num 이 작은 쪽(더 최근 질문),
- * 다음글은 큰 쪽이고, 최고관리자가 아니면 자기 질문 안에서만 찾는다. 답변 글이면 둘 다 null.
- */
-function api_qa_neighbors($row, $viewer)
-{
-    $neighbors = ['prev' => null, 'next' => null];
-    if ((int) ($row['qa_type'] ?? 0) !== 0) {
-        return $neighbors;
-    }
-
-    $table = DB::table('qa_content_table');
-    $where = 'qa_type = 0';
-    $params = [];
-    if (!api_qa_is_admin($viewer)) {
-        $where .= ' AND mb_id = ?';
-        $params[] = $viewer['mb_id'];
-    }
-    $num = (int) ($row['qa_num'] ?? 0);
-
-    $queries = [
-        'prev' => "SELECT qa_id, qa_subject FROM {$table} WHERE {$where} AND qa_num < ? ORDER BY qa_num DESC LIMIT 1",
-        'next' => "SELECT qa_id, qa_subject FROM {$table} WHERE {$where} AND qa_num > ? ORDER BY qa_num ASC LIMIT 1",
-    ];
-    foreach ($queries as $key => $sql) {
-        $found = DB::fetch($sql, array_merge($params, [$num]));
-        if ($found) {
-            $neighbors[$key] = ['qa_id' => (int) $found['qa_id'], 'qa_subject' => (string) $found['qa_subject']];
-        }
-    }
-
-    return $neighbors;
-}
-
-function api_qa_related_questions($row, $viewer, $limit = 10)
-{
-    $related = (int) ($row['qa_related'] ?? 0);
-    $qaId = (int) ($row['qa_id'] ?? 0);
-    if ($related <= 0 || $qaId <= 0) {
-        return [];
-    }
-
-    $table = DB::table('qa_content_table');
-    $params = [$qaId, $related, max(1, (int) $limit)];
-    $sql = "SELECT *
-            FROM {$table}
-            WHERE qa_id <> ?
-              AND qa_related = ?
-              AND qa_type = 0";
-
-    if (!api_qa_is_admin($viewer)) {
-        $sql .= " AND mb_id = ?";
-        $params[] = $viewer['mb_id'];
-    }
-
-    $sql .= " ORDER BY qa_num ASC, qa_type ASC LIMIT ?";
-
-    if (!api_qa_is_admin($viewer)) {
-        $params = [$qaId, $related, $viewer['mb_id'], max(1, (int) $limit)];
-    }
-
-    $rows = DB::fetchAll($sql, $params);
-    $items = [];
-    foreach ($rows as $relatedRow) {
-        $items[] = api_qa_normalize_row($relatedRow, $viewer, false, false);
-    }
-
-    return $items;
-}
-
-function api_qa_find($qaId, $viewer)
-{
-    $table = DB::table('qa_content_table');
-    $params = [(int) $qaId];
-    $sql = "SELECT * FROM {$table} WHERE qa_id = ?";
-
-    if (!api_qa_is_admin($viewer)) {
-        $sql .= " AND mb_id = ?";
-        $params[] = $viewer['mb_id'];
-    }
-
-    $sql .= " LIMIT 1";
-    return DB::fetch($sql, $params);
-}
-
-function api_qa_find_reply_source($qaId, $viewer)
-{
-    $qaId = (int) $qaId;
-    if ($qaId <= 0) {
-        return null;
-    }
-
-    $table = DB::table('qa_content_table');
-    $params = [$qaId];
-    $sql = "SELECT * FROM {$table} WHERE qa_id = ?";
-
-    if (!api_qa_is_admin($viewer)) {
-        $sql .= " AND mb_id = ?";
-        $params[] = $viewer['mb_id'];
-    }
-
-    $sql .= " LIMIT 1";
-    return DB::fetch($sql, $params);
 }
 
 // -------------------------------------------------------------------------
@@ -520,6 +416,10 @@ if ($qaId > 0 && !$seg1 && ($apiMethod === 'PATCH' || $isMultipartPatch)) {
     }
 
     $updated = api_qa_find($qaId, $me);
+    // 본문에서 뺀 사진은 이 문의(답변)에서 뗀다 — 며칠 뒤 정리된다(api/lib/editor-uploads.php).
+    if (is_array($updated)) {
+        api_editor_release_removed(api_editor_target('qa', $qaId, (int) $row['qa_parent']), (string) $updated['qa_content']);
+    }
     // 그누보드 훅 — 수정은 $w = 'u', $write 는 고치기 전 글
     api_run_event('qawrite_update', array($qaId, $row, 'u', api_qa_config(), null), $me);
     Response::success(api_qa_normalize_row($updated, $me, true, true));
@@ -595,6 +495,7 @@ if ($qaId > 0 && $seg1 === 'answer' && $apiMethod === 'POST') {
                 (int) $answer['qa_id'],
             ]
         );
+        api_editor_release_removed(api_editor_target('qa', $answerId, $qaId), (string) $payload['qa_content']);
     } else {
         $attachments = api_qa_process_attachments(null, $qaConfig, true);
         DB::execute(

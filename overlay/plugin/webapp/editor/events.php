@@ -44,12 +44,22 @@ if (!function_exists('webapp_editor_images_run')) {
         return is_array($board) ? (string) ($board['bo_table'] ?? '') : '';
     }
 
-    /** 글을 지웠다 — 글과 그 댓글(ei_parent_id 가 글 번호)의 사진. */
+    /** 수정 이력을 남기는 게시판(매뉴얼, plugin/webapp/post-history) — 지운 글의 옛 판이 보관함에 남아 그 사진을 계속 쓴다. */
+    function webapp_editor_images_keeps_history($board): bool
+    {
+        return is_array($board) && function_exists('webapp_post_history_is_tracked_board') && webapp_post_history_is_tracked_board($board);
+    }
+
+    /** 글을 지웠다 — 글과 그 댓글(ei_parent_id 가 글 번호)의 사진. 이력 게시판이면 글 자신의 사진은 남긴다. */
     function webapp_editor_images_on_bbs_delete($write, $board = null): void
     {
         $boTable = webapp_editor_images_board_table($board);
         $wrId = is_array($write) ? (int) ($write['wr_id'] ?? 0) : 0;
-        webapp_editor_images_run(static function () use ($boTable, $wrId) {
+        $keep = webapp_editor_images_keeps_history($board);
+        webapp_editor_images_run(static function () use ($boTable, $wrId, $keep) {
+            if ($keep) {
+                api_editor_keep_attached('write', $boTable, $wrId);
+            }
             api_editor_delete_attached('write', $boTable, $wrId, true);
         });
     }
@@ -58,8 +68,12 @@ if (!function_exists('webapp_editor_images_run')) {
     function webapp_editor_images_on_bbs_delete_all($wrIds, $board = null): void
     {
         $boTable = webapp_editor_images_board_table($board);
-        webapp_editor_images_run(static function () use ($wrIds, $boTable) {
+        $keep = webapp_editor_images_keeps_history($board);
+        webapp_editor_images_run(static function () use ($wrIds, $boTable, $keep) {
             foreach ((array) $wrIds as $wrId) {
+                if ($keep) {
+                    api_editor_keep_attached('write', $boTable, (int) $wrId);
+                }
                 api_editor_delete_attached('write', $boTable, (int) $wrId, true);
             }
         });

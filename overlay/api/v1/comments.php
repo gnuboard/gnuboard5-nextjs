@@ -437,6 +437,8 @@ if ($apiMethod === 'PATCH') {
             [$wr_content, $now, $commentId]
         );
     }
+    // 본문에서 뺀 사진은 이 댓글에서 뗀다 — 며칠 뒤 정리된다(api/lib/editor-uploads.php).
+    api_editor_release_removed(api_editor_target('write', (int) $commentId, (int) $comment['wr_parent'], $bo_table), $wr_content);
 
     // 그누보드 훅 — 댓글 수정은 $w = 'cu', $wr_id 는 원글, 부모 댓글 정보는 원본처럼 빈 배열
     // 그누보드 latest() 위젯 캐시를 비운다(원본과 같이 훅 앞에서). 안의 delete_cache_latest 훅도 보호해서 부른다.

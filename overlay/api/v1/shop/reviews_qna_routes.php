@@ -108,6 +108,8 @@ if ($qnaAction !== '' && preg_match('/^\d+$/', (string) $qnaAction)) {
          WHERE iq_id = ? AND mb_id = ?",
         [$iq_subject, $iq_question, $iq_secret, $iq_email, $iq_hp, $iqId, $member['mb_id']]
     );
+    // 본문에서 뺀 사진은 이 문의에서 뗀다 — 며칠 뒤 정리된다(api/lib/editor-uploads.php).
+    api_editor_release_removed(api_editor_target('item_qa', $iqId), $iq_question);
     if (function_exists('run_event')) {
         api_run_event('shop_item_qa_updated', array($iqId, (string) ($qna['it_id'] ?? '')), $member);
     }
